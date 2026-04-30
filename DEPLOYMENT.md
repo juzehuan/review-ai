@@ -1,6 +1,20 @@
 # 生产环境部署指南
 
-只暴露 1 个端口（80），DB / Redis / API 全部走内部网络。Web 容器内置 nginx 反代 `/api` 到 API 服务。
+只暴露 1 个端口（默认 **5201**），DB / Redis / API 全部走内部网络。Web 容器内置 nginx 反代 `/api` 到 API 服务。
+
+## 与其它 Docker 服务的隔离性
+
+- **Project name 固定为 `review-ai`**：所有容器、网络、数据卷都以这个前缀命名，不会和别的栈撞名
+- **数据库零冲突**：Postgres 不绑定主机端口，只在 `review-ai_backend` 桥接网络内可达，主机或其它 Docker 栈里的数据库完全互相看不见
+- **数据卷独立**：`review-ai_postgres_data` / `review-ai_redis_data`，删除时只动这两个，别的栈数据不受影响
+- **唯一需要避开的就是主机端口 5201**。冲突时改 `.env.production` 里 `WEB_PORT` 即可
+
+验证主机端口占用：
+
+```bash
+ss -lntp | grep 5201   # Linux
+lsof -iTCP:5201 -sTCP:LISTEN   # macOS
+```
 
 ## 前置要求
 

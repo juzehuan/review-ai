@@ -4,10 +4,13 @@
 #   编辑 .env.production 填入实际密钥
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 #
-# 公开端口：仅 80（Web + /api 反代）。Postgres / Redis 不对外暴露。
-# 数据持久化：postgres_data 卷。
+# 公开端口：仅 WEB_PORT（默认 5201）。Postgres / Redis / API 不对外暴露。
+# 与其它 Docker 服务隔离：固定 project name = review-ai，自有网络 + 数据卷，不会污染其它栈。
+# 数据持久化：postgres_data + redis_data 卷。
 # 日志轮转：每个容器单文件 ≤ 10MB，最多 5 份。
 # 自动重启：除非手动 stop。
+
+name: review-ai
 
 x-logging: &default-logging
   driver: json-file
@@ -109,7 +112,7 @@ services:
     image: review-ai-web:prod
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-80}:80"
+      - "${WEB_PORT:-5201}:80"
     depends_on:
       api:
         condition: service_healthy

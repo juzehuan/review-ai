@@ -113,7 +113,7 @@ action_up() {
 
   local web_port
   web_port=$(grep -E '^WEB_PORT=' "$ENV_FILE" | cut -d= -f2 | tr -d ' "' || echo "")
-  web_port=${web_port:-80}
+  web_port=${web_port:-5201}
 
   echo -e "${C_GREEN}${C_BOLD}╔════════════════════════════════════════╗${C_RESET}"
   echo -e "${C_GREEN}${C_BOLD}║   Review AI Platform 部署成功 🎉      ║${C_RESET}"

@@ -33,8 +33,12 @@ chmod +x deploy.sh
 
 启动后访问：
 
-- 主页：`http://<服务器IP>/`
-- AI 配置：`http://<服务器IP>/settings`（首次进入选择服务商 + 填 API Key + 选模型即可开始分析）
+- 主页：`http://<服务器IP>:5201/`
+- AI 配置：`http://<服务器IP>:5201/settings`（首次进入选择服务商 + 填 API Key + 选模型即可开始分析）
+
+> 默认 Web 端口为 **5201**，避开 80/8080。需要修改可在 `.env.production` 改 `WEB_PORT`。
+>
+> **与其它 Docker 服务隔离**：Postgres / Redis / API 都不对主机暴露端口，跑在自己的 `review-ai_backend` 网络和 `review-ai_postgres_data` / `review-ai_redis_data` 卷里。即使服务器上跑着别的 Postgres 或 Docker 栈，也不会冲突或互相干扰。
 
 更多运维命令（停止、重启、备份、更新）见 `./deploy.sh help`。
 
