@@ -93,7 +93,7 @@ docker compose up -d --build
 ## 文档
 
 - 详细部署 / 运维 / HTTPS 配置 / 备份：[DEPLOYMENT.md](./DEPLOYMENT.md)
-- 评论采集浏览器插件（独立仓库）：用于从 Shopee TH / Lazada TH / TikTok Shop TH 商品页抓评论导出 CSV，配合本平台使用
+- 评论采集浏览器插件：[review-exporter](https://github.com/juzehuan/review-exporter) — 从 Shopee TH / Lazada TH / TikTok Shop TH 商品页抓评论导出 CSV，配合本平台使用
 
 ## License
 
