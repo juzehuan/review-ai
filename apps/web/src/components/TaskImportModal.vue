@@ -26,8 +26,8 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from "vue";
-import { message } from "ant-design-vue";
+import { reactive, ref, h } from "vue";
+import { message, Modal } from "ant-design-vue";
 import { importTask } from "@/api";
 
 defineProps<{ open: boolean }>();
@@ -63,7 +63,21 @@ async function submit() {
       sourceChannel: form.sourceChannel,
       file: form.file
     });
-    message.success(`导入成功，共 ${result.reviewCount} 条评论。`);
+    const totalDropped = result.droppedEmpty + result.droppedDuplicate + result.droppedByDb;
+    if (totalDropped > 0) {
+      Modal.info({
+        title: `导入完成：写入 ${result.reviewCount} / 共 ${result.csvTotal} 条`,
+        content: h("div", null, [
+          h("p", null, `CSV 解析行数：${result.csvTotal}`),
+          h("p", null, `已写入数据库：${result.reviewCount}`),
+          h("p", { style: "color:#d46b08" }, `因评论内容为空跳过：${result.droppedEmpty}`),
+          h("p", { style: "color:#d46b08" }, `因 cmtId 在 CSV 内重复跳过：${result.droppedDuplicate}`),
+          h("p", { style: "color:#d46b08" }, `因数据库唯一索引兜底跳过：${result.droppedByDb}`)
+        ])
+      });
+    } else {
+      message.success(`导入成功，共 ${result.reviewCount} 条评论。`);
+    }
     emit("success", result.taskId);
     emit("close");
   } catch (error: unknown) {

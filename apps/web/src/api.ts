@@ -2,6 +2,7 @@ import axios from "axios";
 import type {
   AiConfigDTO,
   AnalysisRunDTO,
+  AppendImportResponse,
   DashboardDTO,
   ImportTaskResponse,
   ReviewRowDTO,
@@ -35,13 +36,7 @@ export async function importTask(payload: {
 export async function appendImport(taskId: string, file: File) {
   const formData = new FormData();
   formData.append("file", file);
-  const { data } = await api.post<{
-    taskId: string;
-    importId: string;
-    totalRows: number;
-    newRows: number;
-    skippedRows: number;
-  }>(`/tasks/${taskId}/import`, formData);
+  const { data } = await api.post<AppendImportResponse>(`/tasks/${taskId}/import`, formData);
   return data;
 }
 

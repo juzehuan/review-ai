@@ -131,6 +131,23 @@ export interface ImportTaskResponse {
   taskId: string;
   importId: string;
   reviewCount: number;
+  csvTotal: number;
+  droppedEmpty: number;
+  droppedDuplicate: number;
+  droppedByDb: number;
+}
+
+export interface AppendImportResponse {
+  taskId: string;
+  importId: string;
+  totalRows: number;
+  newRows: number;
+  skippedRows: number;
+  csvTotal: number;
+  droppedEmpty: number;
+  droppedExisting: number;
+  droppedDuplicate: number;
+  droppedByDb: number;
 }
 
 export interface AiProviderPreset {

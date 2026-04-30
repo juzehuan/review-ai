@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   }
 
   const rawContent = await file.text();
-  const parsedRows = parseShopeeCsv(rawContent);
+  const { rows: parsedRows, stats } = parseShopeeCsv(rawContent);
 
   if (!parsedRows.length) {
     return fail("CSV 没有可导入的数据");
@@ -50,9 +50,11 @@ export async function POST(request: Request) {
     });
 
     const existing = new Set<string>();
+    let droppedDuplicate = 0;
     const createManyData = parsedRows
       .filter((row) => {
         if (existing.has(row.cmtId)) {
+          droppedDuplicate += 1;
           return false;
         }
         existing.add(row.cmtId);
@@ -74,7 +76,7 @@ export async function POST(request: Request) {
         rawJson: row.rawJson as Prisma.InputJsonValue
       }));
 
-    await tx.review.createMany({
+    const inserted = await tx.review.createMany({
       data: createManyData,
       skipDuplicates: true
     });
@@ -82,7 +84,11 @@ export async function POST(request: Request) {
     return {
       taskId: task.id,
       importId: importRecord.id,
-      reviewCount: createManyData.length
+      reviewCount: inserted.count,
+      csvTotal: stats.totalParsed,
+      droppedEmpty: stats.droppedEmpty,
+      droppedDuplicate,
+      droppedByDb: createManyData.length - inserted.count
     } satisfies ImportTaskResponse;
   });
 

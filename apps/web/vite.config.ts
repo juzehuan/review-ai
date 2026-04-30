@@ -5,6 +5,7 @@ import path from "node:path";
 export default defineConfig({
   plugins: [vue()],
   resolve: {
+    extensions: [".mts", ".ts", ".tsx", ".mjs", ".js", ".jsx", ".json"],
     alias: {
       "@": path.resolve(__dirname, "./src")
     }

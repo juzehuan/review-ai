@@ -90,23 +90,42 @@
           <template #icon><DownloadOutlined /></template>
           导出 CSV
         </a-button>
-        <!-- 分析中：进度条 + 停止按钮 -->
-        <template v-if="latestRun && ['queued', 'running'].includes(latestRun.status)">
+        <!-- 分析中：详细进度 + 停止按钮 -->
+        <template v-if="latestRun && analysisProgress && ['queued', 'running'].includes(latestRun.status)">
           <div class="analysis-progress-block">
             <div class="analysis-progress-label">
               <a-tag :color="runStatusColor(latestRun.status)">{{ runStatusLabel(latestRun.status) }}</a-tag>
               <span class="progress-text">
-                已分析 {{ latestRun.successCount + latestRun.failedCount }} / {{ latestRun.reviewCount || '?' }} 条
+                {{ analysisProgress.processed }} / {{ analysisProgress.total }} 条 ({{ analysisProgress.percent }}%)
               </span>
             </div>
             <a-progress
-              :percent="latestRun.reviewCount
-                ? Math.round((latestRun.successCount + latestRun.failedCount) / latestRun.reviewCount * 100)
-                : 0"
+              :percent="analysisProgress.percent"
               :status="latestRun.status === 'running' ? 'active' : 'normal'"
               size="small"
-              style="width: 260px"
+              style="width: 280px"
             />
+            <div class="analysis-progress-meta">
+              <span class="meta-success">✓ 成功 {{ analysisProgress.success }}</span>
+              <span class="meta-failed">✗ 失败 {{ analysisProgress.failed }}</span>
+              <span class="meta-remaining">剩 {{ analysisProgress.remaining }}</span>
+              <span v-if="analysisProgress.ratePerMin !== null" class="meta-rate">
+                · {{ analysisProgress.ratePerMin }} 条/分
+              </span>
+              <span class="meta-time">
+                · 已用 {{ formatDuration(analysisProgress.elapsedSec) }}
+                <template v-if="analysisProgress.etaSec !== null">
+                  · 剩 {{ formatDuration(analysisProgress.etaSec) }}
+                </template>
+              </span>
+            </div>
+            <a-tooltip
+              v-if="latestRun.failedCount > 0 && latestRun.lastError"
+              :title="latestRun.lastError"
+              placement="bottomRight"
+            >
+              <div class="analysis-progress-error">⚠ 最近错误：{{ latestRun.lastError.slice(0, 60) }}{{ latestRun.lastError.length > 60 ? '…' : '' }}</div>
+            </a-tooltip>
           </div>
           <a-popconfirm
             title="确认停止当前分析任务？已分析的结果会保留。"
@@ -310,8 +329,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
-import { message } from "ant-design-vue";
+import { computed, h, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { Modal, message } from "ant-design-vue";
 import {
   CloseOutlined,
   DownloadOutlined,
@@ -323,7 +342,7 @@ import {
 } from "@ant-design/icons-vue";
 import type { AnalysisRunDTO, ReviewRowDTO, Sentiment } from "@review-ai/shared";
 import { buildExportUrl, cancelRun, createRun, fetchReviews, fetchRuns } from "@/api";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 type PaginationConfig = { current?: number; pageSize?: number; total?: number };
 type SorterConfig = { field?: string; order?: "ascend" | "descend" };
@@ -367,7 +386,10 @@ type GroupRow = {
 const DEFAULT_VIEW_ID = "all-comments";
 
 const route = useRoute();
+const router = useRouter();
 const taskId = computed(() => route.params.taskId as string);
+const nowTick = ref(Date.now());
+let nowTimer: ReturnType<typeof setInterval> | null = null;
 const loading = ref(false);
 const running = ref(false);
 const stopping = ref(false);
@@ -633,6 +655,10 @@ function stopPolling() {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+  if (nowTimer) {
+    clearInterval(nowTimer);
+    nowTimer = null;
+  }
 }
 
 async function loadRuns() {
@@ -656,10 +682,55 @@ async function loadRuns() {
         }
       }, 2000);
     }
+    if (!nowTimer) {
+      nowTick.value = Date.now();
+      nowTimer = setInterval(() => { nowTick.value = Date.now(); }, 1000);
+    }
   } else {
     running.value = false;
     stopPolling();
   }
+}
+
+const analysisProgress = computed(() => {
+  const run = latestRun.value;
+  if (!run) return null;
+  const total = run.reviewCount || 0;
+  const success = run.successCount || 0;
+  const failed = run.failedCount || 0;
+  const processed = success + failed;
+  const remaining = Math.max(0, total - processed);
+  const percent = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+
+  let elapsedSec = 0;
+  let etaSec: number | null = null;
+  let ratePerMin: number | null = null;
+  if (run.startedAt) {
+    const startMs = new Date(run.startedAt).getTime();
+    elapsedSec = Math.max(0, Math.round((nowTick.value - startMs) / 1000));
+    if (processed > 0 && elapsedSec > 0) {
+      const ratePerSec = processed / elapsedSec;
+      ratePerMin = Math.round(ratePerSec * 60);
+      if (remaining > 0 && ratePerSec > 0) {
+        etaSec = Math.round(remaining / ratePerSec);
+      } else {
+        etaSec = 0;
+      }
+    }
+  }
+
+  return { total, success, failed, processed, remaining, percent, elapsedSec, etaSec, ratePerMin };
+});
+
+function formatDuration(seconds: number | null) {
+  if (seconds === null || seconds === undefined) return "—";
+  if (seconds < 60) return `${seconds} 秒`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m < 60) return s ? `${m} 分 ${s} 秒` : `${m} 分`;
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return mm ? `${h} 时 ${mm} 分` : `${h} 时`;
 }
 
 async function loadReviews() {
@@ -712,9 +783,25 @@ async function runAnalysis() {
     await createRun(taskId.value);
     message.success("分析任务已提交，系统会自动轮询状态。");
     await loadRuns();
-  } catch {
+  } catch (err: unknown) {
     running.value = false;
-    message.error("发起分析失败。");
+    const resp = (err as { response?: { status?: number; data?: { message?: string; code?: string } } })?.response;
+    const code = resp?.data?.code;
+    const msg = resp?.data?.message;
+    if (code === "ai_config_missing") {
+      Modal.confirm({
+        title: "AI 模型尚未配置",
+        content: h("div", null, [
+          h("p", null, msg || "请先在「AI 设置」中配置模型 API Key 与模型名称。"),
+          h("p", { style: "color:#8c8c8c;font-size:12px;margin-top:8px" }, "配置完成后回到此页面再次点击「发起分析」即可。")
+        ]),
+        okText: "去 AI 设置",
+        cancelText: "稍后再说",
+        onOk: () => router.push("/settings")
+      });
+    } else {
+      message.error(msg || "发起分析失败。");
+    }
   }
 }
 
@@ -797,6 +884,30 @@ onBeforeUnmount(stopPolling);
   font-size: 13px;
   color: #516079;
   font-weight: 500;
+}
+
+.analysis-progress-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: #7b8494;
+}
+.analysis-progress-meta .meta-success { color: #389e0d; font-weight: 600; }
+.analysis-progress-meta .meta-failed { color: #cf1322; font-weight: 600; }
+.analysis-progress-meta .meta-remaining { color: #1d39c4; font-weight: 600; }
+.analysis-progress-meta .meta-rate,
+.analysis-progress-meta .meta-time { color: #7b8494; }
+
+.analysis-progress-error {
+  font-size: 12px;
+  color: #cf1322;
+  background: rgba(255, 241, 240, 0.7);
+  border: 1px solid rgba(255, 204, 199, 0.7);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: help;
 }
 
 .analysis-status-block {

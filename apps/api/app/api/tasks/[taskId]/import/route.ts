@@ -18,7 +18,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
   }
 
   const rawContent = await file.text();
-  const parsedRows = parseShopeeCsv(rawContent);
+  const { rows: parsedRows, stats } = parseShopeeCsv(rawContent);
 
   if (!parsedRows.length) {
     return fail("CSV 没有可导入的数据");
@@ -40,9 +40,18 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
   });
 
   const seen = new Set<string>();
+  let droppedExisting = 0;
+  let droppedDuplicate = 0;
   const newRows = parsedRows
     .filter((row) => {
-      if (existingCmtIds.has(row.cmtId) || seen.has(row.cmtId)) return false;
+      if (existingCmtIds.has(row.cmtId)) {
+        droppedExisting += 1;
+        return false;
+      }
+      if (seen.has(row.cmtId)) {
+        droppedDuplicate += 1;
+        return false;
+      }
       seen.add(row.cmtId);
       return true;
     })
@@ -62,15 +71,20 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       rawJson: row.rawJson as Prisma.InputJsonValue
     }));
 
-  await prisma.review.createMany({ data: newRows, skipDuplicates: true });
+  const inserted = await prisma.review.createMany({ data: newRows, skipDuplicates: true });
 
   return ok(
     {
       taskId,
       importId: importRecord.id,
       totalRows: parsedRows.length,
-      newRows: newRows.length,
-      skippedRows: parsedRows.length - newRows.length
+      newRows: inserted.count,
+      skippedRows: parsedRows.length - inserted.count,
+      csvTotal: stats.totalParsed,
+      droppedEmpty: stats.droppedEmpty,
+      droppedExisting,
+      droppedDuplicate,
+      droppedByDb: newRows.length - inserted.count
     },
     201
   );

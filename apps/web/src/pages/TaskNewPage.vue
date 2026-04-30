@@ -102,9 +102,9 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { reactive, ref, h } from "vue";
 import { useRouter } from "vue-router";
-import { message } from "ant-design-vue";
+import { message, Modal } from "ant-design-vue";
 import {
   CloudUploadOutlined,
   FileTextOutlined,
@@ -154,8 +154,24 @@ async function submit() {
       sourceChannel: form.sourceChannel,
       file: form.file
     });
-    message.success(`导入成功，共 ${result.reviewCount} 条评论。`);
-    router.push(`/tasks/${result.taskId}/dashboard`);
+    const totalDropped = result.droppedEmpty + result.droppedDuplicate + result.droppedByDb;
+    if (totalDropped > 0) {
+      Modal.info({
+        title: `导入完成：写入 ${result.reviewCount} / 共 ${result.csvTotal} 条`,
+        content: h("div", null, [
+          h("p", null, `CSV 解析行数：${result.csvTotal}`),
+          h("p", null, `已写入数据库：${result.reviewCount}`),
+          h("p", { style: "color:#d46b08" }, `因评论内容为空跳过：${result.droppedEmpty}`),
+          h("p", { style: "color:#d46b08" }, `因 cmtId 在 CSV 内重复跳过：${result.droppedDuplicate}`),
+          h("p", { style: "color:#d46b08" }, `因数据库唯一索引兜底跳过：${result.droppedByDb}`)
+        ]),
+        okText: "去看任务看板",
+        onOk: () => router.push(`/tasks/${result.taskId}/dashboard`)
+      });
+    } else {
+      message.success(`导入成功，共 ${result.reviewCount} 条评论。`);
+      router.push(`/tasks/${result.taskId}/dashboard`);
+    }
   } catch (err: unknown) {
     const errMsg =
       typeof err === "object" &&
