@@ -1,0 +1,32 @@
+node_modules
+.pnpm-store
+dist
+.turbo
+.next
+.vite
+coverage
+*.log
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Temp / sample data
+tmp-*
+*.tmp
+backups/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+pnpm-lock.yaml
+apps/api/.next
+apps/web/dist
+packages/db/generated
+
