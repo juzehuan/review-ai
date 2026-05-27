@@ -6,10 +6,14 @@ dist
 .vite
 coverage
 *.log
+*.tsbuildinfo
 .env
 .env.local
-pnpm-lock.yaml
 apps/api/.next
 apps/web/dist
+apps/web/src/**/*.js
+apps/web/src/**/*.d.ts
+!apps/web/src/env.d.ts
+packages/shared/src/**/*.js
+packages/shared/src/**/*.d.ts
 packages/db/generated
-

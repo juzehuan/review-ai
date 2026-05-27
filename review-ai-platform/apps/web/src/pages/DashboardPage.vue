@@ -40,6 +40,11 @@
       </div>
     </div>
 
+    <section v-if="dashboard?.aiSummary" class="ai-summary-card">
+      <div class="panel-label">AI 总结</div>
+      <div class="ai-summary-text">{{ dashboard.aiSummary }}</div>
+    </section>
+
     <div class="summary-grid">
       <div class="stat-card stat-card-primary">
         <div class="stat-label">评论总量</div>
@@ -120,6 +125,20 @@
       <EChartCard title="用户声音词云" :option="wordCloudOption" />
       <EChartCard title="用户问题统计" :option="issueOption" />
     </div>
+    <section v-if="dashboard?.productInsights" class="product-insights-panel">
+      <div class="settings-section-head">
+        <div>
+          <div class="panel-label">Product Insights</div>
+          <div class="settings-section-title">产品洞察报告</div>
+        </div>
+      </div>
+      <div class="product-insights-grid">
+        <article v-for="item in productInsightSections" :key="item.key" class="product-insight-card">
+          <div class="product-insight-title">{{ item.title }}</div>
+          <div class="product-insight-body">{{ item.content }}</div>
+        </article>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -174,6 +193,20 @@ const issueCount = computed(() => dashboard.value?.issues?.length || 0);
 const positivePercent = computed(() => {
   const positive = dashboard.value?.sentimentDistribution?.find((item) => item.sentiment === "positive");
   return positive?.percent || 0;
+});
+const productInsightSections = computed(() => {
+  const insights = dashboard.value?.productInsights;
+  if (!insights) {
+    return [];
+  }
+  return [
+    { key: "userPersonas", title: "用户画像", content: insights.userPersonas },
+    { key: "usageScenarios", title: "使用场景", content: insights.usageScenarios },
+    { key: "sellingPoints", title: "销售卖点", content: insights.sellingPoints },
+    { key: "advantages", title: "产品优势", content: insights.advantages },
+    { key: "improvements", title: "待改进点", content: insights.improvements },
+    { key: "expectations", title: "用户期待", content: insights.expectations }
+  ].filter((item) => item.content);
 });
 
 function sentimentText(sentiment: Sentiment) {

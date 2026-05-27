@@ -91,6 +91,10 @@
             <template #icon><CloudUploadOutlined /></template>
             导入评论
           </a-button>
+          <a-button :disabled="!canWriteWorkspace || !selectedTask" @click="showAppendImport = true">
+            <template #icon><FileAddOutlined /></template>
+            追加评论
+          </a-button>
           <a-dropdown>
             <button type="button" class="account-chip">
               <span class="account-avatar">{{ accountInitial }}</span>
@@ -117,6 +121,12 @@
   </a-layout>
 
   <TaskImportModal :open="showImport" @close="showImport = false" @success="handleImportSuccess" />
+  <TaskImportModal
+    :open="showAppendImport"
+    :append-task="selectedTask"
+    @close="showAppendImport = false"
+    @success="handleImportSuccess"
+  />
 </template>
 
 <script setup lang="ts">
@@ -126,6 +136,7 @@ import {
   BarChartOutlined,
   CloudUploadOutlined,
   CrownOutlined,
+  FileAddOutlined,
   LogoutOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -140,6 +151,7 @@ import { useTaskStore } from "@/composables";
 const router = useRouter();
 const route = useRoute();
 const showImport = ref(false);
+const showAppendImport = ref(false);
 const {
   tasks,
   workspace,

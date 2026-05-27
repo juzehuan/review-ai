@@ -327,6 +327,17 @@ export interface ImportTaskResponse {
   reviewCount: number;
 }
 
+export interface AppendImportResponse {
+  taskId: string;
+  importId: string;
+  totalRows: number;
+  newRows: number;
+  skippedRows: number;
+  droppedExisting: number;
+  droppedDuplicate: number;
+  droppedByDb: number;
+}
+
 type DashboardReviewLike = {
   runId: string;
   reviewId: string;

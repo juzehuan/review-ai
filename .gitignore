@@ -6,8 +6,14 @@ dist/
 .vite/
 coverage/
 *.log
+*.tsbuildinfo
 .env
 .env.local
+review-ai-platform/apps/web/src/**/*.js
+review-ai-platform/apps/web/src/**/*.d.ts
+!review-ai-platform/apps/web/src/env.d.ts
+review-ai-platform/packages/shared/src/**/*.js
+review-ai-platform/packages/shared/src/**/*.d.ts
 apps/api/.next/
 apps/web/dist/
 packages/db/generated/

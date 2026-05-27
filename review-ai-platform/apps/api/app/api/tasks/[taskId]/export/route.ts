@@ -1,0 +1,128 @@
+import { prisma } from "@review-ai/db";
+import { serializeReviewRow } from "@/lib/serializers";
+import { fail } from "@/lib/http";
+import { getWorkspaceContext, requireScopedTask } from "@/lib/workspace";
+
+function escapeCsv(value: unknown) {
+  const text = value == null ? "" : String(value);
+  if (/[",\r\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function toCsvRow(values: unknown[]) {
+  return values.map(escapeCsv).join(",");
+}
+
+export async function GET(request: Request, context: { params: Promise<{ taskId: string }> }) {
+  const { taskId } = await context.params;
+  const workspaceContext = await getWorkspaceContext(request);
+  if (workspaceContext.response || !workspaceContext.workspace) {
+    return workspaceContext.response;
+  }
+
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
+  if (scoped.response || !scoped.task) {
+    return scoped.response;
+  }
+
+  const { searchParams } = new URL(request.url);
+  const sentiment = searchParams.get("sentiment");
+  const ratingStar = Number(searchParams.get("ratingStar") || 0);
+  const keyword = searchParams.get("keyword");
+  const hasMedia = searchParams.get("hasMedia");
+  const variant = searchParams.get("variant");
+
+  const run = await prisma.analysisRun.findFirst({
+    where: { taskId, status: { in: ["completed", "partial_failed"] } },
+    orderBy: { startedAt: "desc" }
+  });
+
+  const reviews = await prisma.review.findMany({
+    where: {
+      taskId,
+      ...(ratingStar ? { ratingStar } : {}),
+      ...(variant ? { modelName: variant } : {}),
+      ...(hasMedia !== null && hasMedia !== "" ? { hasMedia: hasMedia === "true" } : {}),
+      ...(keyword
+        ? {
+            OR: [
+              { comment: { contains: keyword, mode: "insensitive" } },
+              { commentTr: { contains: keyword, mode: "insensitive" } }
+            ]
+          }
+        : {})
+    },
+    include: {
+      task: true,
+      analyses: run
+        ? {
+            where: sentiment ? { runId: run.id, sentiment: sentiment as never } : { runId: run.id },
+            take: 1
+          }
+        : false
+    },
+    orderBy: { commentTime: "desc" }
+  });
+
+  const rows = reviews.map(serializeReviewRow).filter((row) => !sentiment || row.sentiment === sentiment);
+  if (!rows.length) {
+    return fail("当前筛选条件下没有可导出的评论", 404);
+  }
+
+  const header = toCsvRow([
+    "评论ID",
+    "商品名称",
+    "规格",
+    "评分",
+    "评论时间",
+    "反馈渠道",
+    "是否有媒体",
+    "原始评论",
+    "翻译评论",
+    "AI情感",
+    "情感分数",
+    "AI标签",
+    "关键词",
+    "问题点",
+    "亮点",
+    "AI摘要",
+    "AI建议",
+    "需要关注"
+  ]);
+
+  const lines = rows.map((row) =>
+    toCsvRow([
+      row.cmtId,
+      row.productName,
+      row.variantName,
+      row.ratingStar,
+      row.commentTime || "",
+      row.sourceChannel,
+      row.hasMedia ? "是" : "否",
+      row.comment,
+      row.commentTr || "",
+      row.sentiment || "",
+      row.sentimentScore ?? "",
+      row.analysisTags.join("; "),
+      row.keywords.join("; "),
+      row.painPoints.join("; "),
+      row.highlights.join("; "),
+      row.summary || "",
+      row.suggestion || "",
+      row.needsAttention ? "是" : "否"
+    ])
+  );
+
+  const csv = `\uFEFF${[header, ...lines].join("\n")}`;
+  const filename = encodeURIComponent(`${scoped.task.name}-reviews.csv`);
+
+  return new Response(csv, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename*=UTF-8''${filename}`
+    }
+  });
+}

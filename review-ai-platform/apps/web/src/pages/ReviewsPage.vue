@@ -18,10 +18,23 @@
           <template #icon><RobotOutlined /></template>
           发起分析
         </a-button>
+        <a-button v-if="canCancelRun" danger @click="cancelAnalysis">
+          <template #icon><StopOutlined /></template>
+          停止分析
+        </a-button>
         <a-tag :color="runStatusColor(latestRun?.status)">
           {{ latestRun ? `最新分析：${runStatusLabel(latestRun.status)}` : "尚未分析" }}
         </a-tag>
       </a-space>
+    </div>
+
+    <div v-if="latestRun" class="analysis-progress-panel">
+      <div class="analysis-progress-head">
+        <span>{{ runStatusLabel(latestRun.status) }}</span>
+        <span>{{ latestRun.successCount }}/{{ latestRun.reviewCount || 0 }} 完成，{{ latestRun.failedCount }} 失败</span>
+      </div>
+      <a-progress :percent="progressPercent" :status="progressStatus" />
+      <div v-if="latestRun.lastError" class="analysis-progress-error">{{ latestRun.lastError }}</div>
     </div>
 
     <div class="view-strip">
@@ -104,6 +117,10 @@
         <a-button @click="saveCurrentView">
           <template #icon><SaveOutlined /></template>
           保存视图
+        </a-button>
+        <a-button @click="handleExport" :loading="exporting">
+          <template #icon><DownloadOutlined /></template>
+          导出当前结果
         </a-button>
         <a-button @click="setCurrentAsDefault" :disabled="!activeViewId">
           <template #icon><StarOutlined /></template>
@@ -214,15 +231,17 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 import {
+  DownloadOutlined,
   ReloadOutlined,
   RobotOutlined,
   SaveOutlined,
   SearchOutlined,
   SettingOutlined,
-  StarOutlined
+  StarOutlined,
+  StopOutlined
 } from "@ant-design/icons-vue";
 import type { AnalysisRunDTO, ReviewRowDTO, Sentiment } from "@review-ai/shared";
-import { createRun, fetchReviews, fetchRuns } from "@/api";
+import { cancelRun, createRun, exportReviews, fetchReviews, fetchRuns } from "@/api";
 import { useTaskStore } from "@/composables";
 
 type PaginationConfig = {
@@ -272,6 +291,7 @@ const running = ref(false);
 const rows = ref<ReviewRowDTO[]>([]);
 const latestRun = ref<AnalysisRunDTO | null>(null);
 const selectedRow = ref<ReviewRowDTO | null>(null);
+const exporting = ref(false);
 const saveViewModalOpen = ref(false);
 const pendingViewName = ref("");
 const activeViewId = ref<string>("");
@@ -320,6 +340,22 @@ const totalCount = computed(() => pagination.total || 0);
 const mediaCount = computed(() => rows.value.filter((item) => item.hasMedia).length);
 const negativeCount = computed(() => rows.value.filter((item) => item.sentiment === "negative").length);
 const visibleColumns = computed(() => allColumns.filter((column) => visibleColumnKeys.value.includes(column.key)));
+const canCancelRun = computed(() => Boolean(latestRun.value && ["queued", "running"].includes(latestRun.value.status)));
+const progressPercent = computed(() => {
+  if (!latestRun.value?.reviewCount) {
+    return 0;
+  }
+  return Math.min(Math.round((latestRun.value.successCount / latestRun.value.reviewCount) * 100), 100);
+});
+const progressStatus = computed(() => {
+  if (latestRun.value?.status === "failed") {
+    return "exception";
+  }
+  if (latestRun.value?.status === "completed") {
+    return "success";
+  }
+  return "active";
+});
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 const applyingSavedView = ref(false);
@@ -644,6 +680,49 @@ async function runAnalysis() {
   } catch {
     running.value = false;
     message.error("发起分析失败。");
+  }
+}
+
+async function cancelAnalysis() {
+  if (!selectedTask.value || !latestRun.value) {
+    return;
+  }
+
+  try {
+    latestRun.value = await cancelRun(selectedTask.value.id, latestRun.value.id);
+    running.value = false;
+    stopPolling();
+    message.success("分析已停止。");
+  } catch {
+    message.error("停止分析失败，请稍后重试。");
+  }
+}
+
+async function handleExport() {
+  if (!selectedTask.value) {
+    return;
+  }
+
+  exporting.value = true;
+  try {
+    const { blob, filename } = await exportReviews(selectedTask.value.id, {
+      ratingStar: filters.ratingStar,
+      sentiment: filters.sentiment,
+      hasMedia: filters.hasMedia,
+      keyword: filters.keyword || undefined
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename || `${selectedTask.value.name}-reviews.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    message.error("导出失败，当前筛选条件可能没有评论。");
+  } finally {
+    exporting.value = false;
   }
 }
 

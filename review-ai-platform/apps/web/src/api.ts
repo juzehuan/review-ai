@@ -3,6 +3,7 @@ import type {
   AdminOverviewDTO,
   AdminWorkspaceDTO,
   AnalysisRunDTO,
+  AppendImportResponse,
   AuthResponseDTO,
   DashboardDTO,
   ImportTaskResponse,
@@ -192,6 +193,13 @@ export async function importTask(payload: {
   return data;
 }
 
+export async function appendImport(taskId: string, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await api.post<AppendImportResponse>(`/tasks/${taskId}/import`, formData);
+  return data;
+}
+
 export async function fetchTask(taskId: string) {
   const { data } = await api.get(`/tasks/${taskId}`);
   return data;
@@ -210,6 +218,14 @@ export async function fetchReviews(taskId: string, params: Record<string, string
   return data;
 }
 
+export async function exportReviews(taskId: string, params: Record<string, string | number | boolean | undefined>) {
+  const { data, headers } = await api.get<Blob>(`/tasks/${taskId}/export`, {
+    params,
+    responseType: "blob"
+  });
+  return { blob: data, filename: parseContentDispositionFilename(headers["content-disposition"]) };
+}
+
 export async function createRun(taskId: string) {
   const { data } = await api.post<AnalysisRunDTO>(`/tasks/${taskId}/analysis-runs`, {
     promptVersion: "v2-thai"
@@ -220,4 +236,21 @@ export async function createRun(taskId: string) {
 export async function fetchRuns(taskId: string) {
   const { data } = await api.get<AnalysisRunDTO[]>(`/tasks/${taskId}/analysis-runs`);
   return data;
+}
+
+export async function cancelRun(taskId: string, runId: string) {
+  const { data } = await api.patch<AnalysisRunDTO>(`/tasks/${taskId}/analysis-runs/${runId}`, { action: "cancel" });
+  return data;
+}
+
+function parseContentDispositionFilename(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+  const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+  const asciiMatch = value.match(/filename="?([^";]+)"?/i);
+  return asciiMatch?.[1] || null;
 }
