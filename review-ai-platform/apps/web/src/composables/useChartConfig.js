@@ -1,0 +1,163 @@
+// 统一配色系统
+export const CHART_COLORS = {
+    positive: ["#34d399", "#059669"],
+    neutral: ["#fbbf24", "#d97706"],
+    negative: ["#f87171", "#dc2626"],
+    primary: ["#6a82fb", "#4f46e5"],
+    accent: ["#ffb15e", "#f97316"],
+    cyan: ["#67e8f9", "#0891b2"],
+    violet: ["#a78bfa", "#7c3aed"],
+    series: [
+        "#6a82fb",
+        "#ffb15e",
+        "#34d399",
+        "#f87171",
+        "#67e8f9",
+        "#a78bfa",
+        "#fbbf24",
+        "#4ade80"
+    ]
+};
+// 统一Tooltip样式
+export const getTooltip = (trigger = "axis") => ({
+    trigger,
+    backgroundColor: "rgba(255, 255, 255, 0.96)",
+    borderColor: "rgba(229, 234, 244, 0.9)",
+    borderWidth: 1,
+    textStyle: {
+        color: "#243042",
+        fontSize: 13,
+        fontWeight: 500
+    },
+    padding: [12, 16],
+    extraCssText: "border-radius: 12px; box-shadow: 0 12px 34px rgba(26, 38, 64, 0.14); backdrop-filter: blur(12px)"
+});
+// 统一Legend样式
+export const getLegend = (options) => ({
+    textStyle: {
+        color: "#6d7788",
+        fontSize: 13,
+        fontWeight: 500
+    },
+    itemGap: 20,
+    itemWidth: 12,
+    itemHeight: 12,
+    ...options
+});
+// 统一X轴样式
+export const getXAxis = (options) => ({
+    type: "category",
+    axisLine: {
+        lineStyle: {
+            color: "#e5eaf4"
+        }
+    },
+    axisTick: {
+        show: false
+    },
+    axisLabel: {
+        color: "#7b8494",
+        fontSize: 12,
+        fontWeight: 500,
+        interval: 0
+    },
+    ...options
+});
+// 统一Y轴样式
+export const getYAxis = (options) => ({
+    type: "value",
+    axisLine: {
+        show: false
+    },
+    axisTick: {
+        show: false
+    },
+    axisLabel: {
+        color: "#8a93a2",
+        fontSize: 12,
+        fontWeight: 500
+    },
+    splitLine: {
+        lineStyle: {
+            color: "#f0f3f9",
+            type: "dashed"
+        }
+    },
+    ...options
+});
+// 统一Grid样式
+export const getGrid = (options) => ({
+    left: 50,
+    right: 30,
+    top: 60,
+    bottom: 50,
+    ...options
+});
+// 柱状图渐变色
+export const getBarGradient = (color = CHART_COLORS.primary[0], colorEnd = CHART_COLORS.primary[1]) => ({
+    type: "linear",
+    x: 0,
+    y: 0,
+    x2: 0,
+    y2: 1,
+    colorStops: [
+        { offset: 0, color },
+        { offset: 1, color: colorEnd }
+    ]
+});
+// 饼图扇区配置
+export const getPieItem = (radius = ["48%", "72%"]) => ({
+    type: "pie",
+    radius,
+    center: ["50%", "52%"],
+    itemStyle: {
+        borderRadius: 12,
+        borderColor: "#fff",
+        borderWidth: 3
+    },
+    label: {
+        show: true,
+        formatter: "{b}",
+        color: "#516079",
+        fontSize: 13,
+        fontWeight: 600
+    },
+    labelLine: {
+        show: true,
+        length: 18,
+        length2: 10,
+        lineStyle: {
+            color: "#cbd5e1"
+        }
+    },
+    emphasis: {
+        scale: true,
+        scaleSize: 8,
+        itemStyle: {
+            shadowBlur: 20,
+            shadowOffsetX: 0,
+            shadowColor: "rgba(0, 0, 0, 0.15)"
+        },
+        label: {
+            fontSize: 14,
+            fontWeight: 700
+        }
+    }
+});
+// 情感分析配色
+export const getSentimentColors = () => ({
+    positive: CHART_COLORS.positive[0],
+    neutral: CHART_COLORS.neutral[0],
+    negative: CHART_COLORS.negative[0]
+});
+// 词云配色
+export const getWordCloudColors = () => [
+    "#6a82fb",
+    "#ffb15e",
+    "#34d399",
+    "#67e8f9",
+    "#a78bfa",
+    "#f87171",
+    "#fbbf24",
+    "#4ade80"
+];

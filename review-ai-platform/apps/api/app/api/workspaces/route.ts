@@ -1,0 +1,84 @@
+import { prisma } from "@review-ai/db";
+import { requireAuthenticated } from "@/lib/auth";
+import { fail, ok } from "@/lib/http";
+import { serializeMyWorkspace } from "@/lib/serializers";
+
+function slugify(value: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  return slug || `workspace-${Date.now()}`;
+}
+
+export async function GET(request: Request) {
+  const auth = await requireAuthenticated(request);
+  if (auth.response || !auth.user) {
+    return auth.response;
+  }
+
+  const memberships = await prisma.workspaceMember.findMany({
+    where: { userId: auth.user.id },
+    orderBy: { createdAt: "asc" },
+    include: {
+      workspace: {
+        include: { subscription: true }
+      }
+    }
+  });
+
+  return ok(memberships.map(serializeMyWorkspace));
+}
+
+export async function POST(request: Request) {
+  const auth = await requireAuthenticated(request);
+  if (auth.response || !auth.user) {
+    return auth.response;
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const name = String(body.name || "").trim();
+  const slug = slugify(String(body.slug || name));
+
+  if (!name) {
+    return fail("空间名称不能为空");
+  }
+
+  const workspace = await prisma.workspace.create({
+    data: {
+      name,
+      slug: `${slug}-${Date.now().toString(36)}`,
+      ownerUserId: auth.user.id,
+      subscription: { create: {} },
+      memberships: {
+        create: {
+          userId: auth.user.id,
+          role: "owner"
+        }
+      }
+    },
+    include: {
+      subscription: true,
+      memberships: {
+        where: { userId: auth.user.id },
+        take: 1
+      }
+    }
+  });
+
+  return ok(
+    {
+      id: workspace.id,
+      slug: workspace.slug,
+      name: workspace.name,
+      planTier: workspace.subscription?.planTier || "free",
+      monthlyReviewLimit: workspace.subscription?.monthlyReviewLimit || 0,
+      monthlyRunLimit: workspace.subscription?.monthlyRunLimit || 0,
+      currentPeriodReviewCount: workspace.subscription?.currentPeriodReviewCount || 0,
+      currentPeriodRunCount: workspace.subscription?.currentPeriodRunCount || 0,
+      role: workspace.memberships[0]?.role || "owner"
+    },
+    201
+  );
+}

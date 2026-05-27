@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Shopee TH Review Exporter",
+  "version": "0.1.0",
+  "description": "Collect review data from Shopee Thailand product pages and export it as JSON or CSV.",
+  "permissions": [
+    "downloads",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://shopee.co.th/*"
+  ],
+  "action": {
+    "default_title": "Shopee TH Review Exporter",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://shopee.co.th/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "page-bridge.js"
+      ],
+      "matches": [
+        "https://shopee.co.th/*"
+      ]
+    }
+  ]
+}

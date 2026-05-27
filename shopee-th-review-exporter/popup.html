@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shopee TH Review Exporter</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <section class="card">
+        <h1>Shopee TH Review Exporter</h1>
+        <p id="pageHint" class="hint">Open a Shopee Thailand product detail page first.</p>
+
+        <div class="stats">
+          <div class="stat">
+            <span class="label">Status</span>
+            <span id="statusText" class="value">Idle</span>
+          </div>
+          <div class="stat">
+            <span class="label">Reviews</span>
+            <span id="reviewCount" class="value">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Pages</span>
+            <span id="pageCount" class="value">0</span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="startBtn" class="primary">Start</button>
+          <button id="stopBtn">Stop</button>
+        </div>
+
+        <div class="actions">
+          <button id="jsonBtn">Export JSON</button>
+          <button id="csvBtn">Export CSV</button>
+        </div>
+
+        <div class="actions">
+          <button id="clearBtn" class="ghost">Clear Data</button>
+        </div>
+
+        <pre id="logBox" class="log">Waiting for page data...</pre>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

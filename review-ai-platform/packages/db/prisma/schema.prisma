@@ -1,0 +1,261 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TaskStatus {
+  draft
+  imported
+  analyzing
+  completed
+  failed
+}
+
+enum ImportStatus {
+  pending
+  completed
+  failed
+}
+
+enum RunStatus {
+  queued
+  running
+  completed
+  partial_failed
+  failed
+}
+
+enum Sentiment {
+  positive
+  neutral
+  negative
+}
+
+enum MemberRole {
+  owner
+  admin
+  analyst
+  viewer
+}
+
+enum PlanTier {
+  free
+  pro
+  business
+}
+
+model User {
+  id           String            @id @default(cuid())
+  email        String            @unique
+  name         String
+  passwordHash String?           @map("password_hash")
+  avatarUrl    String?           @map("avatar_url")
+  isSuperAdmin Boolean           @default(false) @map("is_super_admin")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  memberships  WorkspaceMember[]
+  sessions     AuthSession[]
+
+  @@map("user_account")
+}
+
+model AuthSession {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_session")
+}
+
+model Workspace {
+  id             String            @id @default(cuid())
+  slug           String            @unique
+  name           String
+  ownerUserId    String?           @map("owner_user_id")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  tasks          Task[]
+  memberships    WorkspaceMember[]
+  subscription   Subscription?
+  aiSetting      WorkspaceAiSetting?
+
+  @@map("workspace")
+}
+
+model WorkspaceAiSetting {
+  id                 String    @id @default(cuid())
+  workspaceId        String    @unique @map("workspace_id")
+  provider           String    @default("openai")
+  apiKey             String?   @map("api_key")
+  baseUrl            String?   @map("base_url")
+  modelName          String    @default("gpt-4.1-mini") @map("model_name")
+  promptVersion      String    @default("v2-thai") @map("prompt_version")
+  systemPrompt       String    @map("system_prompt")
+  userPromptTemplate String    @map("user_prompt_template")
+  summaryPrompt      String    @default("") @map("summary_prompt")
+  insightsPrompt     String    @default("") @map("insights_prompt")
+  temperature        Float     @default(0.2)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_ai_setting")
+}
+
+model WorkspaceMember {
+  id           String     @id @default(cuid())
+  workspaceId  String     @map("workspace_id")
+  userId       String     @map("user_id")
+  role         MemberRole @default(analyst)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_member")
+}
+
+model Subscription {
+  id                            String    @id @default(cuid())
+  workspaceId                   String    @unique @map("workspace_id")
+  planTier                      PlanTier  @default(pro) @map("plan_tier")
+  monthlyReviewLimit            Int       @default(20000) @map("monthly_review_limit")
+  monthlyRunLimit               Int       @default(200) @map("monthly_run_limit")
+  currentPeriodReviewCount      Int       @default(0) @map("current_period_review_count")
+  currentPeriodRunCount         Int       @default(0) @map("current_period_run_count")
+  currentPeriodStartedAt        DateTime  @default(now()) @map("current_period_started_at")
+  currentPeriodEndsAt           DateTime? @map("current_period_ends_at")
+  workspace                     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("subscription")
+}
+
+model Task {
+  id              String         @id @default(cuid())
+  workspaceId     String?        @map("workspace_id")
+  name            String
+  shopId          String         @map("shop_id")
+  itemId          String         @map("item_id")
+  productName     String         @map("product_name")
+  sourceChannel   String         @map("source_channel")
+  status          TaskStatus     @default(draft)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  workspace       Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  importRecords   ImportRecord[]
+  reviews         Review[]
+  analysisRuns    AnalysisRun[]
+
+  @@index([workspaceId])
+  @@map("task")
+}
+
+model ImportRecord {
+  id          String       @id @default(cuid())
+  taskId      String       @map("task_id")
+  filename    String
+  rawContent  String       @map("raw_content")
+  rowCount    Int          @default(0) @map("row_count")
+  status      ImportStatus @default(pending)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  reviews     Review[]
+
+  @@map("import_record")
+}
+
+model Review {
+  id            String           @id @default(cuid())
+  taskId        String           @map("task_id")
+  importId      String           @map("import_id")
+  cmtId         String           @map("cmt_id")
+  shopId        String           @map("shop_id")
+  itemId        String           @map("item_id")
+  ratingStar    Int              @map("rating_star")
+  comment       String
+  commentTr     String?          @map("comment_tr")
+  modelName     String?          @map("model_name")
+  hasMedia      Boolean          @default(false) @map("has_media")
+  commentTime   DateTime?        @map("comment_time")
+  sourceChannel String           @map("source_channel")
+  rawJson       Json             @map("raw_json")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  task          Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  importRecord  ImportRecord     @relation(fields: [importId], references: [id], onDelete: Cascade)
+  analyses      ReviewAnalysis[]
+
+  @@unique([taskId, cmtId])
+  @@map("review")
+}
+
+model AnalysisRun {
+  id                String           @id @default(cuid())
+  taskId            String           @map("task_id")
+  provider          String
+  modelName         String           @map("model_name")
+  promptVersion     String           @map("prompt_version")
+  status            RunStatus        @default(queued)
+  reviewCount       Int              @default(0) @map("review_count")
+  successCount      Int              @default(0) @map("success_count")
+  failedCount       Int              @default(0) @map("failed_count")
+  lastError         String?          @map("last_error")
+  dashboardSnapshot Json?            @map("dashboard_snapshot")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  startedAt         DateTime?        @map("started_at")
+  finishedAt        DateTime?        @map("finished_at")
+  task              Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  reviewAnalyses    ReviewAnalysis[]
+  issueStats        IssueStat[]
+  tagStats          TagStat[]
+
+  @@map("analysis_run")
+}
+
+model ReviewAnalysis {
+  id             String      @id @default(cuid())
+  runId          String      @map("run_id")
+  reviewId       String      @map("review_id")
+  sentiment      Sentiment
+  sentimentScore Float       @map("sentiment_score")
+  topicLabels    String[]    @map("topic_labels")
+  keywords       String[]
+  summary        String
+  painPoints     String[]    @map("pain_points")
+  highlights     String[]
+  suggestion     String
+  needsAttention Boolean     @default(false) @map("needs_attention")
+  rawModelOutput String      @map("raw_model_output")
+  run            AnalysisRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  review         Review      @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, reviewId])
+  @@map("review_analysis")
+}
+
+model IssueStat {
+  id              String      @id @default(cuid())
+  runId           String      @map("run_id")
+  issueName       String      @map("issue_name")
+  count           Int
+  sampleReviewIds String[]    @map("sample_review_ids")
+  run             AnalysisRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@map("issue_stat")
+}
+
+model TagStat {
+  id      String      @id @default(cuid())
+  runId   String      @map("run_id")
+  tagName String      @map("tag_name")
+  count   Int
+  run     AnalysisRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@map("tag_stat")
+}

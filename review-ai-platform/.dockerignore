@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+.git
+.turbo
+.next
+dist
+coverage
+*.log
+packages/db/prisma/bootstrap.sql
+apps/api/tsconfig.tsbuildinfo
+apps/web/node_modules
+apps/worker/node_modules
+packages/shared/dist
+packages/db/dist
