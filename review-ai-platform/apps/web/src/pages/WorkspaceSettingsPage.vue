@@ -179,9 +179,21 @@
             {{ record.currentPeriodReviewCount }}/{{ record.monthlyReviewLimit }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button size="small" :disabled="record.slug === workspace?.slug" @click="switchTo(record.slug)">
-              切换
-            </a-button>
+            <a-space>
+              <a-button size="small" :disabled="record.slug === workspace?.slug" @click="switchTo(record.slug)">
+                切换
+              </a-button>
+              <a-popconfirm
+                title="确定删除这个工作空间吗？"
+                description="删除后空间内的任务、评论、分析结果和成员关系都会被移除。"
+                ok-text="删除"
+                cancel-text="取消"
+                placement="left"
+                @confirm="removeWorkspace(record.id)"
+              >
+                <a-button size="small" danger :disabled="!canDeleteWorkspace(record)">删除</a-button>
+              </a-popconfirm>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -223,6 +235,7 @@ import {
 import type { MemberRole, WorkspaceAiSettingDTO, WorkspaceCrawlerSettingDTO } from "@review-ai/shared";
 import {
   createWorkspace,
+  deleteWorkspace,
   fetchWorkspaceAiSettings,
   fetchWorkspaceCrawlerSettings,
   updateWorkspaceAiSettings,
@@ -234,6 +247,7 @@ const { workspace, workspaces, currentUser, refreshTasks, switchWorkspace } = us
 const route = useRoute();
 const modalOpen = ref(false);
 const saving = ref(false);
+const deletingWorkspaceId = ref("");
 const loadingAi = ref(false);
 const savingAi = ref(false);
 const savingCrawler = ref(false);
@@ -327,7 +341,7 @@ const columns = [
   { title: "角色", key: "role", width: 140 },
   { title: "套餐", dataIndex: "planTier", key: "planTier", width: 120 },
   { title: "评论用量", key: "usage", width: 180 },
-  { title: "操作", key: "action", width: 120 }
+  { title: "操作", key: "action", width: 180 }
 ];
 
 function assignAiForm(data: WorkspaceAiSettingDTO) {
@@ -429,6 +443,32 @@ async function saveCrawlerSettings() {
 async function switchTo(slug: string) {
   await switchWorkspace(slug);
   message.success("空间已切换");
+}
+
+function canDeleteWorkspace(record: { id: string; role: MemberRole }) {
+  if (deletingWorkspaceId.value === record.id || workspaces.value.length <= 1) {
+    return false;
+  }
+  return Boolean(currentUser.value?.isSuperAdmin || record.role === "owner");
+}
+
+async function removeWorkspace(workspaceId: string) {
+  deletingWorkspaceId.value = workspaceId;
+  try {
+    const target = workspaces.value.find((item) => item.id === workspaceId);
+    await deleteWorkspace(workspaceId);
+    const nextWorkspace = workspaces.value.find((item) => item.id !== workspaceId);
+    if (nextWorkspace) {
+      await switchWorkspace(nextWorkspace.slug);
+    } else {
+      await refreshTasks();
+    }
+    message.success(`工作空间「${target?.name || "已选空间"}」已删除`);
+  } catch {
+    message.error("删除工作空间失败，请检查权限或稍后重试");
+  } finally {
+    deletingWorkspaceId.value = "";
+  }
 }
 
 async function submit() {

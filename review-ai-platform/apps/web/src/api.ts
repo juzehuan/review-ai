@@ -120,6 +120,11 @@ export async function createWorkspace(payload: { name: string; slug?: string }) 
   return data;
 }
 
+export async function deleteWorkspace(workspaceId: string) {
+  const { data } = await api.delete<{ success: boolean }>(`/workspaces/${workspaceId}`);
+  return data;
+}
+
 export async function fetchWorkspaceMembers() {
   const { data } = await api.get<WorkspaceMemberDTO[]>("/workspace/members");
   return data;
