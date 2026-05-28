@@ -7,6 +7,8 @@ dist/
 coverage/
 *.log
 *.tsbuildinfo
+__pycache__/
+*.py[cod]
 .env
 .env.local
 review-ai-platform/apps/web/src/**/*.js
