@@ -2,16 +2,16 @@
   <div class="review-page">
     <div class="page-toolbar dashboard-toolbar">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">空间设置</div>
-        <div class="toolbar-subtitle">管理当前租户空间、模型策略和分析提示词。</div>
+        <div class="toolbar-title">{{ pageTitle }}</div>
+        <div class="toolbar-subtitle">{{ pageSubtitle }}</div>
       </div>
       <a-space wrap>
         <a-button @click="loadAiSettings" :loading="loadingAi">刷新</a-button>
-        <a-button type="primary" @click="modalOpen = true">新建空间</a-button>
+        <a-button v-if="activeSection === 'workspace'" type="primary" @click="modalOpen = true">新建空间</a-button>
       </a-space>
     </div>
 
-    <div class="settings-grid">
+    <div v-if="activeSection === 'workspace'" class="settings-grid">
       <section class="settings-panel">
         <div class="panel-label">当前空间</div>
         <div class="settings-title">{{ workspace?.name || "-" }}</div>
@@ -34,7 +34,7 @@
       </section>
     </div>
 
-    <div class="settings-layout">
+    <div v-if="activeSection === 'ai'" class="settings-layout">
       <section class="settings-panel settings-panel-wide">
         <div class="settings-section-head">
           <div>
@@ -111,6 +111,9 @@
         </div>
       </section>
 
+    </div>
+
+    <div v-if="activeSection === 'crawler'" class="settings-layout settings-layout-single">
       <section class="settings-panel settings-panel-wide">
         <div class="settings-section-head">
           <div>
@@ -162,7 +165,7 @@
       </section>
     </div>
 
-    <div class="table-shell">
+    <div v-if="activeSection === 'workspace'" class="table-shell">
       <a-table :columns="columns" :data-source="workspaces" row-key="id" :pagination="false">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
@@ -207,6 +210,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { message } from "ant-design-vue";
 import {
   AI_PROVIDER_PRESETS,
@@ -227,6 +231,7 @@ import {
 import { useTaskStore } from "@/composables";
 
 const { workspace, workspaces, currentUser, refreshTasks, switchWorkspace } = useTaskStore();
+const route = useRoute();
 const modalOpen = ref(false);
 const saving = ref(false);
 const loadingAi = ref(false);
@@ -264,6 +269,33 @@ const crawlerForm = reactive<WorkspaceCrawlerSettingDTO>({
 });
 
 const currentRole = computed(() => workspaces.value.find((item) => item.slug === workspace.value?.slug)?.role || null);
+const activeSection = computed<"workspace" | "ai" | "crawler">(() => {
+  if (route.path.endsWith("/ai")) {
+    return "ai";
+  }
+  if (route.path.endsWith("/crawler")) {
+    return "crawler";
+  }
+  return "workspace";
+});
+const pageTitle = computed(() => {
+  if (activeSection.value === "ai") {
+    return "AI 设置";
+  }
+  if (activeSection.value === "crawler") {
+    return "爬虫设置";
+  }
+  return "空间设置";
+});
+const pageSubtitle = computed(() => {
+  if (activeSection.value === "ai") {
+    return "配置当前空间的模型供应商、接口密钥和评论分析提示词。";
+  }
+  if (activeSection.value === "crawler") {
+    return "配置当前空间的 Scrapling 评论抓取渠道、代理、Cookie 和默认抓取参数。";
+  }
+  return "管理当前租户空间、成员角色视图和额度使用情况。";
+});
 const canEditAi = computed(() => {
   return Boolean(currentUser.value?.isSuperAdmin || currentRole.value === "owner" || currentRole.value === "admin");
 });

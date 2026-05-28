@@ -17,7 +17,10 @@ export const router = createRouter({
     { path: "/dashboard", component: DashboardPage },
     { path: "/reviews", component: ReviewsPage },
     { path: "/users", component: UserManagementPage },
-    { path: "/settings", component: WorkspaceSettingsPage },
+    { path: "/settings", redirect: "/settings/workspace" },
+    { path: "/settings/workspace", component: WorkspaceSettingsPage },
+    { path: "/settings/ai", component: WorkspaceSettingsPage },
+    { path: "/settings/crawler", component: WorkspaceSettingsPage },
     { path: "/admin", component: AdminPage }
   ]
 });

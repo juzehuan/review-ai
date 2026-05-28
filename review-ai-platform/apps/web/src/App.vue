@@ -31,18 +31,25 @@
       </div>
 
       <nav class="side-nav">
-        <button
-          v-for="item in navItems"
-          :key="item.path"
-          type="button"
-          class="side-nav-item"
-          :class="{ active: route.path === item.path, disabled: item.disabled }"
-          :disabled="item.disabled"
-          @click="router.push(item.path)"
-        >
-          <component :is="item.icon" />
-          <span>{{ item.label }}</span>
-        </button>
+        <div v-for="section in navSections" :key="section.label" class="side-nav-section">
+          <div class="side-nav-group" :class="{ active: sectionActive(section) }">
+            <component :is="section.icon" />
+            <span>{{ section.label }}</span>
+          </div>
+          <div class="side-nav-children">
+            <button
+              v-for="item in section.items"
+              :key="item.path"
+              type="button"
+              class="side-nav-subitem"
+              :class="{ active: route.path === item.path, disabled: item.disabled }"
+              :disabled="item.disabled"
+              @click="router.push(item.path)"
+            >
+              <span>{{ item.label }}</span>
+            </button>
+          </div>
+        </div>
       </nav>
 
       <div class="current-project">
@@ -137,6 +144,7 @@ import {
   CloudUploadOutlined,
   CrownOutlined,
   FileAddOutlined,
+  FolderOpenOutlined,
   LogoutOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -189,15 +197,36 @@ const canWriteWorkspace = computed(() => {
   );
 });
 
-const navItems = computed(() => [
-  { path: "/dashboard", label: "经营看板", icon: BarChartOutlined, disabled: false },
-  { path: "/reviews", label: "评论工作台", icon: TableOutlined, disabled: false },
-  ...(canManageUsers.value ? [{ path: "/users", label: "用户管理", icon: TeamOutlined, disabled: false }] : []),
-  ...(currentUser.value?.isSuperAdmin
-    ? [{ path: "/admin", label: "超管后台", icon: CrownOutlined, disabled: false }]
-    : []),
-  { path: "/settings", label: "空间设置", icon: SettingOutlined, disabled: false }
-]);
+type NavItem = { path: string; label: string; disabled: boolean };
+type NavSection = { label: string; icon: unknown; items: NavItem[] };
+
+const navSections = computed<NavSection[]>(() => [
+  {
+    label: "工作台",
+    icon: FolderOpenOutlined,
+    items: [
+      { path: "/dashboard", label: "经营看板", disabled: false },
+      { path: "/reviews", label: "评论工作台", disabled: false }
+    ]
+  },
+  {
+    label: "管理",
+    icon: TeamOutlined,
+    items: [
+      ...(canManageUsers.value ? [{ path: "/users", label: "用户管理", disabled: false }] : []),
+      ...(currentUser.value?.isSuperAdmin ? [{ path: "/admin", label: "超管后台", disabled: false }] : [])
+    ]
+  },
+  {
+    label: "设置",
+    icon: SettingOutlined,
+    items: [
+      { path: "/settings/workspace", label: "空间设置", disabled: false },
+      { path: "/settings/ai", label: "AI 设置", disabled: false },
+      { path: "/settings/crawler", label: "爬虫设置", disabled: false }
+    ]
+  }
+].filter((section) => section.items.length));
 
 const isPublicRoute = computed(() => Boolean(route.meta.public));
 const currentTitle = computed(() => {
@@ -210,8 +239,14 @@ const currentTitle = computed(() => {
   if (route.path === "/admin") {
     return "超管后台";
   }
-  if (route.path === "/settings") {
+  if (route.path === "/settings/workspace") {
     return "空间设置";
+  }
+  if (route.path === "/settings/ai") {
+    return "AI 设置";
+  }
+  if (route.path === "/settings/crawler") {
+    return "爬虫设置";
   }
   return "经营看板";
 });
@@ -265,6 +300,10 @@ function runStatusColor(status?: string | null) {
     return "error";
   }
   return "default";
+}
+
+function sectionActive(section: NavSection) {
+  return section.items.some((item) => item.path === route.path);
 }
 
 async function handleImportSuccess(taskId: string) {
