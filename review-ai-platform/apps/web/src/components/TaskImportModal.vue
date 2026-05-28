@@ -52,6 +52,9 @@
           <a-form-item label="最多抓取条数">
             <a-input-number v-model:value="form.maxReviews" :min="1" :max="1000" class="full-input" />
           </a-form-item>
+          <a-form-item label="抓取渠道">
+            <a-select v-model:value="form.crawlChannels" mode="multiple" :options="crawlerChannelOptions" />
+          </a-form-item>
         </template>
         <a-form-item v-else label="评论文件">
           <a-upload-dragger
@@ -81,7 +84,7 @@ import { message } from "ant-design-vue";
 import type { UploadProps } from "ant-design-vue";
 import { InboxOutlined } from "@ant-design/icons-vue";
 import { appendImport, crawlTask, fetchWorkspaceCrawlerSettings, importTask } from "@/api";
-import type { TaskListItem } from "@review-ai/shared";
+import { CRAWLER_CHANNEL_PRESETS, type CrawlerChannel, type TaskListItem } from "@review-ai/shared";
 
 const props = defineProps<{ open: boolean; appendTask?: TaskListItem | null }>();
 const emit = defineEmits<{
@@ -99,8 +102,14 @@ const form = reactive({
   sourceChannel: "Shopee",
   productUrl: "",
   maxReviews: 200,
+  crawlChannels: ["api_exporter", "api_basic"] as CrawlerChannel[],
   file: null as File | null
 });
+
+const crawlerChannelOptions = CRAWLER_CHANNEL_PRESETS.map((channel) => ({
+  label: channel.label,
+  value: channel.id
+}));
 
 function isSupportedFile(file: File) {
   const name = file.name.toLowerCase();
@@ -139,6 +148,7 @@ function resetForm() {
   form.sourceChannel = "Shopee";
   form.productUrl = "";
   form.maxReviews = 200;
+  form.crawlChannels = ["api_exporter", "api_basic"];
   importMode.value = "file";
   removeFile();
 }
@@ -152,6 +162,7 @@ async function loadCrawlerDefaults() {
     const setting = await fetchWorkspaceCrawlerSettings();
     form.sourceChannel = setting.defaultSourceChannel || "Shopee";
     form.maxReviews = setting.defaultMaxReviews || 200;
+    form.crawlChannels = setting.crawlChannels.length ? setting.crawlChannels : ["api_exporter", "api_basic"];
   } catch {
     // 导入弹窗仍然可以使用手工填写值，设置加载失败时不阻塞导入。
   } finally {
@@ -183,6 +194,10 @@ async function submit() {
     message.error("请填写商品链接。");
     return;
   }
+  if (!props.appendTask && importMode.value === "crawl" && !form.crawlChannels.length) {
+    message.error("请至少选择一个抓取渠道。");
+    return;
+  }
 
   loading.value = true;
   try {
@@ -196,7 +211,8 @@ async function submit() {
         productName: form.productName,
         sourceChannel: form.sourceChannel,
         productUrl: form.productUrl,
-        maxReviews: form.maxReviews
+        maxReviews: form.maxReviews,
+        crawlChannels: form.crawlChannels
       });
       message.success(`抓取成功：导入 ${result.reviewCount} 条评论。`);
       emit("success", result.taskId);

@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { Prisma, prisma } from "@review-ai/db";
-import type { CrawlTaskResponse } from "@review-ai/shared";
-import { defaultCrawlerSetting } from "@/lib/crawler-settings";
+import type { CrawlTaskResponse, CrawlerChannel } from "@review-ai/shared";
+import { defaultCrawlerSetting, parseCrawlerChannels } from "@/lib/crawler-settings";
 import { fail, ok } from "@/lib/http";
 import { assertReviewQuota, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -21,6 +21,8 @@ type CrawledReview = {
 
 type CrawlResult = {
   source: string;
+  crawlChannel?: string;
+  crawlChannelLabel?: string;
   productUrl: string;
   productName: string;
   shopId: string;
@@ -33,6 +35,7 @@ type ResolvedCrawlerSetting = {
   pythonBin: string;
   proxyUrl: string | null;
   shopeeCookie: string | null;
+  crawlChannels: CrawlerChannel[];
   defaultSourceChannel: string;
   defaultMaxReviews: number;
   requestTimeoutSec: number;
@@ -41,9 +44,20 @@ type ResolvedCrawlerSetting = {
 function runScraplingCrawler(productUrl: string, maxReviews: number, setting: ResolvedCrawlerSetting) {
   return new Promise<CrawlResult>((resolve, reject) => {
     const scriptPath = path.resolve(process.cwd(), "../../apps/crawler/scrapling_reviews.py");
-    const args = [scriptPath, "--url", productUrl, "--max-reviews", String(maxReviews)];
+    const args = [
+      scriptPath,
+      "--url",
+      productUrl,
+      "--max-reviews",
+      String(maxReviews),
+      "--timeout",
+      String(setting.requestTimeoutSec)
+    ];
     if (setting.proxyUrl) {
       args.push("--proxy", setting.proxyUrl);
+    }
+    if (setting.crawlChannels.length) {
+      args.push("--channels", setting.crawlChannels.join(","));
     }
     const child = spawn(setting.pythonBin, args, {
       cwd: process.cwd(),
@@ -110,12 +124,17 @@ export async function POST(request: Request) {
     pythonBin: storedCrawlerSetting?.pythonBin || defaultSetting.pythonBin,
     proxyUrl: storedCrawlerSetting?.proxyUrl || defaultSetting.proxyUrl,
     shopeeCookie: storedCrawlerSetting?.shopeeCookie || process.env.SHOPEE_COOKIE || null,
+    crawlChannels: parseCrawlerChannels(storedCrawlerSetting?.crawlChannels || defaultSetting.crawlChannels.join(",")),
     defaultSourceChannel: storedCrawlerSetting?.defaultSourceChannel || defaultSetting.defaultSourceChannel,
     defaultMaxReviews: storedCrawlerSetting?.defaultMaxReviews || defaultSetting.defaultMaxReviews,
     requestTimeoutSec: storedCrawlerSetting?.requestTimeoutSec || defaultSetting.requestTimeoutSec
   };
   const sourceChannel = String(body.sourceChannel || crawlerSetting.defaultSourceChannel).trim();
   const maxReviews = Math.min(Math.max(Number(body.maxReviews || crawlerSetting.defaultMaxReviews), 1), 1000);
+  const bodyChannels = Array.isArray(body.crawlChannels) ? parseCrawlerChannels(body.crawlChannels.join(",")) : null;
+  if (bodyChannels?.length) {
+    crawlerSetting.crawlChannels = bodyChannels;
+  }
 
   if (!productUrl) {
     return fail("请填写商品链接");
@@ -208,6 +227,8 @@ export async function POST(request: Request) {
       importId: importRecord.id,
       reviewCount: inserted.count,
       productUrl,
+      crawlChannel: crawlResult.crawlChannel || null,
+      crawlChannelLabel: crawlResult.crawlChannelLabel || null,
       fetchedRows: crawlResult.rows.length,
       skippedDuplicate
     } satisfies CrawlTaskResponse;

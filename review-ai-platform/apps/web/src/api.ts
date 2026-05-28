@@ -16,7 +16,8 @@ import type {
   WorkspaceAiSettingDTO,
   WorkspaceCrawlerSettingDTO,
   WorkspaceDTO,
-  WorkspaceMemberDTO
+  WorkspaceMemberDTO,
+  CrawlerChannel
 } from "@review-ai/shared";
 
 const api = axios.create({
@@ -218,6 +219,7 @@ export async function crawlTask(payload: {
   sourceChannel: string;
   productUrl: string;
   maxReviews: number;
+  crawlChannels?: CrawlerChannel[];
 }) {
   const { data } = await api.post<CrawlTaskResponse>("/tasks/crawl", payload);
   return data;

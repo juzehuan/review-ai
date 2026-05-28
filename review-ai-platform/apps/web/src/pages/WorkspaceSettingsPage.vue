@@ -138,6 +138,14 @@
               :placeholder="crawlerForm.shopeeCookieSet ? `已保存（${crawlerForm.shopeeCookie || '已隐藏'}），输入新 Cookie 可替换` : '可选，用于减少风控拦截'"
             />
           </a-form-item>
+          <a-form-item label="抓取渠道">
+            <a-checkbox-group v-model:value="crawlerForm.crawlChannels" :disabled="!canEditAi" class="crawler-channel-list">
+              <a-checkbox v-for="channel in CRAWLER_CHANNEL_PRESETS" :key="channel.id" :value="channel.id">
+                <span class="channel-title">{{ channel.label }}</span>
+                <span class="channel-desc">{{ channel.description }}</span>
+              </a-checkbox>
+            </a-checkbox-group>
+          </a-form-item>
           <a-form-item label="默认来源渠道">
             <a-input v-model:value="crawlerForm.defaultSourceChannel" :disabled="!canEditAi" placeholder="Shopee" />
           </a-form-item>
@@ -202,6 +210,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 import {
   AI_PROVIDER_PRESETS,
+  CRAWLER_CHANNEL_PRESETS,
   DEFAULT_INSIGHTS_PROMPT,
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_SYSTEM_PROMPT,
@@ -247,6 +256,7 @@ const crawlerForm = reactive<WorkspaceCrawlerSettingDTO>({
   proxyUrl: null,
   shopeeCookie: null,
   shopeeCookieSet: false,
+  crawlChannels: ["api_exporter", "api_basic", "browser_intercept"],
   defaultSourceChannel: "Shopee",
   defaultMaxReviews: 200,
   requestTimeoutSec: 180,
@@ -309,6 +319,7 @@ function assignCrawlerForm(data: WorkspaceCrawlerSettingDTO) {
   crawlerForm.proxyUrl = data.proxyUrl;
   crawlerForm.shopeeCookie = data.shopeeCookie;
   crawlerForm.shopeeCookieSet = data.shopeeCookieSet;
+  crawlerForm.crawlChannels = data.crawlChannels;
   crawlerForm.defaultSourceChannel = data.defaultSourceChannel;
   crawlerForm.defaultMaxReviews = data.defaultMaxReviews;
   crawlerForm.requestTimeoutSec = data.requestTimeoutSec;
@@ -368,6 +379,10 @@ async function saveAiSettings() {
 }
 
 async function saveCrawlerSettings() {
+  if (!crawlerForm.crawlChannels.length) {
+    message.error("请至少选择一个抓取渠道");
+    return;
+  }
   savingCrawler.value = true;
   try {
     assignCrawlerForm(await updateWorkspaceCrawlerSettings({ ...crawlerForm }));

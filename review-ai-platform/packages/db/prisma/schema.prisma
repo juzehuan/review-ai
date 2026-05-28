@@ -117,6 +117,7 @@ model WorkspaceCrawlerSetting {
   pythonBin            String    @default("python") @map("python_bin")
   proxyUrl             String?   @map("proxy_url")
   shopeeCookie         String?   @map("shopee_cookie")
+  crawlChannels        String    @default("api_exporter,api_basic,browser_intercept") @map("crawl_channels")
   defaultSourceChannel String    @default("Shopee") @map("default_source_channel")
   defaultMaxReviews    Int       @default(200) @map("default_max_reviews")
   requestTimeoutSec    Int       @default(180) @map("request_timeout_sec")

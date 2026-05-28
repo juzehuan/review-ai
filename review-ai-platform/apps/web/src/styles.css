@@ -775,6 +775,33 @@ select {
   font-size: 13px;
 }
 
+.crawler-channel-list {
+  display: grid;
+  gap: 10px;
+}
+
+.crawler-channel-list .ant-checkbox-wrapper {
+  align-items: flex-start;
+  margin-inline-start: 0;
+  padding: 10px;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+}
+
+.channel-title {
+  display: block;
+  color: #172033;
+  font-weight: 800;
+}
+
+.channel-desc {
+  display: block;
+  margin-top: 3px;
+  color: #697386;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .table-title {
   padding: 4px 4px 14px;
 }

@@ -1,5 +1,5 @@
 import { prisma } from "@review-ai/db";
-import { defaultCrawlerSetting, serializeCrawlerSetting } from "@/lib/crawler-settings";
+import { defaultCrawlerSetting, serializeCrawlerChannels, serializeCrawlerSetting } from "@/lib/crawler-settings";
 import { fail, ok } from "@/lib/http";
 import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -40,9 +40,13 @@ export async function PATCH(request: Request) {
     typeof body.shopeeCookie === "string" && body.shopeeCookie.trim() && !body.shopeeCookie.includes("*")
       ? body.shopeeCookie.trim()
       : undefined;
+  const crawlChannels = serializeCrawlerChannels(body.crawlChannels);
 
   if (!pythonBin || !defaultSourceChannel) {
     return fail("请填写 Python 命令和默认来源渠道");
+  }
+  if (!crawlChannels) {
+    return fail("请至少选择一个抓取渠道");
   }
 
   const setting = await prisma.workspaceCrawlerSetting.upsert({
@@ -52,6 +56,7 @@ export async function PATCH(request: Request) {
       pythonBin,
       proxyUrl,
       ...(shopeeCookie !== undefined ? { shopeeCookie } : {}),
+      crawlChannels,
       defaultSourceChannel,
       defaultMaxReviews,
       requestTimeoutSec
@@ -62,6 +67,7 @@ export async function PATCH(request: Request) {
       pythonBin,
       proxyUrl,
       shopeeCookie,
+      crawlChannels,
       defaultSourceChannel,
       defaultMaxReviews,
       requestTimeoutSec
@@ -70,4 +76,3 @@ export async function PATCH(request: Request) {
 
   return ok(serializeCrawlerSetting(setting));
 }
-

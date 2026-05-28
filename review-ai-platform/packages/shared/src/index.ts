@@ -90,11 +90,38 @@ export interface WorkspaceCrawlerSettingDTO {
   proxyUrl: string | null;
   shopeeCookie: string | null;
   shopeeCookieSet: boolean;
+  crawlChannels: CrawlerChannel[];
   defaultSourceChannel: string;
   defaultMaxReviews: number;
   requestTimeoutSec: number;
   updatedAt: string | null;
 }
+
+export type CrawlerChannel = "api_exporter" | "api_basic" | "browser_intercept";
+
+export interface CrawlerChannelPreset {
+  id: CrawlerChannel;
+  label: string;
+  description: string;
+}
+
+export const CRAWLER_CHANNEL_PRESETS: CrawlerChannelPreset[] = [
+  {
+    id: "api_exporter",
+    label: "增强接口",
+    description: "复用 shopee-th-review-exporter 的评论接口参数，速度快，默认优先使用。"
+  },
+  {
+    id: "api_basic",
+    label: "基础接口",
+    description: "使用最小 get_ratings 参数，作为增强接口失败后的轻量回退。"
+  },
+  {
+    id: "browser_intercept",
+    label: "浏览器拦截",
+    description: "启动 Scrapling 浏览器，监听页面 fetch/xhr 并点击分页，最接近扩展抓取方式。"
+  }
+];
 
 export interface AiProviderPreset {
   id: string;
@@ -352,6 +379,8 @@ export interface AppendImportResponse {
 
 export interface CrawlTaskResponse extends ImportTaskResponse {
   productUrl: string;
+  crawlChannel: CrawlerChannel | string | null;
+  crawlChannelLabel: string | null;
   fetchedRows: number;
   skippedDuplicate: number;
 }
