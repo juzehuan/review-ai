@@ -2,58 +2,128 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: review_ai
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-review_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "15432:5432"
+      - "${POSTGRES_PORT:-15432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-review_ai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   redis:
     image: redis:7-alpine
     ports:
-      - "16379:6379"
+      - "${REDIS_PORT:-16379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
-  api:
+  migrate:
+    image: review-ai-api:latest
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/review_ai
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-review_ai}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin@reviewiq.local}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-Admin@123456}
+      DEFAULT_ADMIN_NAME: ${DEFAULT_ADMIN_NAME:-Super Admin}
+      DEFAULT_WORKSPACE_NAME: ${DEFAULT_WORKSPACE_NAME:-Admin Workspace}
+      DEFAULT_WORKSPACE_SLUG: ${DEFAULT_WORKSPACE_SLUG:-admin-workspace}
+    command: ["sh", "-c", "pnpm db:migrate && pnpm --filter @review-ai/db exec node scripts/seed-admin.mjs"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: review-ai-api:latest
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-review_ai}
       REDIS_URL: redis://redis:6379
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
       ENABLE_MOCK_AI: ${ENABLE_MOCK_AI:-true}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      VOLC_ARK_API_KEY: ${VOLC_ARK_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
+      SCRAPLING_ENABLED: ${SCRAPLING_ENABLED:-true}
+      SCRAPLING_PYTHON_BIN: /opt/review-ai-crawler/bin/python
+      SCRAPLING_PROXY: ${SCRAPLING_PROXY:-}
+      SCRAPLING_CHANNELS: ${SCRAPLING_CHANNELS:-api_exporter,api_basic,browser_intercept}
+      SCRAPLING_DEFAULT_SOURCE: ${SCRAPLING_DEFAULT_SOURCE:-Shopee}
+      SCRAPLING_DEFAULT_MAX_REVIEWS: ${SCRAPLING_DEFAULT_MAX_REVIEWS:-200}
+      SCRAPLING_TIMEOUT_SEC: ${SCRAPLING_TIMEOUT_SEC:-180}
+      SHOPEE_COOKIE: ${SHOPEE_COOKIE:-}
       PORT: 3001
     ports:
-      - "3001:3001"
+      - "${API_PORT:-3001}:3001"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 20
 
   worker:
+    image: review-ai-worker:latest
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/review_ai
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-review_ai}
       REDIS_URL: redis://redis:6379
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
       ENABLE_MOCK_AI: ${ENABLE_MOCK_AI:-true}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      VOLC_ARK_API_KEY: ${VOLC_ARK_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   web:
+    image: review-ai-web:latest
     build:
       context: .
       dockerfile: apps/web/Dockerfile
     ports:
-      - "5173:80"
+      - "${WEB_PORT:-5173}:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
 
 volumes:
   postgres_data:
