@@ -338,6 +338,12 @@ export interface AppendImportResponse {
   droppedByDb: number;
 }
 
+export interface CrawlTaskResponse extends ImportTaskResponse {
+  productUrl: string;
+  fetchedRows: number;
+  skippedDuplicate: number;
+}
+
 type DashboardReviewLike = {
   runId: string;
   reviewId: string;

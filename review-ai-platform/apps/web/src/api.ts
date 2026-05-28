@@ -5,6 +5,7 @@ import type {
   AnalysisRunDTO,
   AppendImportResponse,
   AuthResponseDTO,
+  CrawlTaskResponse,
   DashboardDTO,
   ImportTaskResponse,
   MemberRole,
@@ -197,6 +198,17 @@ export async function appendImport(taskId: string, file: File) {
   const formData = new FormData();
   formData.append("file", file);
   const { data } = await api.post<AppendImportResponse>(`/tasks/${taskId}/import`, formData);
+  return data;
+}
+
+export async function crawlTask(payload: {
+  name: string;
+  productName?: string;
+  sourceChannel: string;
+  productUrl: string;
+  maxReviews: number;
+}) {
+  const { data } = await api.post<CrawlTaskResponse>("/tasks/crawl", payload);
   return data;
 }
 

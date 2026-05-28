@@ -19,6 +19,15 @@
       </div>
 
       <a-form layout="vertical" class="import-form">
+        <a-segmented
+          v-if="!appendTask"
+          v-model:value="importMode"
+          :options="[
+            { label: '文件导入', value: 'file' },
+            { label: '链接抓取', value: 'crawl' }
+          ]"
+          class="import-mode-switch"
+        />
         <a-alert
           v-if="appendTask"
           type="info"
@@ -36,7 +45,15 @@
         <a-form-item v-if="!appendTask" label="来源渠道">
           <a-input v-model:value="form.sourceChannel" placeholder="例如：Shopee / Lazada / Amazon" />
         </a-form-item>
-        <a-form-item label="评论文件">
+        <template v-if="importMode === 'crawl' && !appendTask">
+          <a-form-item label="商品链接">
+            <a-input v-model:value="form.productUrl" placeholder="例如：https://shopee.co.th/xxx-i.123.456" />
+          </a-form-item>
+          <a-form-item label="最多抓取条数">
+            <a-input-number v-model:value="form.maxReviews" :min="1" :max="1000" class="full-input" />
+          </a-form-item>
+        </template>
+        <a-form-item v-else label="评论文件">
           <a-upload-dragger
             name="file"
             :max-count="1"
@@ -63,7 +80,7 @@ import { reactive, ref } from "vue";
 import { message } from "ant-design-vue";
 import type { UploadProps } from "ant-design-vue";
 import { InboxOutlined } from "@ant-design/icons-vue";
-import { appendImport, importTask } from "@/api";
+import { appendImport, crawlTask, importTask } from "@/api";
 import type { TaskListItem } from "@review-ai/shared";
 
 const props = defineProps<{ open: boolean; appendTask?: TaskListItem | null }>();
@@ -74,10 +91,13 @@ const emit = defineEmits<{
 
 const loading = ref(false);
 const fileList = ref<UploadProps["fileList"]>([]);
+const importMode = ref<"file" | "crawl">("file");
 const form = reactive({
   name: "",
   productName: "",
   sourceChannel: "Shopee",
+  productUrl: "",
+  maxReviews: 200,
   file: null as File | null
 });
 
@@ -116,32 +136,50 @@ function resetForm() {
   form.name = "";
   form.productName = "";
   form.sourceChannel = "Shopee";
+  form.productUrl = "";
+  form.maxReviews = 200;
+  importMode.value = "file";
   removeFile();
 }
 
 async function submit() {
-  if (!form.file) {
+  if ((props.appendTask || importMode.value === "file") && !form.file) {
     message.error("请上传评论文件。");
     return;
   }
 
   if (!props.appendTask && (!form.name || !form.productName)) {
-    message.error("请填写项目名称、商品名称并上传评论文件。");
+    message.error("请填写项目名称和商品名称。");
+    return;
+  }
+
+  if (!props.appendTask && importMode.value === "crawl" && !form.productUrl) {
+    message.error("请填写商品链接。");
     return;
   }
 
   loading.value = true;
   try {
     if (props.appendTask) {
-      const result = await appendImport(props.appendTask.id, form.file);
+      const result = await appendImport(props.appendTask.id, form.file!);
       message.success(`追加完成：新增 ${result.newRows} 条，跳过 ${result.skippedRows} 条。`);
+      emit("success", result.taskId);
+    } else if (importMode.value === "crawl") {
+      const result = await crawlTask({
+        name: form.name,
+        productName: form.productName,
+        sourceChannel: form.sourceChannel,
+        productUrl: form.productUrl,
+        maxReviews: form.maxReviews
+      });
+      message.success(`抓取成功：导入 ${result.reviewCount} 条评论。`);
       emit("success", result.taskId);
     } else {
       const result = await importTask({
         name: form.name,
         productName: form.productName,
         sourceChannel: form.sourceChannel,
-        file: form.file
+        file: form.file!
       });
       message.success(`导入成功，共 ${result.reviewCount} 条评论。`);
       emit("success", result.taskId);

@@ -565,6 +565,10 @@ select {
   margin-bottom: 12px;
 }
 
+.import-mode-switch {
+  margin-bottom: 14px;
+}
+
 .chart-header {
   display: flex;
   justify-content: space-between;
