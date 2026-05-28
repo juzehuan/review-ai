@@ -76,11 +76,11 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { reactive, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 import type { UploadProps } from "ant-design-vue";
 import { InboxOutlined } from "@ant-design/icons-vue";
-import { appendImport, crawlTask, importTask } from "@/api";
+import { appendImport, crawlTask, fetchWorkspaceCrawlerSettings, importTask } from "@/api";
 import type { TaskListItem } from "@review-ai/shared";
 
 const props = defineProps<{ open: boolean; appendTask?: TaskListItem | null }>();
@@ -90,6 +90,7 @@ const emit = defineEmits<{
 }>();
 
 const loading = ref(false);
+const loadingCrawlerDefaults = ref(false);
 const fileList = ref<UploadProps["fileList"]>([]);
 const importMode = ref<"file" | "crawl">("file");
 const form = reactive({
@@ -141,6 +142,31 @@ function resetForm() {
   importMode.value = "file";
   removeFile();
 }
+
+async function loadCrawlerDefaults() {
+  if (props.appendTask || loadingCrawlerDefaults.value) {
+    return;
+  }
+  loadingCrawlerDefaults.value = true;
+  try {
+    const setting = await fetchWorkspaceCrawlerSettings();
+    form.sourceChannel = setting.defaultSourceChannel || "Shopee";
+    form.maxReviews = setting.defaultMaxReviews || 200;
+  } catch {
+    // 导入弹窗仍然可以使用手工填写值，设置加载失败时不阻塞导入。
+  } finally {
+    loadingCrawlerDefaults.value = false;
+  }
+}
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open) {
+      loadCrawlerDefaults();
+    }
+  }
+);
 
 async function submit() {
   if ((props.appendTask || importMode.value === "file") && !form.file) {

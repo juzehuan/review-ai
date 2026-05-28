@@ -44,21 +44,21 @@
           <a-tag :color="canEditAi ? 'blue' : 'default'">{{ canEditAi ? "可编辑" : "只读" }}</a-tag>
         </div>
         <a-form layout="vertical" class="settings-form">
-          <a-form-item label="Provider">
+          <a-form-item label="模型供应商">
             <a-select v-model:value="aiForm.provider" :disabled="!canEditAi">
               <a-select-option v-for="provider in AI_PROVIDER_PRESETS" :key="provider.id" :value="provider.id">
                 {{ provider.label }}
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="API Key">
+          <a-form-item label="接口密钥">
             <a-input-password
               v-model:value="aiForm.apiKey"
               :disabled="!canEditAi"
-              :placeholder="aiForm.apiKeySet ? `Saved (${aiForm.apiKey || 'masked'}), enter a new key to replace` : currentProvider?.apiKeyHint || 'API Key'"
+              :placeholder="aiForm.apiKeySet ? `已保存（${aiForm.apiKey || '已隐藏'}），输入新密钥可替换` : currentProvider?.apiKeyHint || 'API Key'"
             />
           </a-form-item>
-          <a-form-item label="Base URL">
+          <a-form-item label="接口地址">
             <a-input
               v-model:value="aiForm.baseUrl"
               :disabled="!canEditAi"
@@ -72,10 +72,10 @@
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="Prompt Version">
+          <a-form-item label="提示词版本">
             <a-input v-model:value="aiForm.promptVersion" :disabled="!canEditAi" placeholder="例如：v2-thai" />
           </a-form-item>
-          <a-form-item label="Temperature">
+          <a-form-item label="随机性">
             <a-input-number v-model:value="aiForm.temperature" :disabled="!canEditAi" :min="0" :max="2" :step="0.1" class="full-input" />
           </a-form-item>
         </a-form>
@@ -85,26 +85,71 @@
         <div class="settings-section-head">
           <div>
             <div class="panel-label">提示词设置</div>
-            <div class="settings-section-title">评论分析 Prompt</div>
+            <div class="settings-section-title">评论分析提示词</div>
           </div>
-          <a-button type="primary" :disabled="!canEditAi" :loading="savingAi" @click="saveAiSettings">保存设置</a-button>
+          <a-space>
+            <a-button :disabled="!canEditAi" @click="resetDefaultPrompts">恢复默认提示词</a-button>
+            <a-button type="primary" :disabled="!canEditAi" :loading="savingAi" @click="saveAiSettings">保存设置</a-button>
+          </a-space>
         </div>
         <a-form layout="vertical" class="settings-form">
-          <a-form-item label="System Prompt">
+          <a-form-item label="系统提示词">
             <a-textarea v-model:value="aiForm.systemPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 3, maxRows: 6 }" />
           </a-form-item>
-          <a-form-item label="User Prompt Template">
+          <a-form-item label="评论分析提示词模板">
             <a-textarea v-model:value="aiForm.userPromptTemplate" :disabled="!canEditAi" :auto-size="{ minRows: 12, maxRows: 20 }" />
           </a-form-item>
-          <a-form-item label="Summary Prompt">
+          <a-form-item label="总体总结提示词">
             <a-textarea v-model:value="aiForm.summaryPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 6, maxRows: 12 }" />
           </a-form-item>
-          <a-form-item label="Product Insights Prompt">
+          <a-form-item label="产品洞察提示词">
             <a-textarea v-model:value="aiForm.insightsPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 8, maxRows: 16 }" />
           </a-form-item>
         </a-form>
         <div class="settings-help">
           可用变量：{taxonomy}、{ratingStar}、{comment}、{commentTr}
+        </div>
+      </section>
+
+      <section class="settings-panel settings-panel-wide">
+        <div class="settings-section-head">
+          <div>
+            <div class="panel-label">爬虫设置</div>
+            <div class="settings-section-title">Scrapling 评论抓取</div>
+          </div>
+          <a-button type="primary" :disabled="!canEditAi" :loading="savingCrawler" @click="saveCrawlerSettings">
+            保存爬虫设置
+          </a-button>
+        </div>
+        <a-form layout="vertical" class="settings-form">
+          <a-form-item label="启用链接抓取">
+            <a-switch v-model:checked="crawlerForm.enabled" :disabled="!canEditAi" />
+          </a-form-item>
+          <a-form-item label="Python 命令">
+            <a-input v-model:value="crawlerForm.pythonBin" :disabled="!canEditAi" placeholder="python 或 C:\\Python312\\python.exe" />
+          </a-form-item>
+          <a-form-item label="代理地址">
+            <a-input v-model:value="crawlerForm.proxyUrl" :disabled="!canEditAi" placeholder="例如：http://127.0.0.1:7890" />
+          </a-form-item>
+          <a-form-item label="Shopee Cookie">
+            <a-input-password
+              v-model:value="crawlerForm.shopeeCookie"
+              :disabled="!canEditAi"
+              :placeholder="crawlerForm.shopeeCookieSet ? `已保存（${crawlerForm.shopeeCookie || '已隐藏'}），输入新 Cookie 可替换` : '可选，用于减少风控拦截'"
+            />
+          </a-form-item>
+          <a-form-item label="默认来源渠道">
+            <a-input v-model:value="crawlerForm.defaultSourceChannel" :disabled="!canEditAi" placeholder="Shopee" />
+          </a-form-item>
+          <a-form-item label="默认抓取条数">
+            <a-input-number v-model:value="crawlerForm.defaultMaxReviews" :disabled="!canEditAi" :min="1" :max="1000" class="full-input" />
+          </a-form-item>
+          <a-form-item label="超时时间（秒）">
+            <a-input-number v-model:value="crawlerForm.requestTimeoutSec" :disabled="!canEditAi" :min="30" :max="900" class="full-input" />
+          </a-form-item>
+        </a-form>
+        <div class="settings-help">
+          这些设置只作用于当前空间的“链接抓取”导入。Cookie 和代理会传给本地 Scrapling 脚本，不会展示明文。
         </div>
       </section>
     </div>
@@ -155,9 +200,21 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { message } from "ant-design-vue";
-import { AI_PROVIDER_PRESETS } from "@review-ai/shared";
-import type { MemberRole, WorkspaceAiSettingDTO } from "@review-ai/shared";
-import { createWorkspace, fetchWorkspaceAiSettings, updateWorkspaceAiSettings } from "@/api";
+import {
+  AI_PROVIDER_PRESETS,
+  DEFAULT_INSIGHTS_PROMPT,
+  DEFAULT_SUMMARY_PROMPT,
+  DEFAULT_SYSTEM_PROMPT,
+  DEFAULT_USER_PROMPT_TEMPLATE
+} from "@review-ai/shared";
+import type { MemberRole, WorkspaceAiSettingDTO, WorkspaceCrawlerSettingDTO } from "@review-ai/shared";
+import {
+  createWorkspace,
+  fetchWorkspaceAiSettings,
+  fetchWorkspaceCrawlerSettings,
+  updateWorkspaceAiSettings,
+  updateWorkspaceCrawlerSettings
+} from "@/api";
 import { useTaskStore } from "@/composables";
 
 const { workspace, workspaces, currentUser, refreshTasks, switchWorkspace } = useTaskStore();
@@ -165,6 +222,7 @@ const modalOpen = ref(false);
 const saving = ref(false);
 const loadingAi = ref(false);
 const savingAi = ref(false);
+const savingCrawler = ref(false);
 const form = reactive({
   name: "",
   slug: ""
@@ -181,6 +239,17 @@ const aiForm = reactive<WorkspaceAiSettingDTO>({
   summaryPrompt: "",
   insightsPrompt: "",
   temperature: 0.2,
+  updatedAt: null
+});
+const crawlerForm = reactive<WorkspaceCrawlerSettingDTO>({
+  enabled: true,
+  pythonBin: "python",
+  proxyUrl: null,
+  shopeeCookie: null,
+  shopeeCookieSet: false,
+  defaultSourceChannel: "Shopee",
+  defaultMaxReviews: 200,
+  requestTimeoutSec: 180,
   updatedAt: null
 });
 
@@ -234,6 +303,26 @@ function assignAiForm(data: WorkspaceAiSettingDTO) {
   aiForm.updatedAt = data.updatedAt;
 }
 
+function assignCrawlerForm(data: WorkspaceCrawlerSettingDTO) {
+  crawlerForm.enabled = data.enabled;
+  crawlerForm.pythonBin = data.pythonBin;
+  crawlerForm.proxyUrl = data.proxyUrl;
+  crawlerForm.shopeeCookie = data.shopeeCookie;
+  crawlerForm.shopeeCookieSet = data.shopeeCookieSet;
+  crawlerForm.defaultSourceChannel = data.defaultSourceChannel;
+  crawlerForm.defaultMaxReviews = data.defaultMaxReviews;
+  crawlerForm.requestTimeoutSec = data.requestTimeoutSec;
+  crawlerForm.updatedAt = data.updatedAt;
+}
+
+function resetDefaultPrompts() {
+  aiForm.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+  aiForm.userPromptTemplate = DEFAULT_USER_PROMPT_TEMPLATE;
+  aiForm.summaryPrompt = DEFAULT_SUMMARY_PROMPT;
+  aiForm.insightsPrompt = DEFAULT_INSIGHTS_PROMPT;
+  message.success("已恢复默认提示词，保存后生效");
+}
+
 function roleLabel(role?: MemberRole | null) {
   if (role === "owner") {
     return "所有者";
@@ -253,9 +342,14 @@ function roleLabel(role?: MemberRole | null) {
 async function loadAiSettings() {
   loadingAi.value = true;
   try {
-    assignAiForm(await fetchWorkspaceAiSettings());
+    const [aiSettings, crawlerSettings] = await Promise.all([
+      fetchWorkspaceAiSettings(),
+      fetchWorkspaceCrawlerSettings()
+    ]);
+    assignAiForm(aiSettings);
+    assignCrawlerForm(crawlerSettings);
   } catch {
-    message.error("AI 设置加载失败");
+    message.error("空间设置加载失败");
   } finally {
     loadingAi.value = false;
   }
@@ -270,6 +364,18 @@ async function saveAiSettings() {
     message.error("AI 设置保存失败，请检查权限或输入内容");
   } finally {
     savingAi.value = false;
+  }
+}
+
+async function saveCrawlerSettings() {
+  savingCrawler.value = true;
+  try {
+    assignCrawlerForm(await updateWorkspaceCrawlerSettings({ ...crawlerForm }));
+    message.success("爬虫设置已保存");
+  } catch {
+    message.error("爬虫设置保存失败，请检查权限或输入内容");
+  } finally {
+    savingCrawler.value = false;
   }
 }
 

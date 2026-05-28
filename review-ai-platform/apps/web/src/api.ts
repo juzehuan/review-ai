@@ -14,6 +14,7 @@ import type {
   TaskListItem,
   UserDTO,
   WorkspaceAiSettingDTO,
+  WorkspaceCrawlerSettingDTO,
   WorkspaceDTO,
   WorkspaceMemberDTO
 } from "@review-ai/shared";
@@ -130,6 +131,16 @@ export async function fetchWorkspaceAiSettings() {
 
 export async function updateWorkspaceAiSettings(payload: WorkspaceAiSettingDTO) {
   const { data } = await api.patch<WorkspaceAiSettingDTO>("/workspace/ai-settings", payload);
+  return data;
+}
+
+export async function fetchWorkspaceCrawlerSettings() {
+  const { data } = await api.get<WorkspaceCrawlerSettingDTO>("/workspace/crawler-settings");
+  return data;
+}
+
+export async function updateWorkspaceCrawlerSettings(payload: WorkspaceCrawlerSettingDTO) {
+  const { data } = await api.patch<WorkspaceCrawlerSettingDTO>("/workspace/crawler-settings", payload);
   return data;
 }
 

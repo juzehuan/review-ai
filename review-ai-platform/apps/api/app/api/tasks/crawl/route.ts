@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { Prisma, prisma } from "@review-ai/db";
 import type { CrawlTaskResponse } from "@review-ai/shared";
+import { defaultCrawlerSetting } from "@/lib/crawler-settings";
 import { fail, ok } from "@/lib/http";
 import { assertReviewQuota, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -27,13 +28,29 @@ type CrawlResult = {
   rows: CrawledReview[];
 };
 
-function runScraplingCrawler(productUrl: string, maxReviews: number) {
+type ResolvedCrawlerSetting = {
+  enabled: boolean;
+  pythonBin: string;
+  proxyUrl: string | null;
+  shopeeCookie: string | null;
+  defaultSourceChannel: string;
+  defaultMaxReviews: number;
+  requestTimeoutSec: number;
+};
+
+function runScraplingCrawler(productUrl: string, maxReviews: number, setting: ResolvedCrawlerSetting) {
   return new Promise<CrawlResult>((resolve, reject) => {
-    const pythonBin = process.env.SCRAPLING_PYTHON_BIN || "python";
     const scriptPath = path.resolve(process.cwd(), "../../apps/crawler/scrapling_reviews.py");
-    const child = spawn(pythonBin, [scriptPath, "--url", productUrl, "--max-reviews", String(maxReviews)], {
+    const args = [scriptPath, "--url", productUrl, "--max-reviews", String(maxReviews)];
+    if (setting.proxyUrl) {
+      args.push("--proxy", setting.proxyUrl);
+    }
+    const child = spawn(setting.pythonBin, args, {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        ...(setting.shopeeCookie ? { SHOPEE_COOKIE: setting.shopeeCookie } : {})
+      },
       windowsHide: true
     });
 
@@ -42,7 +59,7 @@ function runScraplingCrawler(productUrl: string, maxReviews: number) {
     const timer = setTimeout(() => {
       child.kill();
       reject(new Error("Scrapling crawler timed out"));
-    }, 180000);
+    }, setting.requestTimeoutSec * 1000);
 
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
@@ -84,8 +101,21 @@ export async function POST(request: Request) {
   const productUrl = String(body.productUrl || "").trim();
   const name = String(body.name || "").trim();
   const productNameFromBody = String(body.productName || "").trim();
-  const sourceChannel = String(body.sourceChannel || "Shopee").trim();
-  const maxReviews = Math.min(Math.max(Number(body.maxReviews || 200), 1), 1000);
+  const storedCrawlerSetting = await prisma.workspaceCrawlerSetting.findUnique({
+    where: { workspaceId: context.workspace.id }
+  });
+  const defaultSetting = defaultCrawlerSetting();
+  const crawlerSetting: ResolvedCrawlerSetting = {
+    enabled: storedCrawlerSetting?.enabled ?? defaultSetting.enabled,
+    pythonBin: storedCrawlerSetting?.pythonBin || defaultSetting.pythonBin,
+    proxyUrl: storedCrawlerSetting?.proxyUrl || defaultSetting.proxyUrl,
+    shopeeCookie: storedCrawlerSetting?.shopeeCookie || process.env.SHOPEE_COOKIE || null,
+    defaultSourceChannel: storedCrawlerSetting?.defaultSourceChannel || defaultSetting.defaultSourceChannel,
+    defaultMaxReviews: storedCrawlerSetting?.defaultMaxReviews || defaultSetting.defaultMaxReviews,
+    requestTimeoutSec: storedCrawlerSetting?.requestTimeoutSec || defaultSetting.requestTimeoutSec
+  };
+  const sourceChannel = String(body.sourceChannel || crawlerSetting.defaultSourceChannel).trim();
+  const maxReviews = Math.min(Math.max(Number(body.maxReviews || crawlerSetting.defaultMaxReviews), 1), 1000);
 
   if (!productUrl) {
     return fail("请填写商品链接");
@@ -93,10 +123,13 @@ export async function POST(request: Request) {
   if (!name) {
     return fail("请填写任务名称");
   }
+  if (!crawlerSetting.enabled) {
+    return fail("当前空间没有启用链接抓取，请先在空间设置中开启评论爬虫");
+  }
 
   let crawlResult: CrawlResult;
   try {
-    crawlResult = await runScraplingCrawler(productUrl, maxReviews);
+    crawlResult = await runScraplingCrawler(productUrl, maxReviews, crawlerSetting);
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Scrapling 爬取失败", 502);
   }

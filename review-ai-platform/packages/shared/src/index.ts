@@ -84,6 +84,18 @@ export interface WorkspaceAiSettingDTO {
   updatedAt: string | null;
 }
 
+export interface WorkspaceCrawlerSettingDTO {
+  enabled: boolean;
+  pythonBin: string;
+  proxyUrl: string | null;
+  shopeeCookie: string | null;
+  shopeeCookieSet: boolean;
+  defaultSourceChannel: string;
+  defaultMaxReviews: number;
+  requestTimeoutSec: number;
+  updatedAt: string | null;
+}
+
 export interface AiProviderPreset {
   id: string;
   label: string;
@@ -105,7 +117,7 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
   },
   {
     id: "volcengine",
-    label: "Volcengine ARK",
+    label: "火山方舟 Volcengine ARK",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     models: ["doubao-seed-2-0-code-preview-260215", "doubao-seed-1-6-250615", "doubao-pro-32k", "doubao-pro-128k"],
     apiKeyHint: "ark-...",
@@ -129,7 +141,7 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
   },
   {
     id: "dashscope",
-    label: "Alibaba DashScope",
+    label: "阿里云百炼 DashScope",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     models: ["qwen-max", "qwen-plus", "qwen-turbo", "qwen-long"],
     apiKeyHint: "sk-...",
@@ -137,7 +149,7 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
   },
   {
     id: "zhipu",
-    label: "Zhipu ChatGLM",
+    label: "智谱 ChatGLM",
     baseUrl: "https://open.bigmodel.cn/api/paas/v4",
     models: ["glm-4-plus", "glm-4-air", "glm-4-flash", "glm-4-long"],
     apiKeyHint: "id.secret",
@@ -145,7 +157,7 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
   },
   {
     id: "custom",
-    label: "Custom OpenAI Compatible",
+    label: "自定义 OpenAI 兼容接口",
     baseUrl: "",
     models: [],
     apiKeyHint: "API Key"
@@ -153,7 +165,7 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
 ];
 
 export const DEFAULT_SYSTEM_PROMPT =
-  "You are a precise multilingual ecommerce review analyst. Always follow the requested JSON schema exactly.";
+  "你是严谨的多语言电商评论分析专家。必须严格按接口要求的 JSON 结构输出，不要添加额外说明。";
 
 export const DEFAULT_USER_PROMPT_TEMPLATE = [
   "你是电商商品评论分析助手，擅长处理泰文、英文和中文混合评论。",

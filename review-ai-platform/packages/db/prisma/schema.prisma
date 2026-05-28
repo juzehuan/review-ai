@@ -85,6 +85,7 @@ model Workspace {
   memberships    WorkspaceMember[]
   subscription   Subscription?
   aiSetting      WorkspaceAiSetting?
+  crawlerSetting WorkspaceCrawlerSetting?
 
   @@map("workspace")
 }
@@ -107,6 +108,23 @@ model WorkspaceAiSetting {
   workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@map("workspace_ai_setting")
+}
+
+model WorkspaceCrawlerSetting {
+  id                   String    @id @default(cuid())
+  workspaceId          String    @unique @map("workspace_id")
+  enabled              Boolean   @default(true)
+  pythonBin            String    @default("python") @map("python_bin")
+  proxyUrl             String?   @map("proxy_url")
+  shopeeCookie         String?   @map("shopee_cookie")
+  defaultSourceChannel String    @default("Shopee") @map("default_source_channel")
+  defaultMaxReviews    Int       @default(200) @map("default_max_reviews")
+  requestTimeoutSec    Int       @default(180) @map("request_timeout_sec")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_crawler_setting")
 }
 
 model WorkspaceMember {
