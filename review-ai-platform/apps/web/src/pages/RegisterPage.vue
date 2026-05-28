@@ -22,7 +22,7 @@
         <a-form-item label="工作空间名称">
           <a-input v-model:value="form.workspaceName" placeholder="例如：品牌增长团队" />
         </a-form-item>
-        <a-button type="primary" size="large" block :loading="loading" @click="submit">注册并进入</a-button>
+        <a-button type="primary" html-type="submit" size="large" block :loading="loading">注册并进入</a-button>
       </a-form>
 
       <div class="auth-footer">
@@ -35,6 +35,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from "vue";
+import axios from "axios";
 import { message } from "ant-design-vue";
 import { useRouter } from "vue-router";
 import { register } from "@/api";
@@ -62,6 +63,14 @@ async function submit() {
     setAuthState(result.user, result.workspace);
     await refreshTasks();
     router.push("/dashboard");
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      const messageText =
+        typeof error.response?.data?.message === "string" ? error.response.data.message : "注册失败，请检查填写内容。";
+      message.error(messageText);
+      return;
+    }
+    message.error("注册失败，请稍后重试。");
   } finally {
     loading.value = false;
   }
