@@ -11,8 +11,10 @@
 
 body {
   margin: 0;
+  width: 100%;
   min-height: 100vh;
   background: #f4f6fa;
+  overflow: hidden;
 }
 
 button,
@@ -27,13 +29,13 @@ select {
 }
 
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   background: #f4f6fa;
+  overflow: hidden;
 }
 
 .app-sidebar {
-  position: sticky;
-  top: 0;
   width: 288px !important;
   min-width: 288px !important;
   max-width: 288px !important;
@@ -48,6 +50,47 @@ select {
   height: 100%;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.app-content,
+.app-sidebar .ant-layout-sider-children,
+.table-shell,
+.ant-modal-body,
+.ant-drawer-body {
+  scrollbar-width: thin;
+  scrollbar-color: #aab4c5 transparent;
+}
+
+.app-content::-webkit-scrollbar,
+.app-sidebar .ant-layout-sider-children::-webkit-scrollbar,
+.table-shell::-webkit-scrollbar,
+.ant-modal-body::-webkit-scrollbar,
+.ant-drawer-body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.app-content::-webkit-scrollbar-thumb,
+.app-sidebar .ant-layout-sider-children::-webkit-scrollbar-thumb,
+.table-shell::-webkit-scrollbar-thumb,
+.ant-modal-body::-webkit-scrollbar-thumb,
+.ant-drawer-body::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: #aab4c5;
+  background-clip: content-box;
+}
+
+.app-content::-webkit-scrollbar-track,
+.app-sidebar .ant-layout-sider-children::-webkit-scrollbar-track,
+.table-shell::-webkit-scrollbar-track,
+.ant-modal-body::-webkit-scrollbar-track,
+.ant-drawer-body::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .brand-block {
@@ -215,6 +258,7 @@ select {
 .new-project-button {
   height: 46px;
   margin-top: auto;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -237,13 +281,16 @@ select {
 }
 
 .app-main {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
   background: #f4f6fa;
 }
 
 .topbar {
-  position: sticky;
-  top: 0;
+  flex: 0 0 auto;
   z-index: 20;
   height: 72px;
   display: flex;
@@ -324,7 +371,13 @@ select {
 }
 
 .app-content {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 26px 28px 34px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 .dashboard-grid,
@@ -682,7 +735,7 @@ select {
 
 .review-controls {
   position: sticky;
-  top: 88px;
+  top: 0;
   z-index: 10;
 }
 
@@ -704,7 +757,28 @@ select {
 
 .table-shell {
   padding: 12px;
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.ant-modal {
+  max-width: calc(100vw - 32px);
+}
+
+.ant-modal .ant-modal-content {
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.ant-modal .ant-modal-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.ant-drawer-body {
+  overscroll-behavior: contain;
 }
 
 .settings-grid {
@@ -913,10 +987,12 @@ select {
 }
 
 .auth-page {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(360px, 0.82fr) minmax(420px, 1.18fr);
   background: #ffffff;
+  overflow: auto;
 }
 
 .auth-panel {
@@ -1059,8 +1135,15 @@ select {
 }
 
 @media (max-width: 960px) {
+  body {
+    overflow: auto;
+  }
+
   .app-shell {
     display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
 
   .app-sidebar {
@@ -1069,6 +1152,15 @@ select {
     height: auto;
     border-right: 0;
     border-bottom: 1px solid #e4e7ee;
+  }
+
+  .app-sidebar .ant-layout-sider-children {
+    overflow: visible;
+  }
+
+  .app-main {
+    height: auto;
+    min-height: auto;
   }
 
   .new-project-button {
@@ -1091,6 +1183,7 @@ select {
 
   .app-content {
     padding: 18px;
+    overflow: visible;
   }
 
   .page-toolbar,
@@ -1107,6 +1200,8 @@ select {
   }
 
   .auth-page {
+    height: auto;
+    min-height: 100vh;
     grid-template-columns: 1fr;
     background: #f4f6fa;
   }
