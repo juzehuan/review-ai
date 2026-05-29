@@ -164,11 +164,11 @@ const ALL_TOPIC_TAXONOMY = [
 const analysisSchema = z.object({
   sentiment: z.enum(["positive", "neutral", "negative"]),
   sentimentScore: z.number().min(0).max(1),
-  topicLabels: z.array(z.enum(ALL_TOPIC_TAXONOMY)).max(6),
+  topicLabels: z.array(z.string()).max(6),
   keywords: z.array(z.string()).max(12),
   summary: z.string().max(200),
-  painPoints: z.array(z.enum(ALL_TOPIC_TAXONOMY)).max(5),
-  highlights: z.array(z.enum(ALL_TOPIC_TAXONOMY)).max(5),
+  painPoints: z.array(z.string()).max(5),
+  highlights: z.array(z.string()).max(5),
   suggestion: z.string().max(160),
   needsAttention: z.boolean()
 });
@@ -304,6 +304,108 @@ function buildClient(setting: ResolvedAiSetting) {
 
 function unique<T>(items: T[]) {
   return [...new Set(items)];
+}
+
+function mapTopicAlias(label: string, analysisType: AnalysisType) {
+  const normalized = label.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  const rules: Array<{ patterns: string[]; product: string; video: string; tweet: string }> = [
+    {
+      patterns: ["贴牌", "真实性", "真假", "造假", "虚假", "冒牌"],
+      product: "质量做工",
+      video: "事实证据",
+      tweet: "事实质疑"
+    },
+    {
+      patterns: ["司法", "警察", "扣留", "判决", "法律", "执法", "不公", "案件"],
+      product: "综合体验",
+      video: "事实证据",
+      tweet: "事实质疑"
+    },
+    {
+      patterns: ["花钱", "收费", "价格", "贵", "便宜", "成本"],
+      product: "性价比",
+      video: "受众期待",
+      tweet: "回应诉求"
+    },
+    {
+      patterns: ["品牌", "口碑", "信任", "可信"],
+      product: "综合体验",
+      video: "账号信任",
+      tweet: "品牌风险"
+    },
+    {
+      patterns: ["争议", "质疑", "澄清", "解释"],
+      product: "综合体验",
+      video: "争议澄清",
+      tweet: "事实质疑"
+    },
+    {
+      patterns: ["支持", "赞同", "认可"],
+      product: "综合体验",
+      video: "情绪共鸣",
+      tweet: "支持立场"
+    },
+    {
+      patterns: ["反对", "不满", "愤怒", "批评"],
+      product: "综合体验",
+      video: "观点立场",
+      tweet: "反对立场"
+    }
+  ];
+  const matched = rules.find((rule) => rule.patterns.some((pattern) => normalized.includes(pattern.toLowerCase())));
+  return matched ? matched[analysisType] : null;
+}
+
+function normalizeTopicList(
+  labels: string[],
+  setting: ResolvedAiSetting,
+  fallbackLabel: string,
+  maxItems: number
+) {
+  const allowed = new Set(setting.taxonomy);
+  const allAllowed = new Set<string>(ALL_TOPIC_TAXONOMY);
+  const normalized = labels
+    .map((label) => label.trim())
+    .filter(Boolean)
+    .flatMap((label) => {
+      if (allowed.has(label)) {
+        return [label];
+      }
+      const exactKnown = allAllowed.has(label) ? label : null;
+      if (exactKnown && allowed.has(exactKnown)) {
+        return [exactKnown];
+      }
+      const fuzzyKnown = setting.taxonomy.find((topic) => label.includes(topic) || topic.includes(label));
+      if (fuzzyKnown) {
+        return [fuzzyKnown];
+      }
+      const alias = mapTopicAlias(label, setting.analysisType);
+      return alias && allowed.has(alias) ? [alias] : [];
+    });
+  const result = unique(normalized).slice(0, maxItems);
+  return result.length ? result : [fallbackLabel].filter(Boolean).slice(0, maxItems);
+}
+
+function sanitizeAnalysisResult(result: AnalysisResult, setting: ResolvedAiSetting): AnalysisResult {
+  const fallbackTopic = setting.taxonomy[0] || ALL_TOPIC_TAXONOMY[0];
+  const invalidLabels = unique([...result.topicLabels, ...result.painPoints, ...result.highlights].map((label) => label.trim()).filter(Boolean)).filter(
+    (label) => !setting.taxonomy.includes(label)
+  );
+  const topicLabels = normalizeTopicList(result.topicLabels, setting, fallbackTopic, 6);
+  const painPoints =
+    result.painPoints.length > 0 ? normalizeTopicList(result.painPoints, setting, topicLabels[0] || fallbackTopic, 5) : [];
+  const highlights =
+    result.highlights.length > 0 ? normalizeTopicList(result.highlights, setting, topicLabels[0] || fallbackTopic, 5) : [];
+  return {
+    ...result,
+    topicLabels,
+    painPoints,
+    highlights,
+    keywords: unique([...result.keywords.map((item) => item.trim()).filter(Boolean), ...invalidLabels]).slice(0, 12)
+  };
 }
 
 function renderTemplate(template: string, vars: Record<string, string | number | null | undefined>) {
@@ -474,7 +576,7 @@ async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, ite
       throw new Error("AI response was empty");
     }
     const parsed = parseJsonObject(content);
-    return analysisSchema.parse(parsed.analysis || parsed);
+    return sanitizeAnalysisResult(analysisSchema.parse(parsed.analysis || parsed), setting);
   }
   const response = await client.responses.parse({
     model: setting.modelName,
@@ -488,7 +590,7 @@ async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, ite
   if (!response.output_parsed) {
     throw new Error("OpenAI response was not parsed");
   }
-  return response.output_parsed;
+  return sanitizeAnalysisResult(response.output_parsed, setting);
 }
 
 async function analyzeBatch(client: OpenAI, setting: ResolvedAiSetting, items: BatchInput[]) {
@@ -519,7 +621,7 @@ async function analyzeBatch(client: OpenAI, setting: ResolvedAiSetting, items: B
     if (validated.analyses.length !== items.length) {
       throw new Error(`Batch expected ${items.length} analyses but got ${validated.analyses.length}`);
     }
-    return validated.analyses;
+    return validated.analyses.map((analysis) => sanitizeAnalysisResult(analysis, setting));
   }
   const response = await client.responses.parse({
     model: setting.modelName,
@@ -537,7 +639,7 @@ async function analyzeBatch(client: OpenAI, setting: ResolvedAiSetting, items: B
   if (!parsed || parsed.analyses.length !== items.length) {
     throw new Error(`Batch expected ${items.length} analyses but got ${parsed?.analyses.length || 0}`);
   }
-  return parsed.analyses;
+  return parsed.analyses.map((analysis) => sanitizeAnalysisResult(analysis, setting));
 }
 
 async function analyzeWithRetry(client: OpenAI | null, setting: ResolvedAiSetting, item: BatchInput, maxRetries = 3) {
