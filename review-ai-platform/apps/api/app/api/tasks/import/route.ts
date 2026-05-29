@@ -1,5 +1,6 @@
 import { Prisma, prisma } from "@review-ai/db";
 import type { ImportTaskResponse } from "@review-ai/shared";
+import { inferAnalysisType } from "@review-ai/shared";
 import { parseReviewFile } from "@/lib/csv";
 import { fail, ok } from "@/lib/http";
 import { assertReviewQuota, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
@@ -18,6 +19,10 @@ export async function POST(request: Request) {
   const name = String(formData.get("name") || "").trim();
   const productName = String(formData.get("productName") || "").trim();
   const sourceChannel = String(formData.get("sourceChannel") || "Shopee").trim();
+  const rawAnalysisType = String(formData.get("analysisType") || "").trim();
+  const analysisType = ["product", "video", "tweet"].includes(rawAnalysisType)
+    ? rawAnalysisType
+    : inferAnalysisType(sourceChannel);
   const file = formData.get("file");
 
   if (!(file instanceof File)) {
@@ -32,7 +37,7 @@ export async function POST(request: Request) {
   const rawContent = fileBuffer.toString("base64");
   let parsedRows;
   try {
-    parsedRows = parseReviewFile(file.name, fileBuffer);
+    parsedRows = parseReviewFile(file.name, fileBuffer, { sourceChannel });
   } catch (error) {
     return fail(error instanceof Error ? error.message : "文件解析失败");
   }
@@ -57,6 +62,7 @@ export async function POST(request: Request) {
         shopId: first.shopId,
         itemId: first.itemId,
         sourceChannel,
+        analysisType,
         status: "imported"
       }
     });

@@ -45,6 +45,14 @@ export async function PATCH(
     }
   });
 
+  await prisma.analysisRunLog.create({
+    data: {
+      runId,
+      level: "warn",
+      message: "Analysis run cancelled by user"
+    }
+  });
+
   await prisma.task.update({
     where: { id: taskId },
     data: { status: "imported" }

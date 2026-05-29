@@ -1,5 +1,6 @@
-import { prisma } from "@review-ai/db";
+import { Prisma, prisma } from "@review-ai/db";
 import { ok } from "@/lib/http";
+import { findAnalysisRunForResults } from "@/lib/analysis-runs";
 import { serializeReviewRow } from "@/lib/serializers";
 import { getWorkspaceContext, requireScopedTask } from "@/lib/workspace";
 
@@ -17,75 +18,97 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
 
   const { searchParams } = new URL(request.url);
   const sentiment = searchParams.get("sentiment");
+  const issue = searchParams.get("issue");
+  const tag = searchParams.get("tag");
+  const needsAttention = searchParams.get("needsAttention");
   const ratingStar = Number(searchParams.get("ratingStar") || 0);
   const variant = searchParams.get("variant");
   const keyword = searchParams.get("keyword");
   const hasMedia = searchParams.get("hasMedia");
   const sortBy = searchParams.get("sortBy") || "commentTime";
   const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
-  const page = Number(searchParams.get("page") || 1);
-  const pageSize = Number(searchParams.get("pageSize") || 20);
+  const page = Math.max(Number(searchParams.get("page") || 1), 1);
+  const pageSize = Math.min(Math.max(Number(searchParams.get("pageSize") || 20), 1), 500);
 
-  const run = await prisma.analysisRun.findFirst({
-    where: { taskId },
-    orderBy: { startedAt: "desc" }
-  });
-
-  const reviews = await prisma.review.findMany({
-    where: {
-      taskId,
-      ...(ratingStar ? { ratingStar } : {}),
-      ...(variant ? { modelName: variant } : {}),
-      ...(hasMedia !== null ? { hasMedia: hasMedia === "true" } : {}),
-      ...(keyword
-        ? {
-            OR: [
-              { comment: { contains: keyword, mode: "insensitive" } },
-              { commentTr: { contains: keyword, mode: "insensitive" } }
-            ]
-          }
-        : {})
-    },
-    include: {
-      task: true,
-      analyses: run
-        ? {
-            where: sentiment ? { runId: run.id, sentiment: sentiment as never } : { runId: run.id },
-            take: 1
-          }
-        : false
-    }
-  });
-
-  let rows = reviews.map(serializeReviewRow);
-
-  if (sentiment) {
-    rows = rows.filter((row) => row.sentiment === sentiment);
+  const run = await findAnalysisRunForResults(taskId, searchParams.get("runId"));
+  const hasAnalysisFilter = Boolean(sentiment || issue || tag || needsAttention !== null);
+  if (hasAnalysisFilter && !run) {
+    return ok({ total: 0, page, pageSize, items: [] });
   }
 
-  if (sortBy === "ratingStar") {
-    rows = rows.sort((a, b) => (sortOrder === "asc" ? a.ratingStar - b.ratingStar : b.ratingStar - a.ratingStar));
-  } else if (sortBy === "sentimentScore") {
-    rows = rows.sort((a, b) => {
-      const av = a.sentimentScore || 0;
-      const bv = b.sentimentScore || 0;
-      return sortOrder === "asc" ? av - bv : bv - av;
-    });
-  } else {
-    rows = rows.sort((a, b) => {
-      const av = a.commentTime ? new Date(a.commentTime).getTime() : 0;
-      const bv = b.commentTime ? new Date(b.commentTime).getTime() : 0;
-      return sortOrder === "asc" ? av - bv : bv - av;
+  const baseWhere: Prisma.ReviewWhereInput = {
+    taskId,
+    ...(ratingStar ? { ratingStar } : {}),
+    ...(variant ? { modelName: variant } : {}),
+    ...(hasMedia !== null ? { hasMedia: hasMedia === "true" } : {}),
+    ...(keyword
+      ? {
+          OR: [
+            { comment: { contains: keyword, mode: "insensitive" } },
+            { commentTr: { contains: keyword, mode: "insensitive" } }
+          ]
+        }
+      : {})
+  };
+
+  const analysisFilter: Prisma.ReviewAnalysisWhereInput | null = run
+    ? {
+        runId: run.id,
+        ...(sentiment ? { sentiment: sentiment as never } : {}),
+        ...(issue ? { painPoints: { has: issue } } : {}),
+        ...(tag ? { topicLabels: { has: tag } } : {}),
+        ...(needsAttention !== null ? { needsAttention: needsAttention === "true" } : {})
+      }
+    : null;
+  const analysisWhere: Prisma.ReviewAnalysisWhereInput | null = analysisFilter
+    ? { ...analysisFilter, review: baseWhere }
+    : null;
+
+  if (sortBy === "sentimentScore" && analysisWhere) {
+    const [total, analyses] = await Promise.all([
+      prisma.reviewAnalysis.count({ where: analysisWhere }),
+      prisma.reviewAnalysis.findMany({
+        where: analysisWhere,
+        include: { review: { include: { task: true } } },
+        orderBy: { sentimentScore: sortOrder },
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      })
+    ]);
+
+    return ok({
+      total,
+      page,
+      pageSize,
+      items: analyses.map((analysis) => serializeReviewRow({ ...analysis.review, analyses: [analysis] }))
     });
   }
 
-  const total = rows.length;
-  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  const reviewWhere: Prisma.ReviewWhereInput = {
+    ...baseWhere,
+    ...(analysisFilter ? { analyses: { some: analysisFilter } } : {})
+  };
+  const orderBy: Prisma.ReviewOrderByWithRelationInput =
+    sortBy === "ratingStar" ? { ratingStar: sortOrder } : { commentTime: sortOrder };
+
+  const [total, reviews] = await Promise.all([
+    prisma.review.count({ where: reviewWhere }),
+    prisma.review.findMany({
+      where: reviewWhere,
+      include: {
+        task: true,
+        analyses: run ? { where: { runId: run.id }, take: 1 } : false
+      },
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    })
+  ]);
 
   return ok({
     total,
     page,
     pageSize,
-    items: pagedRows
+    items: reviews.map(serializeReviewRow)
   });
 }

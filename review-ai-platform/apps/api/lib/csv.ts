@@ -14,6 +14,14 @@ export interface ParsedReviewInput {
   rawJson: Record<string, unknown>;
 }
 
+interface ParseReviewOptions {
+  sourceChannel?: string;
+}
+
+function allowsMissingRating(sourceChannel?: string) {
+  return String(sourceChannel || "").toLowerCase().includes("youtube");
+}
+
 function parseBoolean(value: unknown) {
   return String(value ?? "").toLowerCase() === "true";
 }
@@ -28,7 +36,7 @@ function parseDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function parseShopeeCsv(csvContent: string) {
+export function parseShopeeCsv(csvContent: string, options: ParseReviewOptions = {}) {
   const rows = parse(csvContent, {
     columns: true,
     skip_empty_lines: true,
@@ -36,14 +44,14 @@ export function parseShopeeCsv(csvContent: string) {
     bom: true
   }) as Array<Record<string, string>>;
 
-  return normalizeReviewRows(rows);
+  return normalizeReviewRows(rows, options);
 }
 
-export function parseReviewFile(filename: string, content: Buffer) {
+export function parseReviewFile(filename: string, content: Buffer, options: ParseReviewOptions = {}) {
   const lowerName = filename.toLowerCase();
 
   if (lowerName.endsWith(".csv")) {
-    return parseShopeeCsv(content.toString("utf8"));
+    return parseShopeeCsv(content.toString("utf8"), options);
   }
 
   if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
@@ -57,17 +65,21 @@ export function parseReviewFile(filename: string, content: Buffer) {
       defval: "",
       raw: false
     });
-    return normalizeReviewRows(rows);
+    return normalizeReviewRows(rows, options);
   }
 
   throw new Error("仅支持 CSV、XLS、XLSX 文件");
 }
 
-function normalizeReviewRows(rows: Array<Record<string, unknown>>) {
+function normalizeReviewRows(rows: Array<Record<string, unknown>>, options: ParseReviewOptions = {}) {
+  const allowMissingRating = allowsMissingRating(options.sourceChannel);
   const normalized = rows
     .map<ParsedReviewInput | null>((row) => {
     const cmtId = String(row.cmtid || "").trim();
-    const ratingStar = Number(row.rating_star || 0);
+    const rowPlatform = String(row.platform || "").toLowerCase();
+    const ratingText = String(row.rating_star || row.rating || "").trim();
+    const ratingStar = Number(ratingText || 0);
+    const rowAllowsMissingRating = allowMissingRating || rowPlatform.includes("youtube");
     const comment = String(row.comment || "").trim();
     const commentTr = String(row.comment_tr || "").trim() || null;
 
@@ -75,7 +87,7 @@ function normalizeReviewRows(rows: Array<Record<string, unknown>>) {
       throw new Error("CSV 缺少 cmtid");
     }
 
-    if (!ratingStar) {
+    if (!ratingStar && !rowAllowsMissingRating) {
       throw new Error(`评论 ${cmtId} 缺少 rating_star`);
     }
 

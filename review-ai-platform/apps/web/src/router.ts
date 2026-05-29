@@ -1,10 +1,13 @@
 import { createRouter, createWebHistory } from "vue-router";
 import DashboardPage from "./pages/DashboardPage.vue";
+import WorkspaceOverviewPage from "./pages/WorkspaceOverviewPage.vue";
 import ReviewsPage from "./pages/ReviewsPage.vue";
+import AnalysisRunsPage from "./pages/AnalysisRunsPage.vue";
+import CrawlJobsPage from "./pages/CrawlJobsPage.vue";
+import ActionItemsPage from "./pages/ActionItemsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
 import LoginPage from "./pages/LoginPage.vue";
 import RegisterPage from "./pages/RegisterPage.vue";
-import UserManagementPage from "./pages/UserManagementPage.vue";
 import WorkspaceSettingsPage from "./pages/WorkspaceSettingsPage.vue";
 import { getAuthToken } from "./api";
 
@@ -14,9 +17,16 @@ export const router = createRouter({
     { path: "/login", component: LoginPage, meta: { public: true } },
     { path: "/register", component: RegisterPage, meta: { public: true } },
     { path: "/", redirect: "/dashboard" },
-    { path: "/dashboard", component: DashboardPage },
+    { path: "/dashboard", component: WorkspaceOverviewPage },
+    { path: "/tasks/:taskId/report", component: DashboardPage },
+    { path: "/tasks/:taskId/reviews", component: ReviewsPage },
+    { path: "/tasks/:taskId/runs", component: AnalysisRunsPage },
+    { path: "/tasks/:taskId/actions", component: ActionItemsPage },
+    { path: "/report", component: DashboardPage },
     { path: "/reviews", component: ReviewsPage },
-    { path: "/users", component: UserManagementPage },
+    { path: "/analysis-runs", component: AnalysisRunsPage },
+    { path: "/crawl-jobs", component: CrawlJobsPage },
+    { path: "/users", redirect: "/settings/workspace" },
     { path: "/settings", redirect: "/settings/workspace" },
     { path: "/settings/workspace", component: WorkspaceSettingsPage },
     { path: "/settings/ai", component: WorkspaceSettingsPage },

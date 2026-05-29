@@ -6,7 +6,7 @@
   <div v-else class="review-page">
     <div class="page-toolbar review-hero">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">评论工作台</div>
+        <div class="toolbar-title">评论列表</div>
         <div class="toolbar-subtitle">筛选、分组、保存视图，并把 AI 分析结果沉淀为团队可复用的评论视图。</div>
       </div>
       <a-space wrap>
@@ -22,6 +22,17 @@
           <template #icon><StopOutlined /></template>
           停止分析
         </a-button>
+        <a-select
+          v-if="resultRuns.length"
+          v-model:value="selectedResultRunId"
+          class="filter-select-lg"
+          placeholder="分析批次"
+          @change="loadReviews"
+        >
+          <a-select-option v-for="run in resultRuns" :key="run.id" :value="run.id">
+            {{ run.modelName }} · {{ formatRunTime(run.finishedAt || run.startedAt) }}
+          </a-select-option>
+        </a-select>
         <a-tag :color="runStatusColor(latestRun?.status)">
           {{ latestRun ? `最新分析：${runStatusLabel(latestRun.status)}` : "尚未分析" }}
         </a-tag>
@@ -35,6 +46,33 @@
       </div>
       <a-progress :percent="progressPercent" :status="progressStatus" />
       <div v-if="latestRun.lastError" class="analysis-progress-error">{{ latestRun.lastError }}</div>
+    </div>
+
+    <a-alert
+      v-if="evidenceIssue"
+      type="info"
+      show-icon
+      class="evidence-alert"
+      :message="`正在查看「${evidenceIssue}」相关评论证据`"
+    >
+      <template #action>
+        <a-button size="small" @click="clearEvidenceFilter">清除筛选</a-button>
+      </template>
+    </a-alert>
+
+    <div class="analysis-progress-panel">
+      <div class="analysis-progress-head">
+        <span>行动项</span>
+        <a-button size="small" @click="loadActionItems">刷新</a-button>
+      </div>
+      <a-empty v-if="!actionItems.length" description="暂无行动项" />
+      <div v-else class="view-strip">
+        <button v-for="item in actionItems.slice(0, 8)" :key="item.id" type="button" class="view-pill">
+          <span>{{ item.title }}</span>
+          <a-tag :color="item.priority === 'high' ? 'red' : 'blue'">{{ item.priority }}</a-tag>
+          <a-tag>{{ item.status }}</a-tag>
+        </button>
+      </div>
     </div>
 
     <div class="view-strip">
@@ -207,6 +245,9 @@
           <a-descriptions-item label="关键词">{{ selectedRow.keywords.join("、") || "-" }}</a-descriptions-item>
           <a-descriptions-item label="问题点">{{ selectedRow.painPoints.join("、") || "-" }}</a-descriptions-item>
         </a-descriptions>
+        <div class="drawer-actions">
+          <a-button type="primary" @click="createActionFromSelectedRow">转为行动项</a-button>
+        </div>
       </template>
     </a-drawer>
 
@@ -229,6 +270,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { message } from "ant-design-vue";
 import {
   DownloadOutlined,
@@ -240,8 +282,19 @@ import {
   StarOutlined,
   StopOutlined
 } from "@ant-design/icons-vue";
-import type { AnalysisRunDTO, ReviewRowDTO, Sentiment } from "@review-ai/shared";
-import { cancelRun, createRun, exportReviews, fetchReviews, fetchRuns } from "@/api";
+import type { AnalysisRunDTO, ReviewActionItemDTO, ReviewRowDTO, SavedReviewViewDTO, Sentiment } from "@review-ai/shared";
+import {
+  cancelRun,
+  createActionItem,
+  createRun,
+  createSavedView,
+  exportReviews,
+  fetchActionItems,
+  fetchReviews,
+  fetchRuns,
+  fetchSavedViews,
+  updateSavedView
+} from "@/api";
 import { useTaskStore } from "@/composables";
 
 type PaginationConfig = {
@@ -285,11 +338,17 @@ type SavedView = {
 };
 
 const DEFAULT_VIEW_ID = "all-comments";
-const { selectedTask } = useTaskStore();
+const route = useRoute();
+const router = useRouter();
+const { selectedTask, setSelectedTask } = useTaskStore();
 const loading = ref(false);
 const running = ref(false);
 const rows = ref<ReviewRowDTO[]>([]);
+const allRuns = ref<AnalysisRunDTO[]>([]);
 const latestRun = ref<AnalysisRunDTO | null>(null);
+const selectedResultRunId = ref<string | undefined>();
+const evidenceIssue = ref("");
+const actionItems = ref<ReviewActionItemDTO[]>([]);
 const selectedRow = ref<ReviewRowDTO | null>(null);
 const exporting = ref(false);
 const saveViewModalOpen = ref(false);
@@ -341,6 +400,7 @@ const mediaCount = computed(() => rows.value.filter((item) => item.hasMedia).len
 const negativeCount = computed(() => rows.value.filter((item) => item.sentiment === "negative").length);
 const visibleColumns = computed(() => allColumns.filter((column) => visibleColumnKeys.value.includes(column.key)));
 const canCancelRun = computed(() => Boolean(latestRun.value && ["queued", "running"].includes(latestRun.value.status)));
+const resultRuns = computed(() => allRuns.value.filter((run) => ["completed", "partial_failed"].includes(run.status)));
 const progressPercent = computed(() => {
   if (!latestRun.value?.reviewCount) {
     return 0;
@@ -397,10 +457,6 @@ function addGroupItem(
   groups.get(key)!.items.push(row);
 }
 
-function storageKey(taskId: string) {
-  return `review-ai:saved-views:${taskId}`;
-}
-
 function buildDefaultView(): SavedView {
   return {
     id: DEFAULT_VIEW_ID,
@@ -412,6 +468,30 @@ function buildDefaultView(): SavedView {
     sortBy: "commentTime",
     sortOrder: "desc",
     visibleColumnKeys: allColumns.map((column) => column.key)
+  };
+}
+
+function savedViewFromDto(view: SavedReviewViewDTO): SavedView {
+  const filters = view.filters as SavedView["filters"];
+  return {
+    id: view.id,
+    name: view.name,
+    isDefault: view.isDefault,
+    filters: {
+      ratingStar: typeof filters.ratingStar === "number" ? filters.ratingStar : undefined,
+      sentiment: typeof filters.sentiment === "string" ? filters.sentiment : undefined,
+      hasMedia: typeof filters.hasMedia === "boolean" ? filters.hasMedia : undefined,
+      keyword: typeof filters.keyword === "string" ? filters.keyword : ""
+    },
+    groupBy: ["sentiment", "ratingStar", "analysisTag"].includes(view.groupBy)
+      ? (view.groupBy as SavedView["groupBy"])
+      : "sentiment",
+    viewMode: view.viewMode === "grouped" ? "grouped" : "table",
+    sortBy: view.sortBy || "commentTime",
+    sortOrder: view.sortOrder === "asc" ? "asc" : "desc",
+    visibleColumnKeys: view.visibleColumnKeys.filter((key): key is ColumnKey =>
+      allColumns.some((column) => column.key === key)
+    )
   };
 }
 
@@ -434,35 +514,15 @@ function snapshotCurrentView(name: string, id?: string): SavedView {
   };
 }
 
-function loadSavedViews(taskId: string) {
-  const raw = window.localStorage.getItem(storageKey(taskId));
-  if (!raw) {
-    const initial = [buildDefaultView()];
-    savedViews.value = initial;
-    activeViewId.value = DEFAULT_VIEW_ID;
-    applyView(initial[0]);
-    return;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as SavedView[];
-    savedViews.value = parsed.length ? parsed : [buildDefaultView()];
-    const defaultView = savedViews.value.find((item) => item.isDefault) || savedViews.value[0];
-    activeViewId.value = defaultView.id;
-    applyView(defaultView);
-  } catch {
-    const fallback = [buildDefaultView()];
-    savedViews.value = fallback;
-    activeViewId.value = DEFAULT_VIEW_ID;
-    applyView(fallback[0]);
-  }
-}
-
-function persistSavedViews() {
+async function loadSavedViews() {
   if (!selectedTask.value) {
     return;
   }
-  window.localStorage.setItem(storageKey(selectedTask.value.id), JSON.stringify(savedViews.value));
+  const serverViews = await fetchSavedViews(selectedTask.value.id);
+  savedViews.value = serverViews.length ? serverViews.map(savedViewFromDto) : [buildDefaultView()];
+  const defaultView = savedViews.value.find((item) => item.isDefault) || savedViews.value[0];
+  activeViewId.value = defaultView.id;
+  applyView(defaultView);
 }
 
 function applyView(view: SavedView) {
@@ -501,32 +561,33 @@ function saveCurrentView() {
   saveViewModalOpen.value = true;
 }
 
-function confirmSaveView() {
+async function confirmSaveView() {
+  if (!selectedTask.value) {
+    return;
+  }
   if (!pendingViewName.value.trim()) {
     message.error("请输入视图名称。");
     return;
   }
 
   const nextView = snapshotCurrentView(pendingViewName.value.trim());
-  savedViews.value.push(nextView);
-  activeViewId.value = nextView.id;
-  persistSavedViews();
+  const created = await createSavedView(selectedTask.value.id, nextView);
+  const createdView = savedViewFromDto(created);
+  savedViews.value.push(createdView);
+  activeViewId.value = createdView.id;
   saveViewModalOpen.value = false;
   pendingViewName.value = "";
   message.success("视图已保存。");
 }
 
-function setCurrentAsDefault() {
-  if (!activeViewId.value) {
+async function setCurrentAsDefault() {
+  if (!selectedTask.value || !activeViewId.value) {
     message.warning("请先选择一个已保存视图。");
     return;
   }
 
-  savedViews.value = savedViews.value.map((view) => ({
-    ...view,
-    isDefault: view.id === activeViewId.value
-  }));
-  persistSavedViews();
+  await updateSavedView(selectedTask.value.id, activeViewId.value, { isDefault: true });
+  savedViews.value = (await fetchSavedViews(selectedTask.value.id)).map(savedViewFromDto);
   message.success("默认视图已更新。");
 }
 
@@ -603,6 +664,10 @@ function runStatusColor(status?: string | null) {
   return "default";
 }
 
+function formatRunTime(value?: string | null) {
+  return value ? new Date(value).toLocaleString() : "-";
+}
+
 function stopPolling() {
   if (pollTimer) {
     clearInterval(pollTimer);
@@ -617,7 +682,11 @@ async function loadRuns() {
   }
 
   const runs = await fetchRuns(selectedTask.value.id);
+  allRuns.value = runs;
   latestRun.value = runs[0] || null;
+  if (!selectedResultRunId.value || !runs.some((run) => run.id === selectedResultRunId.value)) {
+    selectedResultRunId.value = resultRuns.value[0]?.id;
+  }
 
   if (latestRun.value && ["queued", "running"].includes(latestRun.value.status)) {
     running.value = true;
@@ -638,6 +707,14 @@ async function loadRuns() {
   }
 }
 
+async function loadActionItems() {
+  if (!selectedTask.value) {
+    actionItems.value = [];
+    return;
+  }
+  actionItems.value = await fetchActionItems(selectedTask.value.id, { status: "open" });
+}
+
 async function loadReviews() {
   if (!selectedTask.value) {
     return;
@@ -655,7 +732,9 @@ async function loadReviews() {
       hasMedia: filters.hasMedia,
       keyword: filters.keyword || undefined,
       sortBy: sortState.sortBy,
-      sortOrder: sortState.sortOrder
+      sortOrder: sortState.sortOrder,
+      runId: selectedResultRunId.value,
+      issue: evidenceIssue.value || undefined
     });
     rows.value = result.items;
     pagination.total = result.total;
@@ -698,6 +777,23 @@ async function cancelAnalysis() {
   }
 }
 
+async function createActionFromSelectedRow() {
+  if (!selectedTask.value || !selectedRow.value) {
+    return;
+  }
+  const row = selectedRow.value;
+  await createActionItem(selectedTask.value.id, {
+    runId: selectedResultRunId.value || latestRun.value?.id || null,
+    title: row.summary || truncate(row.comment, 48),
+    description: row.suggestion || row.comment,
+    priority: row.sentiment === "negative" || row.needsAttention ? "high" : "medium",
+    source: "review",
+    relatedReviewIds: [row.id]
+  });
+  await loadActionItems();
+  message.success("已创建行动项。");
+}
+
 async function handleExport() {
   if (!selectedTask.value) {
     return;
@@ -709,7 +805,9 @@ async function handleExport() {
       ratingStar: filters.ratingStar,
       sentiment: filters.sentiment,
       hasMedia: filters.hasMedia,
-      keyword: filters.keyword || undefined
+      keyword: filters.keyword || undefined,
+      runId: selectedResultRunId.value,
+      issue: evidenceIssue.value || undefined
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -738,6 +836,14 @@ function resetFilters() {
   loadReviews();
 }
 
+function clearEvidenceFilter() {
+  evidenceIssue.value = "";
+  if (selectedTask.value) {
+    router.replace(`/tasks/${selectedTask.value.id}/reviews`);
+  }
+  loadReviews();
+}
+
 function handleTableChange(next: PaginationConfig, _: unknown, sorter: SorterConfig | SorterConfig[]) {
   pagination.current = next.current || 1;
   pagination.pageSize = next.pageSize || 10;
@@ -757,10 +863,34 @@ watch(
   async (taskId) => {
     pagination.current = 1;
     if (taskId) {
-      loadSavedViews(taskId);
+      await loadSavedViews();
     }
     await loadRuns();
+    await loadActionItems();
     await loadReviews();
+  },
+  { immediate: true }
+);
+
+watch(
+  () => route.params.taskId,
+  (taskId) => {
+    if (typeof taskId === "string" && taskId !== selectedTask.value?.id) {
+      setSelectedTask(taskId);
+    }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => [route.query.issue, route.query.runId],
+  ([issue, runId]) => {
+    evidenceIssue.value = typeof issue === "string" ? issue : "";
+    if (typeof runId === "string") {
+      selectedResultRunId.value = runId;
+    }
+    pagination.current = 1;
+    loadReviews();
   },
   { immediate: true }
 );

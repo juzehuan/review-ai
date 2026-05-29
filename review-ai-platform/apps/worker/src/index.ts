@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+import path from "node:path";
 import { Worker } from "bullmq";
 import { OpenAI } from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
@@ -9,6 +11,9 @@ import {
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_USER_PROMPT_TEMPLATE,
+  getAnalysisPromptProfile,
+  type CrawlerChannel,
+  type AnalysisType,
   type DashboardDTO,
   type ProductInsightsDTO
 } from "@review-ai/shared";
@@ -16,6 +21,123 @@ import Redis from "ioredis";
 
 const redisUrl = process.env.REDIS_URL || "redis://127.0.0.1:6379";
 const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
+const CRAWLER_CHANNELS = new Set<CrawlerChannel>(["api_exporter", "api_basic", "browser_intercept"]);
+
+type CrawlResult = {
+  source: string;
+  crawlChannel?: string;
+  crawlChannelLabel?: string;
+  productUrl: string;
+  productName: string;
+  shopId: string;
+  itemId: string;
+  rows: Array<Record<string, unknown>>;
+  nextRequests?: number;
+  payloadComments?: number;
+  domCommentCount?: number;
+  domContentTextCount?: number;
+  endReached?: boolean;
+};
+
+type ResolvedCrawlerSetting = {
+  pythonBin: string;
+  proxyUrl: string | null;
+  shopeeCookie: string | null;
+  crawlChannels: CrawlerChannel[];
+  requestTimeoutSec: number;
+};
+
+function parseCrawlerChannels(value: string | null | undefined): CrawlerChannel[] {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item): item is CrawlerChannel => CRAWLER_CHANNELS.has(item as CrawlerChannel));
+}
+
+function parseCrawlerProcessError(stderr: string, fallback: string) {
+  const text = stderr.trim();
+  if (!text) {
+    return fallback;
+  }
+  try {
+    const parsed = JSON.parse(text) as { error?: string; detail?: string };
+    return [parsed.error, parsed.detail].filter(Boolean).join(" - ") || fallback;
+  } catch {
+    return text;
+  }
+}
+
+function runScraplingCrawler(productUrl: string, maxReviews: number, setting: ResolvedCrawlerSetting) {
+  return new Promise<CrawlResult>((resolve, reject) => {
+    const scriptPath = path.resolve(process.cwd(), "../../apps/crawler/scrapling_reviews.py");
+    const args = [
+      scriptPath,
+      "--url",
+      productUrl,
+      "--max-reviews",
+      String(maxReviews),
+      "--timeout",
+      String(setting.requestTimeoutSec)
+    ];
+    if (setting.proxyUrl) {
+      args.push("--proxy", setting.proxyUrl);
+    }
+    if (setting.crawlChannels.length) {
+      args.push("--channels", setting.crawlChannels.join(","));
+    }
+    const child = spawn(setting.pythonBin, args, {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        PYTHONIOENCODING: "utf-8",
+        ...(setting.shopeeCookie ? { SHOPEE_COOKIE: setting.shopeeCookie } : {})
+      },
+      windowsHide: true
+    });
+
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error("Scrapling crawler timed out"));
+    }, setting.requestTimeoutSec * 1000);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        reject(new Error(parseCrawlerProcessError(stderr, `Scrapling crawler exited with code ${code}`)));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout) as CrawlResult);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
+}
+
+function buildEmptyCrawlError(result: CrawlResult) {
+  const diagnostics = [
+    result.nextRequests === undefined ? null : `nextRequests=${result.nextRequests}`,
+    result.payloadComments === undefined ? null : `payloadComments=${result.payloadComments}`,
+    result.domCommentCount === undefined ? null : `domCommentCount=${result.domCommentCount}`,
+    result.domContentTextCount === undefined ? null : `domContentTextCount=${result.domContentTextCount}`,
+    result.endReached === undefined ? null : `endReached=${result.endReached}`
+  ].filter(Boolean);
+  const suffix = diagnostics.length ? ` (${diagnostics.join(", ")})` : "";
+  return `Crawler finished but collected 0 comments${suffix}. The page may require login, be rate-limited, have comments disabled, or need another crawl retry.`;
+}
 
 const TOPIC_TAXONOMY = [
   "综合体验",
@@ -33,15 +155,20 @@ const TOPIC_TAXONOMY = [
   "售后服务",
   "客服响应"
 ] as const;
+const ALL_TOPIC_TAXONOMY = [
+  ...TOPIC_TAXONOMY,
+  "内容选题", "叙事结构", "观点立场", "事实证据", "情绪共鸣", "表达节奏", "标题封面", "剪辑包装", "争议澄清", "互动引导", "受众期待", "账号信任",
+  "支持立场", "反对立场", "中立观望", "事实质疑", "情绪宣泄", "讽刺调侃", "传播扩散", "误解谣言", "品牌风险", "回应诉求", "行动号召"
+] as const;
 
 const analysisSchema = z.object({
   sentiment: z.enum(["positive", "neutral", "negative"]),
   sentimentScore: z.number().min(0).max(1),
-  topicLabels: z.array(z.enum(TOPIC_TAXONOMY)).max(6),
+  topicLabels: z.array(z.enum(ALL_TOPIC_TAXONOMY)).max(6),
   keywords: z.array(z.string()).max(12),
   summary: z.string().max(200),
-  painPoints: z.array(z.enum(TOPIC_TAXONOMY)).max(5),
-  highlights: z.array(z.enum(TOPIC_TAXONOMY)).max(5),
+  painPoints: z.array(z.enum(ALL_TOPIC_TAXONOMY)).max(5),
+  highlights: z.array(z.enum(ALL_TOPIC_TAXONOMY)).max(5),
   suggestion: z.string().max(160),
   needsAttention: z.boolean()
 });
@@ -60,6 +187,8 @@ type ResolvedAiSetting = {
   summaryPrompt: string;
   insightsPrompt: string;
   temperature: number;
+  analysisType: AnalysisType;
+  taxonomy: string[];
 };
 
 const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; envKeys: string[] }> = {
@@ -72,7 +201,7 @@ const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; envKeys: string[] }> 
 };
 
 type TopicRule = {
-  label: (typeof TOPIC_TAXONOMY)[number];
+  label: (typeof ALL_TOPIC_TAXONOMY)[number];
   keywords: string[];
   kind: "issue" | "highlight" | "mixed";
 };
@@ -105,24 +234,61 @@ function resolveEnvKey(provider: string) {
   return null;
 }
 
+function resolveBaseUrl(provider: string, storedBaseUrl?: string | null) {
+  if (provider === "custom") {
+    return storedBaseUrl || null;
+  }
+  const providerDefault = PROVIDER_DEFAULTS[provider]?.baseUrl || null;
+  if (!providerDefault) {
+    return storedBaseUrl || null;
+  }
+  const knownProviderBaseUrls = Object.values(PROVIDER_DEFAULTS).map((item) => item.baseUrl);
+  if (!storedBaseUrl || (knownProviderBaseUrls.includes(storedBaseUrl) && storedBaseUrl !== providerDefault)) {
+    return providerDefault;
+  }
+  return storedBaseUrl;
+}
+
 async function loadAiSetting(taskId: string): Promise<ResolvedAiSetting> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: { workspace: { include: { aiSetting: true } } }
   });
   const setting = task?.workspace?.aiSetting || null;
+  const analysisType = ((task?.analysisType as AnalysisType | null) || "product");
+  const profile = getAnalysisPromptProfile(analysisType);
   const provider = setting?.provider || process.env.AI_PROVIDER || "openai";
+  const promptProfile =
+    analysisType === "video"
+      ? {
+          userPromptTemplate: setting?.videoUserPromptTemplate || profile.userPromptTemplate,
+          summaryPrompt: setting?.videoSummaryPrompt || profile.summaryPrompt,
+          insightsPrompt: setting?.videoInsightsPrompt || profile.insightsPrompt
+        }
+      : analysisType === "tweet"
+        ? {
+            userPromptTemplate: setting?.tweetUserPromptTemplate || profile.userPromptTemplate,
+            summaryPrompt: setting?.tweetSummaryPrompt || profile.summaryPrompt,
+            insightsPrompt: setting?.tweetInsightsPrompt || profile.insightsPrompt
+          }
+        : {
+            userPromptTemplate: setting?.userPromptTemplate || DEFAULT_USER_PROMPT_TEMPLATE,
+            summaryPrompt: setting?.summaryPrompt || DEFAULT_SUMMARY_PROMPT,
+            insightsPrompt: setting?.insightsPrompt || DEFAULT_INSIGHTS_PROMPT
+          };
   return {
     provider,
     apiKey: setting?.apiKey || resolveEnvKey(provider),
-    baseUrl: setting?.baseUrl || PROVIDER_DEFAULTS[provider]?.baseUrl || null,
-    modelName: setting?.modelName || process.env.OPENAI_MODEL || "gpt-4.1-mini",
+    baseUrl: resolveBaseUrl(provider, setting?.baseUrl),
+    modelName: setting?.modelName || process.env.OPENAI_MODEL || "gpt-5.4-mini",
     promptVersion: setting?.promptVersion || "v2-thai",
     systemPrompt: setting?.systemPrompt || DEFAULT_SYSTEM_PROMPT,
-    userPromptTemplate: setting?.userPromptTemplate || DEFAULT_USER_PROMPT_TEMPLATE,
-    summaryPrompt: setting?.summaryPrompt || DEFAULT_SUMMARY_PROMPT,
-    insightsPrompt: setting?.insightsPrompt || DEFAULT_INSIGHTS_PROMPT,
-    temperature: setting?.temperature ?? 0.2
+    userPromptTemplate: promptProfile.userPromptTemplate,
+    summaryPrompt: promptProfile.summaryPrompt,
+    insightsPrompt: promptProfile.insightsPrompt,
+    temperature: setting?.temperature ?? 0.2,
+    analysisType,
+    taxonomy: profile.taxonomy
   };
 }
 
@@ -144,6 +310,32 @@ function renderTemplate(template: string, vars: Record<string, string | number |
   return template
     .replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, name) => String(vars[name] ?? ""))
     .replace(/\{([a-zA-Z0-9_]+)\}/g, (_, name) => String(vars[name] ?? ""));
+}
+
+function stripJsonFence(content: string) {
+  return content
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+}
+
+function parseJsonObject(content: string) {
+  const stripped = stripJsonFence(content);
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    const start = stripped.indexOf("{");
+    const end = stripped.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return JSON.parse(stripped.slice(start, end + 1));
+    }
+    throw new Error("AI response did not contain valid JSON");
+  }
+}
+
+function shouldUseResponsesApi(setting: ResolvedAiSetting) {
+  return setting.provider === "openai";
 }
 
 function sleep(ms: number) {
@@ -224,7 +416,7 @@ function mockAnalyze(comment: string, commentTr: string | null, ratingStar: numb
 
 function buildSinglePrompt(setting: ResolvedAiSetting, item: BatchInput) {
   return renderTemplate(setting.userPromptTemplate, {
-    taxonomy: TOPIC_TAXONOMY.join("、"),
+    taxonomy: setting.taxonomy.join("、"),
     ratingStar: item.ratingStar,
     rating_star: item.ratingStar,
     comment: item.comment,
@@ -236,7 +428,7 @@ function buildSinglePrompt(setting: ResolvedAiSetting, item: BatchInput) {
 
 function buildBatchPrompt(setting: ResolvedAiSetting, items: BatchInput[]) {
   const instructions = renderTemplate(setting.userPromptTemplate, {
-    taxonomy: TOPIC_TAXONOMY.join("、"),
+    taxonomy: setting.taxonomy.join("、"),
     ratingStar: "",
     rating_star: "",
     comment: "",
@@ -260,6 +452,30 @@ async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, ite
   if (!client) {
     throw new Error(`API key for provider "${setting.provider}" is not configured`);
   }
+  if (!shouldUseResponsesApi(setting)) {
+    const response = await client.chat.completions.create({
+      model: setting.modelName,
+      temperature: setting.temperature,
+      max_tokens: 900,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `${setting.systemPrompt}\nReturn only valid JSON. Do not wrap it in markdown.`
+        },
+        {
+          role: "user",
+          content: `${buildSinglePrompt(setting, item)}\n\nReturn one JSON object with these fields: sentiment, sentimentScore, topicLabels, keywords, summary, painPoints, highlights, suggestion, needsAttention.`
+        }
+      ]
+    });
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("AI response was empty");
+    }
+    const parsed = parseJsonObject(content);
+    return analysisSchema.parse(parsed.analysis || parsed);
+  }
   const response = await client.responses.parse({
     model: setting.modelName,
     temperature: setting.temperature,
@@ -276,6 +492,35 @@ async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, ite
 }
 
 async function analyzeBatch(client: OpenAI, setting: ResolvedAiSetting, items: BatchInput[]) {
+  if (!shouldUseResponsesApi(setting)) {
+    const response = await client.chat.completions.create({
+      model: setting.modelName,
+      temperature: setting.temperature,
+      max_tokens: Math.min(6000, Math.max(1200, items.length * 650)),
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `${setting.systemPrompt}\nReturn only valid JSON. Do not wrap it in markdown. The analyses array must contain exactly one entry per input review, in the same order.`
+        },
+        {
+          role: "user",
+          content: `${buildBatchPrompt(setting, items)}\n\nReturn JSON in this exact shape: {"analyses":[{"sentiment":"positive|neutral|negative","sentimentScore":0.5,"topicLabels":[],"keywords":[],"summary":"","painPoints":[],"highlights":[],"suggestion":"","needsAttention":false}]}`
+        }
+      ]
+    });
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("AI response was empty");
+    }
+    const parsed = parseJsonObject(content);
+    const normalized = Array.isArray(parsed) ? { analyses: parsed } : parsed;
+    const validated = batchAnalysisSchema.parse(normalized);
+    if (validated.analyses.length !== items.length) {
+      throw new Error(`Batch expected ${items.length} analyses but got ${validated.analyses.length}`);
+    }
+    return validated.analyses;
+  }
   const response = await client.responses.parse({
     model: setting.modelName,
     temperature: setting.temperature,
@@ -323,6 +568,21 @@ function buildAnalysisData(result: AnalysisResult) {
     needsAttention: result.needsAttention,
     rawModelOutput: JSON.stringify(result)
   };
+}
+
+async function addRunLog(runId: string, level: "info" | "warn" | "error", message: string, meta?: Prisma.InputJsonValue) {
+  try {
+    await prisma.analysisRunLog.create({
+      data: {
+        runId,
+        level,
+        message,
+        ...(meta === undefined ? {} : { meta })
+      }
+    });
+  } catch (error) {
+    console.warn("Failed to write analysis run log", error);
+  }
 }
 
 async function updateRunProgress(runId: string, successCount: number, failedCount: number, lastError?: string) {
@@ -438,8 +698,16 @@ const worker = new Worker(
       throw new Error(`Run ${runId} not found`);
     }
 
+    await addRunLog(runId, "info", "Worker picked up analysis run", { taskId });
     const setting = await loadAiSetting(taskId);
     const client = buildClient(setting);
+    await addRunLog(runId, "info", "AI setting resolved", {
+      provider: setting.provider,
+      modelName: setting.modelName,
+      baseUrl: setting.baseUrl,
+      analysisType: setting.analysisType,
+      taxonomy: setting.taxonomy
+    });
     const existingReviewIds = await prisma.reviewAnalysis
       .findMany({ where: { runId }, select: { reviewId: true } })
       .then((rows) => new Set(rows.map((row) => row.reviewId)));
@@ -455,6 +723,11 @@ const worker = new Worker(
         successCount: existingReviewIds.size,
         lastError: null
       }
+    });
+    await addRunLog(runId, "info", "Analysis run started", {
+      totalReviews: reviews.length,
+      pendingReviews: pendingReviews.length,
+      resumedReviews: existingReviewIds.size
     });
 
     let successCount = existingReviewIds.size;
@@ -492,6 +765,11 @@ const worker = new Worker(
 
       const batch = pendingReviews.slice(i, i + batchSize);
       let batchSucceeded = false;
+      await addRunLog(runId, "info", "Processing review batch", {
+        batchStart: i + 1,
+        batchEnd: i + batch.length,
+        batchSize: batch.length
+      });
 
       if (!useMock && client && batch.length > 1) {
         try {
@@ -506,9 +784,19 @@ const worker = new Worker(
             successCount += 1;
           }
           batchSucceeded = true;
+          await addRunLog(runId, "info", "Batch analysis succeeded", {
+            batchStart: i + 1,
+            batchEnd: i + batch.length,
+            successCount
+          });
         } catch (error) {
           lastError = error instanceof Error ? error.message : String(error);
           console.warn(`Batch analysis failed, fallback to single review: ${lastError}`);
+          await addRunLog(runId, "warn", "Batch analysis failed, falling back to single reviews", {
+            batchStart: i + 1,
+            batchEnd: i + batch.length,
+            error: lastError
+          });
         }
       }
 
@@ -523,17 +811,27 @@ const worker = new Worker(
             } else {
               failedCount += 1;
               lastError = result.reason instanceof Error ? result.reason.message : String(result.reason);
+              await addRunLog(runId, "error", "Single review analysis failed", {
+                error: lastError
+              });
             }
           }
         }
       }
 
       await updateRunProgress(runId, successCount, failedCount, lastError);
+      await addRunLog(runId, failedCount > 0 ? "warn" : "info", "Analysis progress updated", {
+        successCount,
+        failedCount,
+        totalReviews: reviews.length,
+        lastError: lastError || null
+      });
       if (i + batchSize < pendingReviews.length) {
         await sleep(800);
       }
     }
 
+    await addRunLog(runId, "info", "Generating dashboard summary");
     const analyses = await prisma.reviewAnalysis.findMany({ where: { runId }, include: { review: true } });
     const dashboard = buildDashboardSnapshot(taskId, analyses);
     dashboard.aiSummary = await generateAiSummary(client, setting, dashboard);
@@ -585,6 +883,11 @@ const worker = new Worker(
         lastError
       }
     });
+    await addRunLog(runId, failedCount > 0 ? "warn" : "info", "Analysis run finished", {
+      status: failedCount > 0 ? "partial_failed" : "completed",
+      successCount: analyses.length,
+      failedCount
+    });
 
     await prisma.task.update({ where: { id: taskId }, data: { status: "completed" } });
     return { successCount: analyses.length, failedCount };
@@ -599,6 +902,9 @@ worker.on("completed", (job) => {
 worker.on("failed", async (job, error) => {
   console.error(`Job ${job?.id} failed`, error);
   if (job?.data?.runId) {
+    await addRunLog(job.data.runId as string, "error", "Analysis job failed", {
+      error: error instanceof Error ? error.message : String(error)
+    });
     await prisma.analysisRun.update({
       where: { id: job.data.runId as string },
       data: {
@@ -610,4 +916,93 @@ worker.on("failed", async (job, error) => {
   }
 });
 
-console.log("Analysis worker started");
+const crawlWorker = new Worker(
+  "crawl-jobs",
+  async (job) => {
+    const crawlJobId = String(job.data.crawlJobId || "");
+    const crawlJob = await prisma.crawlJob.findUnique({
+      where: { id: crawlJobId },
+      include: { workspace: { include: { crawlerSetting: true } } }
+    });
+    if (!crawlJob) {
+      throw new Error(`Crawl job ${crawlJobId} not found`);
+    }
+    if (crawlJob.status === "completed" || crawlJob.status === "imported") {
+      return { skipped: true };
+    }
+
+    const storedSetting = crawlJob.workspace.crawlerSetting;
+    const setting: ResolvedCrawlerSetting = {
+      pythonBin: storedSetting?.pythonBin || process.env.SCRAPLING_PYTHON_BIN || "python",
+      proxyUrl: storedSetting?.proxyUrl || process.env.SCRAPLING_PROXY || null,
+      shopeeCookie: storedSetting?.shopeeCookie || process.env.SHOPEE_COOKIE || null,
+      crawlChannels:
+        crawlJob.platform === "youtube"
+          ? ["browser_intercept"]
+          : parseCrawlerChannels(crawlJob.crawlChannels || storedSetting?.crawlChannels).length
+            ? parseCrawlerChannels(crawlJob.crawlChannels || storedSetting?.crawlChannels)
+            : ["api_exporter", "api_basic", "browser_intercept"],
+      requestTimeoutSec: storedSetting?.requestTimeoutSec || Number(process.env.SCRAPLING_TIMEOUT_SEC || 180)
+    };
+
+    await prisma.crawlJob.update({
+      where: { id: crawlJob.id },
+      data: { status: "running", progress: 10, startedAt: new Date(), lastError: null }
+    });
+
+    try {
+      const result = await runScraplingCrawler(crawlJob.normalizedUrl, crawlJob.maxReviews, setting);
+      if (!result.rows.length) {
+        const message = buildEmptyCrawlError(result);
+        await prisma.crawlJob.update({
+          where: { id: crawlJob.id },
+          data: {
+            rawResult: result as unknown as Prisma.InputJsonValue,
+            crawlChannel: result.crawlChannel || null,
+            crawlChannelLabel: result.crawlChannelLabel || null,
+            productName: crawlJob.productName || result.productName || crawlJob.name
+          }
+        });
+        throw new Error(message);
+      }
+      await prisma.crawlJob.update({
+        where: { id: crawlJob.id },
+        data: {
+          status: "completed",
+          progress: 100,
+          fetchedRows: result.rows.length,
+          productName: crawlJob.productName || result.productName || crawlJob.name,
+          crawlChannel: result.crawlChannel || null,
+          crawlChannelLabel: result.crawlChannelLabel || null,
+          rawResult: result as unknown as Prisma.InputJsonValue,
+          finishedAt: new Date(),
+          lastError: null
+        }
+      });
+      return { fetchedRows: result.rows.length };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await prisma.crawlJob.update({
+        where: { id: crawlJob.id },
+        data: {
+          status: "failed",
+          progress: 100,
+          lastError: message,
+          finishedAt: new Date()
+        }
+      });
+      throw error;
+    }
+  },
+  { connection, concurrency: 1 }
+);
+
+crawlWorker.on("completed", (job) => {
+  console.log(`Crawl job ${job.id} completed`);
+});
+
+crawlWorker.on("failed", (job, error) => {
+  console.error(`Crawl job ${job?.id} failed`, error);
+});
+
+console.log("Analysis and crawl workers started");

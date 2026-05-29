@@ -7,7 +7,7 @@
         sub-title="当前账号没有平台级管理权限。请使用超管账号登录，或联系现有超管为你开通权限。"
       >
         <template #extra>
-          <a-button type="primary" @click="$router.push('/dashboard')">返回经营看板</a-button>
+          <a-button type="primary" @click="$router.push('/dashboard')">返回空间概览</a-button>
         </template>
       </a-result>
     </div>
@@ -17,13 +17,31 @@
     <div class="page-toolbar dashboard-toolbar">
       <div class="toolbar-title-block">
         <div class="toolbar-title">超管后台</div>
-        <div class="toolbar-subtitle">平台级用户、租户空间、套餐额度和运行规模管理。</div>
+        <div class="toolbar-subtitle">平台级账号、租户空间、套餐额度和运行规模管理；空间成员请在“空间与成员”维护。</div>
       </div>
       <a-space wrap>
         <a-button @click="load" :loading="loading">刷新</a-button>
-        <a-button type="primary" @click="openWorkspaceModal">新建空间</a-button>
-        <a-button @click="openUserModal">新建用户</a-button>
+        <a-button type="primary" @click="openWorkspaceModal">新建租户空间</a-button>
+        <a-button @click="openUserModal">新建平台账号</a-button>
       </a-space>
+    </div>
+
+    <div class="settings-grid">
+      <section class="settings-panel">
+        <div class="panel-label">Scope</div>
+        <div class="settings-title">平台账号</div>
+        <div class="settings-meta">账号是否为超管在这里设置；空间内角色不在这里维护。</div>
+      </section>
+      <section class="settings-panel">
+        <div class="panel-label">Scope</div>
+        <div class="settings-title">租户空间</div>
+        <div class="settings-meta">创建空间和配置套餐额度；成员关系由空间所有者管理。</div>
+      </section>
+      <section class="settings-panel">
+        <div class="panel-label">Boundary</div>
+        <div class="settings-title">空间与成员</div>
+        <div class="settings-meta">切到目标空间后，在设置中维护成员、AI 和爬虫配置。</div>
+      </section>
     </div>
 
     <div class="summary-grid">
@@ -42,7 +60,7 @@
     </div>
 
     <div class="table-shell">
-      <div class="table-title">租户空间</div>
+      <div class="table-title">租户空间与额度</div>
       <a-table :columns="workspaceColumns" :data-source="workspaces" :loading="loading" row-key="id">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
@@ -61,7 +79,7 @@
     </div>
 
     <div class="table-shell">
-      <div class="table-title">平台用户</div>
+      <div class="table-title">平台账号</div>
       <a-table :columns="userColumns" :data-source="users" :loading="loading" row-key="id">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'user'">
@@ -84,7 +102,7 @@
 
     <a-modal
       :open="userModalOpen"
-      title="新建平台用户"
+      title="新建平台账号"
       ok-text="保存"
       cancel-text="取消"
       :confirm-loading="saving"

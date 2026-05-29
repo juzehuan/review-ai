@@ -6,7 +6,8 @@
         <div class="toolbar-subtitle">{{ pageSubtitle }}</div>
       </div>
       <a-space wrap>
-        <a-button @click="loadAiSettings" :loading="loadingAi">刷新</a-button>
+        <a-button @click="reloadCurrentSection" :loading="loading">刷新</a-button>
+        <a-button v-if="activeSection === 'workspace'" :disabled="!canManageMembers" @click="openMemberModal">添加成员</a-button>
         <a-button v-if="activeSection === 'workspace'" type="primary" @click="modalOpen = true">新建空间</a-button>
       </a-space>
     </div>
@@ -20,7 +21,7 @@
       <section class="settings-panel">
         <div class="panel-label">我的角色</div>
         <div class="settings-title">{{ roleLabel(currentRole) }}</div>
-        <div class="settings-meta">所有者和管理员可以编辑 AI 设置</div>
+        <div class="settings-meta">所有者和管理员可以管理成员与空间配置</div>
       </section>
       <section class="settings-panel">
         <div class="panel-label">评论额度</div>
@@ -31,6 +32,62 @@
         <div class="panel-label">分析次数</div>
         <div class="settings-title">{{ workspace?.currentPeriodRunCount || 0 }}/{{ workspace?.monthlyRunLimit || 0 }}</div>
         <a-progress :percent="runUsagePercent" size="small" />
+      </section>
+    </div>
+
+    <div v-if="activeSection === 'workspace'" class="settings-layout settings-layout-single">
+      <section class="settings-panel settings-panel-wide">
+        <div class="settings-section-head">
+          <div>
+            <div class="panel-label">Members</div>
+            <div class="settings-section-title">当前空间成员</div>
+          </div>
+          <a-tag :color="canManageMembers ? 'blue' : 'default'">{{ canManageMembers ? "可管理" : "只读" }}</a-tag>
+        </div>
+        <a-table
+          :columns="memberColumns"
+          :data-source="members"
+          :loading="loadingMembers"
+          row-key="id"
+          :pagination="false"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'user'">
+              <div class="member-cell">
+                <div class="member-avatar">{{ record.user.name.slice(0, 1).toUpperCase() }}</div>
+                <div>
+                  <div class="member-name">{{ record.user.name }}</div>
+                  <div class="member-email">{{ record.user.email }}</div>
+                </div>
+              </div>
+            </template>
+            <template v-else-if="column.key === 'role'">
+              <a-select
+                :value="record.role"
+                class="role-select"
+                :disabled="!canManageMembers || !canEditMember(record)"
+                @change="changeRoleFromSelect(record.id, $event)"
+              >
+                <a-select-option v-for="role in roleOptions" :key="role.value" :value="role.value">
+                  {{ role.label }}
+                </a-select-option>
+              </a-select>
+            </template>
+            <template v-else-if="column.key === 'isSuperAdmin'">
+              <a-tag :color="record.user.isSuperAdmin ? 'purple' : 'default'">
+                {{ record.user.isSuperAdmin ? "平台超管" : "普通账号" }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a-popconfirm title="确定从当前空间移除该成员？" @confirm="removeMember(record.id)">
+                <a-button danger size="small" :disabled="!canManageMembers || !canRemoveMember(record)">移除</a-button>
+              </a-popconfirm>
+            </template>
+          </template>
+        </a-table>
+        <div class="settings-help">
+          这里管理的是当前空间成员关系；平台账号、超管权限和租户额度由超管后台管理。
+        </div>
       </section>
     </div>
 
@@ -85,7 +142,7 @@
         <div class="settings-section-head">
           <div>
             <div class="panel-label">提示词设置</div>
-            <div class="settings-section-title">评论分析提示词</div>
+            <div class="settings-section-title">{{ activePromptProfile?.label || "评论" }}提示词</div>
           </div>
           <a-space>
             <a-button :disabled="!canEditAi" @click="resetDefaultPrompts">恢复默认提示词</a-button>
@@ -96,14 +153,18 @@
           <a-form-item label="系统提示词">
             <a-textarea v-model:value="aiForm.systemPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 3, maxRows: 6 }" />
           </a-form-item>
-          <a-form-item label="评论分析提示词模板">
-            <a-textarea v-model:value="aiForm.userPromptTemplate" :disabled="!canEditAi" :auto-size="{ minRows: 12, maxRows: 20 }" />
+          <a-form-item label="分析类型">
+            <a-segmented v-model:value="promptProfileType" :options="promptProfileOptions" />
+            <div class="settings-help compact-help">{{ activePromptProfile?.description }}</div>
+          </a-form-item>
+          <a-form-item label="单条评论分析提示词模板">
+            <a-textarea v-model:value="activeUserPromptTemplate" :disabled="!canEditAi" :auto-size="{ minRows: 12, maxRows: 20 }" />
           </a-form-item>
           <a-form-item label="总体总结提示词">
-            <a-textarea v-model:value="aiForm.summaryPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 6, maxRows: 12 }" />
+            <a-textarea v-model:value="activeSummaryPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 6, maxRows: 12 }" />
           </a-form-item>
-          <a-form-item label="产品洞察提示词">
-            <a-textarea v-model:value="aiForm.insightsPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 8, maxRows: 16 }" />
+          <a-form-item label="分析报告提示词">
+            <a-textarea v-model:value="activeInsightsPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 8, maxRows: 16 }" />
           </a-form-item>
         </a-form>
         <div class="settings-help">
@@ -166,6 +227,7 @@
     </div>
 
     <div v-if="activeSection === 'workspace'" class="table-shell">
+      <div class="table-title">我的空间</div>
       <a-table :columns="columns" :data-source="workspaces" row-key="id" :pagination="false">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
@@ -217,6 +279,35 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal
+      :open="memberModalOpen"
+      title="添加空间成员"
+      ok-text="保存"
+      cancel-text="取消"
+      :confirm-loading="savingMember"
+      @ok="submitMember"
+      @cancel="memberModalOpen = false"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="姓名">
+          <a-input v-model:value="memberForm.name" placeholder="例如：运营同事" />
+        </a-form-item>
+        <a-form-item label="邮箱">
+          <a-input v-model:value="memberForm.email" placeholder="name@example.com" />
+        </a-form-item>
+        <a-form-item label="空间角色">
+          <a-select v-model:value="memberForm.role">
+            <a-select-option v-for="role in roleOptions" :key="role.value" :value="role.value">
+              {{ role.label }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <div class="settings-help">
+          如果该邮箱尚未注册，系统会先创建占位账号；对方用同一邮箱注册后即可进入此空间。
+        </div>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -225,19 +316,25 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { message } from "ant-design-vue";
 import {
+  ANALYSIS_TYPE_PRESETS,
   AI_PROVIDER_PRESETS,
   CRAWLER_CHANNEL_PRESETS,
   DEFAULT_INSIGHTS_PROMPT,
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_SYSTEM_PROMPT,
-  DEFAULT_USER_PROMPT_TEMPLATE
+  DEFAULT_USER_PROMPT_TEMPLATE,
+  getAnalysisPromptProfile
 } from "@review-ai/shared";
-import type { MemberRole, WorkspaceAiSettingDTO, WorkspaceCrawlerSettingDTO } from "@review-ai/shared";
+import type { AnalysisType, MemberRole, WorkspaceAiSettingDTO, WorkspaceCrawlerSettingDTO, WorkspaceMemberDTO } from "@review-ai/shared";
 import {
   createWorkspace,
+  createWorkspaceMember,
   deleteWorkspace,
+  deleteWorkspaceMember,
   fetchWorkspaceAiSettings,
   fetchWorkspaceCrawlerSettings,
+  fetchWorkspaceMembers,
+  updateWorkspaceMember,
   updateWorkspaceAiSettings,
   updateWorkspaceCrawlerSettings
 } from "@/api";
@@ -246,26 +343,43 @@ import { useTaskStore } from "@/composables";
 const { workspace, workspaces, currentUser, refreshTasks, switchWorkspace } = useTaskStore();
 const route = useRoute();
 const modalOpen = ref(false);
+const memberModalOpen = ref(false);
 const saving = ref(false);
+const savingMember = ref(false);
 const deletingWorkspaceId = ref("");
-const loadingAi = ref(false);
+const loading = ref(false);
+const loadingMembers = ref(false);
 const savingAi = ref(false);
+const syncingAiForm = ref(false);
 const savingCrawler = ref(false);
+const promptProfileType = ref<AnalysisType>("product");
 const form = reactive({
   name: "",
   slug: ""
 });
+const memberForm = reactive({
+  name: "",
+  email: "",
+  role: "analyst" as MemberRole
+});
+const members = ref<WorkspaceMemberDTO[]>([]);
 const aiForm = reactive<WorkspaceAiSettingDTO>({
   provider: "openai",
   apiKey: null,
   apiKeySet: false,
   baseUrl: null,
-  modelName: "gpt-4.1-mini",
+  modelName: "gpt-5.4-mini",
   promptVersion: "v2-thai",
   systemPrompt: "",
   userPromptTemplate: "",
   summaryPrompt: "",
   insightsPrompt: "",
+  videoUserPromptTemplate: "",
+  videoSummaryPrompt: "",
+  videoInsightsPrompt: "",
+  tweetUserPromptTemplate: "",
+  tweetSummaryPrompt: "",
+  tweetInsightsPrompt: "",
   temperature: 0.2,
   updatedAt: null
 });
@@ -299,7 +413,7 @@ const pageTitle = computed(() => {
   if (activeSection.value === "crawler") {
     return "爬虫设置";
   }
-  return "空间设置";
+  return "空间与成员";
 });
 const pageSubtitle = computed(() => {
   if (activeSection.value === "ai") {
@@ -308,15 +422,89 @@ const pageSubtitle = computed(() => {
   if (activeSection.value === "crawler") {
     return "配置当前空间的 Scrapling 评论抓取渠道、代理、Cookie 和默认抓取参数。";
   }
-  return "管理当前租户空间、成员角色视图和额度使用情况。";
+  return "管理当前空间、成员角色、我的空间列表和额度使用情况。";
 });
 const canEditAi = computed(() => {
   return Boolean(currentUser.value?.isSuperAdmin || currentRole.value === "owner" || currentRole.value === "admin");
 });
+const canManageMembers = computed(() => canEditAi.value);
 const currentProvider = computed(() => AI_PROVIDER_PRESETS.find((item) => item.id === aiForm.provider) || null);
 const providerModels = computed(() => {
   const models = currentProvider.value?.models || [];
   return models.includes(aiForm.modelName) ? models : [aiForm.modelName, ...models].filter(Boolean);
+});
+const promptProfileOptions = ANALYSIS_TYPE_PRESETS.map((item) => ({
+  label: item.label,
+  value: item.value
+}));
+const activePromptProfile = computed(() => {
+  return ANALYSIS_TYPE_PRESETS.find((item) => item.value === promptProfileType.value);
+});
+const activeUserPromptTemplate = computed({
+  get() {
+    if (promptProfileType.value === "video") {
+      return aiForm.videoUserPromptTemplate;
+    }
+    if (promptProfileType.value === "tweet") {
+      return aiForm.tweetUserPromptTemplate;
+    }
+    return aiForm.userPromptTemplate;
+  },
+  set(value: string) {
+    if (promptProfileType.value === "video") {
+      aiForm.videoUserPromptTemplate = value;
+      return;
+    }
+    if (promptProfileType.value === "tweet") {
+      aiForm.tweetUserPromptTemplate = value;
+      return;
+    }
+    aiForm.userPromptTemplate = value;
+  }
+});
+const activeSummaryPrompt = computed({
+  get() {
+    if (promptProfileType.value === "video") {
+      return aiForm.videoSummaryPrompt;
+    }
+    if (promptProfileType.value === "tweet") {
+      return aiForm.tweetSummaryPrompt;
+    }
+    return aiForm.summaryPrompt;
+  },
+  set(value: string) {
+    if (promptProfileType.value === "video") {
+      aiForm.videoSummaryPrompt = value;
+      return;
+    }
+    if (promptProfileType.value === "tweet") {
+      aiForm.tweetSummaryPrompt = value;
+      return;
+    }
+    aiForm.summaryPrompt = value;
+  }
+});
+const activeInsightsPrompt = computed({
+  get() {
+    if (promptProfileType.value === "video") {
+      return aiForm.videoInsightsPrompt;
+    }
+    if (promptProfileType.value === "tweet") {
+      return aiForm.tweetInsightsPrompt;
+    }
+    return aiForm.insightsPrompt;
+  },
+  set(value: string) {
+    if (promptProfileType.value === "video") {
+      aiForm.videoInsightsPrompt = value;
+      return;
+    }
+    if (promptProfileType.value === "tweet") {
+      aiForm.tweetInsightsPrompt = value;
+      return;
+    }
+    aiForm.insightsPrompt = value;
+  }
 });
 
 const reviewUsagePercent = computed(() => {
@@ -344,7 +532,23 @@ const columns = [
   { title: "操作", key: "action", width: 180 }
 ];
 
+const roleOptions: Array<{ label: string; value: MemberRole }> = [
+  { label: "所有者", value: "owner" },
+  { label: "管理员", value: "admin" },
+  { label: "分析师", value: "analyst" },
+  { label: "只读", value: "viewer" }
+];
+
+const memberColumns = [
+  { title: "成员", key: "user", width: 320 },
+  { title: "空间角色", key: "role", width: 180 },
+  { title: "平台权限", key: "isSuperAdmin", width: 140 },
+  { title: "加入时间", dataIndex: "createdAt", key: "createdAt", width: 220 },
+  { title: "操作", key: "action", width: 120 }
+];
+
 function assignAiForm(data: WorkspaceAiSettingDTO) {
+  syncingAiForm.value = true;
   aiForm.provider = data.provider;
   aiForm.apiKey = data.apiKey;
   aiForm.apiKeySet = data.apiKeySet;
@@ -355,9 +559,32 @@ function assignAiForm(data: WorkspaceAiSettingDTO) {
   aiForm.userPromptTemplate = data.userPromptTemplate;
   aiForm.summaryPrompt = data.summaryPrompt;
   aiForm.insightsPrompt = data.insightsPrompt;
+  aiForm.videoUserPromptTemplate = data.videoUserPromptTemplate;
+  aiForm.videoSummaryPrompt = data.videoSummaryPrompt;
+  aiForm.videoInsightsPrompt = data.videoInsightsPrompt;
+  aiForm.tweetUserPromptTemplate = data.tweetUserPromptTemplate;
+  aiForm.tweetSummaryPrompt = data.tweetSummaryPrompt;
+  aiForm.tweetInsightsPrompt = data.tweetInsightsPrompt;
   aiForm.temperature = data.temperature;
   aiForm.updatedAt = data.updatedAt;
+  queueMicrotask(() => {
+    syncingAiForm.value = false;
+  });
 }
+
+watch(
+  () => aiForm.provider,
+  () => {
+    if (syncingAiForm.value) {
+      return;
+    }
+    const provider = AI_PROVIDER_PRESETS.find((item) => item.id === aiForm.provider);
+    aiForm.baseUrl = provider?.baseUrl || null;
+    if (provider?.models.length) {
+      aiForm.modelName = provider.models[0];
+    }
+  }
+);
 
 function assignCrawlerForm(data: WorkspaceCrawlerSettingDTO) {
   crawlerForm.enabled = data.enabled;
@@ -374,10 +601,17 @@ function assignCrawlerForm(data: WorkspaceCrawlerSettingDTO) {
 
 function resetDefaultPrompts() {
   aiForm.systemPrompt = DEFAULT_SYSTEM_PROMPT;
-  aiForm.userPromptTemplate = DEFAULT_USER_PROMPT_TEMPLATE;
-  aiForm.summaryPrompt = DEFAULT_SUMMARY_PROMPT;
-  aiForm.insightsPrompt = DEFAULT_INSIGHTS_PROMPT;
-  message.success("已恢复默认提示词，保存后生效");
+  if (promptProfileType.value === "product") {
+    aiForm.userPromptTemplate = DEFAULT_USER_PROMPT_TEMPLATE;
+    aiForm.summaryPrompt = DEFAULT_SUMMARY_PROMPT;
+    aiForm.insightsPrompt = DEFAULT_INSIGHTS_PROMPT;
+  } else {
+    const profile = getAnalysisPromptProfile(promptProfileType.value);
+    activeUserPromptTemplate.value = profile.userPromptTemplate;
+    activeSummaryPrompt.value = profile.summaryPrompt;
+    activeInsightsPrompt.value = profile.insightsPrompt;
+  }
+  message.success("已恢复当前类型默认提示词，保存后生效");
 }
 
 function roleLabel(role?: MemberRole | null) {
@@ -397,7 +631,6 @@ function roleLabel(role?: MemberRole | null) {
 }
 
 async function loadAiSettings() {
-  loadingAi.value = true;
   try {
     const [aiSettings, crawlerSettings] = await Promise.all([
       fetchWorkspaceAiSettings(),
@@ -407,8 +640,35 @@ async function loadAiSettings() {
     assignCrawlerForm(crawlerSettings);
   } catch {
     message.error("空间设置加载失败");
+  }
+}
+
+async function loadMembers() {
+  if (!canManageMembers.value) {
+    members.value = [];
+    return;
+  }
+  loadingMembers.value = true;
+  try {
+    members.value = await fetchWorkspaceMembers();
+  } catch {
+    members.value = [];
+    message.error("成员列表加载失败，请检查权限");
   } finally {
-    loadingAi.value = false;
+    loadingMembers.value = false;
+  }
+}
+
+async function reloadCurrentSection() {
+  loading.value = true;
+  try {
+    if (activeSection.value === "workspace") {
+      await Promise.all([refreshTasks(), loadMembers()]);
+      return;
+    }
+    await loadAiSettings();
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -442,7 +702,71 @@ async function saveCrawlerSettings() {
 
 async function switchTo(slug: string) {
   await switchWorkspace(slug);
+  await reloadCurrentSection();
   message.success("空间已切换");
+}
+
+function openMemberModal() {
+  memberForm.name = "";
+  memberForm.email = "";
+  memberForm.role = "analyst";
+  memberModalOpen.value = true;
+}
+
+function canEditMember(record: WorkspaceMemberDTO) {
+  if (currentUser.value?.isSuperAdmin) {
+    return true;
+  }
+  if (currentRole.value === "owner") {
+    return true;
+  }
+  return record.role !== "owner";
+}
+
+function canRemoveMember(record: WorkspaceMemberDTO) {
+  return canEditMember(record) && record.user.id !== currentUser.value?.id;
+}
+
+async function submitMember() {
+  if (!memberForm.name.trim() || !memberForm.email.trim()) {
+    message.error("请填写姓名和邮箱");
+    return;
+  }
+  savingMember.value = true;
+  try {
+    await createWorkspaceMember({ ...memberForm, name: memberForm.name.trim(), email: memberForm.email.trim() });
+    message.success("成员已添加到当前空间");
+    memberModalOpen.value = false;
+    await loadMembers();
+  } catch {
+    message.error("成员保存失败，请检查权限或输入信息");
+  } finally {
+    savingMember.value = false;
+  }
+}
+
+async function changeRole(memberId: string, role: MemberRole) {
+  try {
+    await updateWorkspaceMember(memberId, { role });
+    message.success("成员角色已更新");
+    await loadMembers();
+  } catch {
+    message.error("角色更新失败，请检查权限");
+  }
+}
+
+function changeRoleFromSelect(memberId: string, role: unknown) {
+  changeRole(memberId, role as MemberRole);
+}
+
+async function removeMember(memberId: string) {
+  try {
+    await deleteWorkspaceMember(memberId);
+    message.success("成员已从当前空间移除");
+    await loadMembers();
+  } catch {
+    message.error("成员移除失败，请检查权限");
+  }
 }
 
 function canDeleteWorkspace(record: { id: string; role: MemberRole }) {
@@ -500,10 +824,17 @@ watch(
   () => workspace.value?.slug,
   () => {
     if (workspace.value?.slug) {
-      loadAiSettings();
+      reloadCurrentSection();
     }
   }
 );
 
-onMounted(loadAiSettings);
+watch(
+  () => route.path,
+  () => {
+    reloadCurrentSection();
+  }
+);
+
+onMounted(reloadCurrentSection);
 </script>

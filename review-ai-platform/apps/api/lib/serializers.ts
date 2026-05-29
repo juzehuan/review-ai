@@ -1,14 +1,33 @@
 import type {
   AdminWorkspaceDTO,
+  AnalysisType,
+  AnalysisRunLogDTO,
   AnalysisRunDTO,
+  CrawlJobDTO,
   MyWorkspaceDTO,
+  ReviewActionItemDTO,
   ReviewRowDTO,
+  SavedReviewViewDTO,
   TaskListItem,
   UserDTO,
   WorkspaceDTO,
   WorkspaceMemberDTO
 } from "@review-ai/shared";
-import type { AnalysisRun, Review, ReviewAnalysis, Subscription, Task, User, Workspace, WorkspaceMember } from "@review-ai/db";
+import type {
+  AnalysisRun,
+  AnalysisRunLog,
+  CrawlJob,
+  Review,
+  ReviewActionItem,
+  ReviewAnalysis,
+  SavedReviewView,
+  Subscription,
+  Task,
+  User,
+  Workspace,
+  WorkspaceMember
+} from "@review-ai/db";
+import { parseCrawlerChannels } from "@/lib/crawler-settings";
 
 export function serializeTask(task: Task & { analysisRuns?: AnalysisRun[] }): TaskListItem {
   const latestRun = task.analysisRuns?.[0] || null;
@@ -20,6 +39,7 @@ export function serializeTask(task: Task & { analysisRuns?: AnalysisRun[] }): Ta
     shopId: task.shopId,
     itemId: task.itemId,
     sourceChannel: task.sourceChannel,
+    analysisType: task.analysisType as AnalysisType,
     status: task.status,
     latestRunStatus: latestRun?.status || null,
     latestRunFinishedAt: latestRun?.finishedAt?.toISOString() || null,
@@ -99,6 +119,89 @@ export function serializeRun(run: AnalysisRun): AnalysisRunDTO {
     startedAt: run.startedAt?.toISOString() || null,
     finishedAt: run.finishedAt?.toISOString() || null,
     lastError: run.lastError || null
+  };
+}
+
+export function serializeRunLog(log: AnalysisRunLog): AnalysisRunLogDTO {
+  return {
+    id: log.id,
+    runId: log.runId,
+    level: log.level,
+    message: log.message,
+    meta: log.meta,
+    createdAt: log.createdAt.toISOString()
+  };
+}
+
+export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
+  return {
+    id: job.id,
+    workspaceId: job.workspaceId,
+    taskId: job.taskId,
+    name: job.name,
+    productName: job.productName,
+    sourceChannel: job.sourceChannel,
+    analysisType: job.analysisType as CrawlJobDTO["analysisType"],
+    productUrl: job.productUrl,
+    normalizedUrl: job.normalizedUrl,
+    platform: job.platform,
+    maxReviews: job.maxReviews,
+    crawlChannels: parseCrawlerChannels(job.crawlChannels),
+    status: job.status,
+    progress: job.progress,
+    fetchedRows: job.fetchedRows,
+    importedRows: job.importedRows,
+    skippedDuplicate: job.skippedDuplicate,
+    crawlChannel: job.crawlChannel,
+    crawlChannelLabel: job.crawlChannelLabel,
+    lastError: job.lastError,
+    createdAt: job.createdAt.toISOString(),
+    updatedAt: job.updatedAt.toISOString(),
+    startedAt: job.startedAt?.toISOString() || null,
+    finishedAt: job.finishedAt?.toISOString() || null
+  };
+}
+
+export function serializeSavedView(view: SavedReviewView): SavedReviewViewDTO {
+  return {
+    id: view.id,
+    taskId: view.taskId,
+    name: view.name,
+    filters: view.filters as Record<string, unknown>,
+    groupBy: view.groupBy,
+    viewMode: view.viewMode,
+    sortBy: view.sortBy,
+    sortOrder: view.sortOrder,
+    visibleColumnKeys: view.visibleColumnKeys,
+    isDefault: view.isDefault,
+    createdAt: view.createdAt.toISOString(),
+    updatedAt: view.updatedAt.toISOString()
+  };
+}
+
+export function serializeActionItem(item: ReviewActionItem & { assignee?: User | null }): ReviewActionItemDTO {
+  return {
+    id: item.id,
+    taskId: item.taskId,
+    runId: item.runId,
+    assigneeUserId: item.assigneeUserId,
+    assignee: item.assignee
+      ? {
+          id: item.assignee.id,
+          name: item.assignee.name,
+          email: item.assignee.email
+        }
+      : null,
+    title: item.title,
+    description: item.description,
+    status: item.status,
+    priority: item.priority,
+    source: item.source,
+    relatedReviewIds: item.relatedReviewIds,
+    dueAt: item.dueAt?.toISOString() || null,
+    completedAt: item.completedAt?.toISOString() || null,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString()
   };
 }
 

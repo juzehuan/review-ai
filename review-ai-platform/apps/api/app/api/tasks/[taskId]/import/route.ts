@@ -31,7 +31,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   let parsedRows;
   try {
-    parsedRows = parseReviewFile(file.name, fileBuffer);
+    parsedRows = parseReviewFile(file.name, fileBuffer, { sourceChannel: scoped.task.sourceChannel });
   } catch (error) {
     return fail(error instanceof Error ? error.message : "文件解析失败");
   }

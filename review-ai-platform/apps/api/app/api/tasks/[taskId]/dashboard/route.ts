@@ -2,6 +2,7 @@ import { prisma } from "@review-ai/db";
 import type { DashboardDTO } from "@review-ai/shared";
 import { buildDashboardSnapshot } from "@review-ai/shared";
 import { fail, ok } from "@/lib/http";
+import { findAnalysisRunForResults } from "@/lib/analysis-runs";
 import { getWorkspaceContext, requireScopedTask } from "@/lib/workspace";
 
 export async function GET(request: Request, context: { params: Promise<{ taskId: string }> }) {
@@ -16,10 +17,8 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     return scoped.response;
   }
 
-  const latestRun = await prisma.analysisRun.findFirst({
-    where: { taskId },
-    orderBy: { startedAt: "desc" }
-  });
+  const { searchParams } = new URL(request.url);
+  const latestRun = await findAnalysisRunForResults(taskId, searchParams.get("runId"));
 
   if (!latestRun) {
     const reviews = await prisma.review.count({ where: { taskId } });

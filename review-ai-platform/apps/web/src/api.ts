@@ -2,15 +2,22 @@ import axios from "axios";
 import type {
   AdminOverviewDTO,
   AdminWorkspaceDTO,
+  AnalysisRunLogDTO,
   AnalysisRunDTO,
   AppendImportResponse,
   AuthResponseDTO,
+  CrawlJobDTO,
+  CreateCrawlJobResponse,
   CrawlTaskResponse,
   DashboardDTO,
   ImportTaskResponse,
+  AnalysisType,
   MemberRole,
   MyWorkspaceDTO,
+  ReviewActionItemDTO,
   ReviewRowDTO,
+  SavedReviewViewDTO,
+  StartCrawlAnalysisResponse,
   TaskListItem,
   UserDTO,
   WorkspaceAiSettingDTO,
@@ -200,12 +207,14 @@ export async function importTask(payload: {
   name: string;
   productName: string;
   sourceChannel: string;
+  analysisType: AnalysisType;
   file: File;
 }) {
   const formData = new FormData();
   formData.append("name", payload.name);
   formData.append("productName", payload.productName);
   formData.append("sourceChannel", payload.sourceChannel);
+  formData.append("analysisType", payload.analysisType);
   formData.append("file", payload.file);
   const { data } = await api.post<ImportTaskResponse>("/tasks/import", formData);
   return data;
@@ -222,6 +231,7 @@ export async function crawlTask(payload: {
   name: string;
   productName?: string;
   sourceChannel: string;
+  analysisType: AnalysisType;
   productUrl: string;
   maxReviews: number;
   crawlChannels?: CrawlerChannel[];
@@ -230,13 +240,38 @@ export async function crawlTask(payload: {
   return data;
 }
 
+export async function createCrawlJob(payload: {
+  name: string;
+  productName?: string;
+  sourceChannel: string;
+  analysisType: AnalysisType;
+  productUrl: string;
+  maxReviews: number;
+  crawlChannels?: CrawlerChannel[];
+}) {
+  const { data } = await api.post<CreateCrawlJobResponse>("/crawl-jobs", payload);
+  return data.job;
+}
+
+export async function fetchCrawlJobs() {
+  const { data } = await api.get<CrawlJobDTO[]>("/crawl-jobs");
+  return data;
+}
+
+export async function startCrawlJobAnalysis(jobId: string) {
+  const { data } = await api.post<StartCrawlAnalysisResponse>(`/crawl-jobs/${jobId}/start-analysis`, {
+    promptVersion: "v2-thai"
+  });
+  return data;
+}
+
 export async function fetchTask(taskId: string) {
   const { data } = await api.get(`/tasks/${taskId}`);
   return data;
 }
 
-export async function fetchDashboard(taskId: string) {
-  const { data } = await api.get<DashboardDTO>(`/tasks/${taskId}/dashboard`);
+export async function fetchDashboard(taskId: string, params?: { runId?: string }) {
+  const { data } = await api.get<DashboardDTO>(`/tasks/${taskId}/dashboard`, { params });
   return data;
 }
 
@@ -268,8 +303,56 @@ export async function fetchRuns(taskId: string) {
   return data;
 }
 
+export async function fetchRunLogs(taskId: string, runId: string, params?: { after?: string; limit?: number }) {
+  const { data } = await api.get<{ run: AnalysisRunDTO | null; logs: AnalysisRunLogDTO[] }>(
+    `/tasks/${taskId}/analysis-runs/${runId}/logs`,
+    { params }
+  );
+  return data;
+}
+
 export async function cancelRun(taskId: string, runId: string) {
   const { data } = await api.patch<AnalysisRunDTO>(`/tasks/${taskId}/analysis-runs/${runId}`, { action: "cancel" });
+  return data;
+}
+
+export async function fetchSavedViews(taskId: string) {
+  const { data } = await api.get<SavedReviewViewDTO[]>(`/tasks/${taskId}/views`);
+  return data;
+}
+
+export async function createSavedView(taskId: string, payload: Partial<SavedReviewViewDTO>) {
+  const { data } = await api.post<SavedReviewViewDTO>(`/tasks/${taskId}/views`, payload);
+  return data;
+}
+
+export async function updateSavedView(taskId: string, viewId: string, payload: Partial<SavedReviewViewDTO>) {
+  const { data } = await api.patch<SavedReviewViewDTO>(`/tasks/${taskId}/views/${viewId}`, payload);
+  return data;
+}
+
+export async function deleteSavedView(taskId: string, viewId: string) {
+  const { data } = await api.delete<{ deleted: boolean }>(`/tasks/${taskId}/views/${viewId}`);
+  return data;
+}
+
+export async function fetchActionItems(taskId: string, params?: { status?: string }) {
+  const { data } = await api.get<ReviewActionItemDTO[]>(`/tasks/${taskId}/actions`, { params });
+  return data;
+}
+
+export async function createActionItem(taskId: string, payload: Partial<ReviewActionItemDTO>) {
+  const { data } = await api.post<ReviewActionItemDTO>(`/tasks/${taskId}/actions`, payload);
+  return data;
+}
+
+export async function updateActionItem(taskId: string, actionId: string, payload: Partial<ReviewActionItemDTO>) {
+  const { data } = await api.patch<ReviewActionItemDTO>(`/tasks/${taskId}/actions/${actionId}`, payload);
+  return data;
+}
+
+export async function deleteActionItem(taskId: string, actionId: string) {
+  const { data } = await api.delete<{ deleted: boolean }>(`/tasks/${taskId}/actions/${actionId}`);
   return data;
 }
 

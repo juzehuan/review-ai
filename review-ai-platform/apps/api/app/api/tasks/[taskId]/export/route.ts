@@ -1,6 +1,7 @@
 import { prisma } from "@review-ai/db";
 import { serializeReviewRow } from "@/lib/serializers";
 import { fail } from "@/lib/http";
+import { findAnalysisRunForResults } from "@/lib/analysis-runs";
 import { getWorkspaceContext, requireScopedTask } from "@/lib/workspace";
 
 function escapeCsv(value: unknown) {
@@ -29,15 +30,28 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
 
   const { searchParams } = new URL(request.url);
   const sentiment = searchParams.get("sentiment");
+  const issue = searchParams.get("issue");
+  const tag = searchParams.get("tag");
+  const needsAttention = searchParams.get("needsAttention");
   const ratingStar = Number(searchParams.get("ratingStar") || 0);
   const keyword = searchParams.get("keyword");
   const hasMedia = searchParams.get("hasMedia");
   const variant = searchParams.get("variant");
 
-  const run = await prisma.analysisRun.findFirst({
-    where: { taskId, status: { in: ["completed", "partial_failed"] } },
-    orderBy: { startedAt: "desc" }
-  });
+  const run = await findAnalysisRunForResults(taskId, searchParams.get("runId"));
+  const hasAnalysisFilter = Boolean(sentiment || issue || tag || needsAttention !== null);
+  if (hasAnalysisFilter && !run) {
+    return fail("当前项目还没有可导出的分析结果", 404);
+  }
+  const analysisFilter = run
+    ? {
+        runId: run.id,
+        ...(sentiment ? { sentiment: sentiment as never } : {}),
+        ...(issue ? { painPoints: { has: issue } } : {}),
+        ...(tag ? { topicLabels: { has: tag } } : {}),
+        ...(needsAttention !== null ? { needsAttention: needsAttention === "true" } : {})
+      }
+    : null;
 
   const reviews = await prisma.review.findMany({
     where: {
@@ -45,6 +59,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
       ...(ratingStar ? { ratingStar } : {}),
       ...(variant ? { modelName: variant } : {}),
       ...(hasMedia !== null && hasMedia !== "" ? { hasMedia: hasMedia === "true" } : {}),
+      ...(analysisFilter ? { analyses: { some: analysisFilter } } : {}),
       ...(keyword
         ? {
             OR: [
@@ -58,7 +73,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
       task: true,
       analyses: run
         ? {
-            where: sentiment ? { runId: run.id, sentiment: sentiment as never } : { runId: run.id },
+            where: analysisFilter || { runId: run.id },
             take: 1
           }
         : false
@@ -66,7 +81,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     orderBy: { commentTime: "desc" }
   });
 
-  const rows = reviews.map(serializeReviewRow).filter((row) => !sentiment || row.sentiment === sentiment);
+  const rows = reviews.map(serializeReviewRow);
   if (!rows.length) {
     return fail("当前筛选条件下没有可导出的评论", 404);
   }

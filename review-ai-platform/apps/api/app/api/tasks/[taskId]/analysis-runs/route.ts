@@ -19,7 +19,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
 
   const runs = await prisma.analysisRun.findMany({
     where: { taskId },
-    orderBy: { startedAt: "desc" }
+    orderBy: [{ createdAt: "desc" }, { startedAt: "desc" }]
   });
   return ok(runs.map(serializeRun));
 }
@@ -99,6 +99,15 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     runId: run.id,
     taskId,
     workspaceId: workspace.id
+  });
+
+  await prisma.analysisRunLog.create({
+    data: {
+      runId: run.id,
+      level: "info",
+      message: "Analysis run queued",
+      meta: { provider: aiSetting.provider, modelName, reviewCount }
+    }
   });
 
   return ok(serializeRun(run), 201);

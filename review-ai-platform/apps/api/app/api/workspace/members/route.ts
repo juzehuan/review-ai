@@ -11,10 +11,6 @@ export async function GET(request: Request) {
   if (context.response || !context.workspace) {
     return context.response;
   }
-  const roleResponse = requireWorkspaceRole(context, ["owner", "admin"]);
-  if (roleResponse) {
-    return roleResponse;
-  }
   const { workspace } = context;
   const members = await prisma.workspaceMember.findMany({
     where: { workspaceId: workspace.id },

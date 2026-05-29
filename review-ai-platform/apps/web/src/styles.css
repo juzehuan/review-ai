@@ -593,6 +593,7 @@ select {
 
 .ai-summary-card,
 .product-insights-panel,
+.evidence-panel,
 .product-insight-card {
   padding: 18px;
 }
@@ -623,6 +624,35 @@ select {
   font-size: 13px;
   line-height: 1.75;
   white-space: pre-wrap;
+}
+
+.evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.evidence-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.evidence-title {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.muted {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .analysis-progress-panel {
@@ -1167,6 +1197,7 @@ select {
   .settings-layout,
   .group-list,
   .product-insights-grid,
+  .evidence-grid,
   .nps-layout {
     grid-template-columns: 1fr;
   }

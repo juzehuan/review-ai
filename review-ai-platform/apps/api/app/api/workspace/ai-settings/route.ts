@@ -1,6 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { fail, ok } from "@/lib/http";
-import { defaultAiSetting, serializeAiSetting } from "@/lib/ai-settings";
+import { defaultAiSetting, normalizeProviderBaseUrl, serializeAiSetting } from "@/lib/ai-settings";
 import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function GET(request: Request) {
@@ -30,21 +30,35 @@ export async function PATCH(request: Request) {
   const body = await request.json().catch(() => ({}));
   const defaults = defaultAiSetting();
   const provider = String(body.provider || defaults.provider).trim() || defaults.provider;
-  const baseUrl =
+  const requestedBaseUrl =
     typeof body.baseUrl === "string" ? body.baseUrl.trim() || null : body.baseUrl === null ? null : defaults.baseUrl;
+  const baseUrl = normalizeProviderBaseUrl(provider, requestedBaseUrl);
   const modelName = String(body.modelName || defaults.modelName).trim();
   const promptVersion = String(body.promptVersion || defaults.promptVersion).trim();
   const systemPrompt = String(body.systemPrompt || defaults.systemPrompt).trim();
   const userPromptTemplate = String(body.userPromptTemplate || defaults.userPromptTemplate).trim();
   const summaryPrompt = String(body.summaryPrompt || defaults.summaryPrompt).trim();
   const insightsPrompt = String(body.insightsPrompt || defaults.insightsPrompt).trim();
+  const videoUserPromptTemplate = String(body.videoUserPromptTemplate || defaults.videoUserPromptTemplate).trim();
+  const videoSummaryPrompt = String(body.videoSummaryPrompt || defaults.videoSummaryPrompt).trim();
+  const videoInsightsPrompt = String(body.videoInsightsPrompt || defaults.videoInsightsPrompt).trim();
+  const tweetUserPromptTemplate = String(body.tweetUserPromptTemplate || defaults.tweetUserPromptTemplate).trim();
+  const tweetSummaryPrompt = String(body.tweetSummaryPrompt || defaults.tweetSummaryPrompt).trim();
+  const tweetInsightsPrompt = String(body.tweetInsightsPrompt || defaults.tweetInsightsPrompt).trim();
   const temperature = Number(body.temperature ?? defaults.temperature);
   const apiKey =
     typeof body.apiKey === "string" && body.apiKey.trim() && !body.apiKey.includes("*")
       ? body.apiKey.trim()
       : undefined;
 
-  if (!modelName || !promptVersion || !systemPrompt || !userPromptTemplate) {
+  if (
+    !modelName ||
+    !promptVersion ||
+    !systemPrompt ||
+    !userPromptTemplate ||
+    !videoUserPromptTemplate ||
+    !tweetUserPromptTemplate
+  ) {
     return fail("模型名称、提示词版本和提示词内容不能为空");
   }
 
@@ -64,6 +78,12 @@ export async function PATCH(request: Request) {
       userPromptTemplate,
       summaryPrompt,
       insightsPrompt,
+      videoUserPromptTemplate,
+      videoSummaryPrompt,
+      videoInsightsPrompt,
+      tweetUserPromptTemplate,
+      tweetSummaryPrompt,
+      tweetInsightsPrompt,
       temperature
     },
     create: {
@@ -77,6 +97,12 @@ export async function PATCH(request: Request) {
       userPromptTemplate,
       summaryPrompt,
       insightsPrompt,
+      videoUserPromptTemplate,
+      videoSummaryPrompt,
+      videoInsightsPrompt,
+      tweetUserPromptTemplate,
+      tweetSummaryPrompt,
+      tweetInsightsPrompt,
       temperature
     }
   });

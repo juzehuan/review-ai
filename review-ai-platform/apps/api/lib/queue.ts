@@ -1,14 +1,25 @@
 import { Queue } from "bullmq";
 import { getRedis } from "./redis";
 
-let queue: Queue | null = null;
+let analysisQueue: Queue | null = null;
+let crawlQueue: Queue | null = null;
 
 export function getAnalysisQueue() {
-  if (!queue) {
-    queue = new Queue("analysis-runs", {
+  if (!analysisQueue) {
+    analysisQueue = new Queue("analysis-runs", {
       connection: getRedis()
     });
   }
 
-  return queue;
+  return analysisQueue;
+}
+
+export function getCrawlQueue() {
+  if (!crawlQueue) {
+    crawlQueue = new Queue("crawl-jobs", {
+      connection: getRedis()
+    });
+  }
+
+  return crawlQueue;
 }

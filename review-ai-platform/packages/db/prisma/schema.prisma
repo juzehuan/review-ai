@@ -29,6 +29,14 @@ enum RunStatus {
   failed
 }
 
+enum CrawlJobStatus {
+  queued
+  running
+  completed
+  failed
+  imported
+}
+
 enum Sentiment {
   positive
   neutral
@@ -58,6 +66,7 @@ model User {
   createdAt    DateTime          @default(now()) @map("created_at")
   memberships  WorkspaceMember[]
   sessions     AuthSession[]
+  assignedActionItems ReviewActionItem[] @relation("ActionItemAssignee")
 
   @@map("user_account")
 }
@@ -86,6 +95,7 @@ model Workspace {
   subscription   Subscription?
   aiSetting      WorkspaceAiSetting?
   crawlerSetting WorkspaceCrawlerSetting?
+  crawlJobs      CrawlJob[]
 
   @@map("workspace")
 }
@@ -96,12 +106,18 @@ model WorkspaceAiSetting {
   provider           String    @default("openai")
   apiKey             String?   @map("api_key")
   baseUrl            String?   @map("base_url")
-  modelName          String    @default("gpt-4.1-mini") @map("model_name")
+  modelName          String    @default("gpt-5.4-mini") @map("model_name")
   promptVersion      String    @default("v2-thai") @map("prompt_version")
   systemPrompt       String    @map("system_prompt")
   userPromptTemplate String    @map("user_prompt_template")
   summaryPrompt      String    @default("") @map("summary_prompt")
   insightsPrompt     String    @default("") @map("insights_prompt")
+  videoUserPromptTemplate String @default("") @map("video_user_prompt_template")
+  videoSummaryPrompt      String @default("") @map("video_summary_prompt")
+  videoInsightsPrompt     String @default("") @map("video_insights_prompt")
+  tweetUserPromptTemplate String @default("") @map("tweet_user_prompt_template")
+  tweetSummaryPrompt      String @default("") @map("tweet_summary_prompt")
+  tweetInsightsPrompt     String @default("") @map("tweet_insights_prompt")
   temperature        Float     @default(0.2)
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
@@ -164,6 +180,7 @@ model Task {
   itemId          String         @map("item_id")
   productName     String         @map("product_name")
   sourceChannel   String         @map("source_channel")
+  analysisType    String         @default("product") @map("analysis_type")
   status          TaskStatus     @default(draft)
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
@@ -171,9 +188,89 @@ model Task {
   importRecords   ImportRecord[]
   reviews         Review[]
   analysisRuns    AnalysisRun[]
+  savedViews      SavedReviewView[]
+  actionItems     ReviewActionItem[]
+  crawlJobs       CrawlJob[]
 
   @@index([workspaceId])
   @@map("task")
+}
+
+model CrawlJob {
+  id                String         @id @default(cuid())
+  workspaceId       String         @map("workspace_id")
+  taskId            String?        @map("task_id")
+  name              String
+  productName       String         @default("") @map("product_name")
+  sourceChannel     String         @map("source_channel")
+  analysisType      String         @default("product") @map("analysis_type")
+  productUrl        String         @map("product_url")
+  normalizedUrl     String         @map("normalized_url")
+  platform          String
+  maxReviews        Int            @default(200) @map("max_reviews")
+  crawlChannels     String         @default("") @map("crawl_channels")
+  status            CrawlJobStatus @default(queued)
+  progress          Int            @default(0)
+  fetchedRows       Int            @default(0) @map("fetched_rows")
+  importedRows      Int            @default(0) @map("imported_rows")
+  skippedDuplicate  Int            @default(0) @map("skipped_duplicate")
+  crawlChannel      String?        @map("crawl_channel")
+  crawlChannelLabel String?        @map("crawl_channel_label")
+  lastError         String?        @map("last_error")
+  rawResult         Json?          @map("raw_result")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  startedAt         DateTime?      @map("started_at")
+  finishedAt        DateTime?      @map("finished_at")
+  workspace         Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task              Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([status])
+  @@map("crawl_job")
+}
+
+model SavedReviewView {
+  id                 String   @id @default(cuid())
+  taskId             String   @map("task_id")
+  name               String
+  filters            Json
+  groupBy            String   @default("sentiment") @map("group_by")
+  viewMode           String   @default("table") @map("view_mode")
+  sortBy             String   @default("commentTime") @map("sort_by")
+  sortOrder          String   @default("desc") @map("sort_order")
+  visibleColumnKeys  String[] @map("visible_column_keys")
+  isDefault          Boolean  @default(false) @map("is_default")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  task               Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("saved_review_view")
+}
+
+model ReviewActionItem {
+  id               String   @id @default(cuid())
+  taskId           String   @map("task_id")
+  runId            String?  @map("run_id")
+  assigneeUserId   String?  @map("assignee_user_id")
+  title            String
+  description      String   @default("")
+  status           String   @default("open")
+  priority         String   @default("medium")
+  source           String   @default("manual")
+  relatedReviewIds String[] @map("related_review_ids")
+  dueAt            DateTime? @map("due_at")
+  completedAt      DateTime? @map("completed_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  task             Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignee         User?    @relation("ActionItemAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([runId])
+  @@index([assigneeUserId])
+  @@map("review_action_item")
 }
 
 model ImportRecord {
@@ -233,8 +330,22 @@ model AnalysisRun {
   reviewAnalyses    ReviewAnalysis[]
   issueStats        IssueStat[]
   tagStats          TagStat[]
+  logs              AnalysisRunLog[]
 
   @@map("analysis_run")
+}
+
+model AnalysisRunLog {
+  id        String      @id @default(cuid())
+  runId     String      @map("run_id")
+  level     String      @default("info")
+  message   String
+  meta      Json?
+  createdAt DateTime    @default(now()) @map("created_at")
+  run       AnalysisRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, createdAt])
+  @@map("analysis_run_log")
 }
 
 model ReviewAnalysis {

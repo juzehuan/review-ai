@@ -1,8 +1,10 @@
 export type TaskStatus = "draft" | "imported" | "analyzing" | "completed" | "failed";
 export type RunStatus = "queued" | "running" | "completed" | "partial_failed" | "failed";
+export type CrawlJobStatus = "queued" | "running" | "completed" | "failed" | "imported";
 export type Sentiment = "positive" | "neutral" | "negative";
 export type PlanTier = "free" | "pro" | "business";
 export type MemberRole = "owner" | "admin" | "analyst" | "viewer";
+export type AnalysisType = "product" | "video" | "tweet";
 
 export interface UserDTO {
   id: string;
@@ -26,6 +28,7 @@ export interface TaskListItem {
   shopId: string;
   itemId: string;
   sourceChannel: string;
+  analysisType: AnalysisType;
   status: TaskStatus;
   latestRunStatus: RunStatus | null;
   latestRunFinishedAt: string | null;
@@ -80,6 +83,12 @@ export interface WorkspaceAiSettingDTO {
   userPromptTemplate: string;
   summaryPrompt: string;
   insightsPrompt: string;
+  videoUserPromptTemplate: string;
+  videoSummaryPrompt: string;
+  videoInsightsPrompt: string;
+  tweetUserPromptTemplate: string;
+  tweetSummaryPrompt: string;
+  tweetInsightsPrompt: string;
   temperature: number;
   updatedAt: string | null;
 }
@@ -95,6 +104,75 @@ export interface WorkspaceCrawlerSettingDTO {
   defaultMaxReviews: number;
   requestTimeoutSec: number;
   updatedAt: string | null;
+}
+
+export interface CrawlJobDTO {
+  id: string;
+  workspaceId: string;
+  taskId: string | null;
+  name: string;
+  productName: string;
+  sourceChannel: string;
+  analysisType: AnalysisType;
+  productUrl: string;
+  normalizedUrl: string;
+  platform: string;
+  maxReviews: number;
+  crawlChannels: CrawlerChannel[];
+  status: CrawlJobStatus;
+  progress: number;
+  fetchedRows: number;
+  importedRows: number;
+  skippedDuplicate: number;
+  crawlChannel: CrawlerChannel | string | null;
+  crawlChannelLabel: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface CreateCrawlJobResponse {
+  job: CrawlJobDTO;
+}
+
+export interface StartCrawlAnalysisResponse {
+  taskId: string;
+  importId: string;
+  reviewCount: number;
+  skippedDuplicate: number;
+  run: AnalysisRunDTO;
+}
+
+export const SOURCE_CHANNEL_PRESETS = [
+  { label: "Shopee TH", value: "Shopee" },
+  { label: "Lazada TH", value: "Lazada" },
+  { label: "TikTok Shop TH", value: "TikTok Shop" },
+  { label: "YouTube", value: "YouTube" }
+] as const;
+
+export const ANALYSIS_TYPE_PRESETS: Array<{ label: string; value: AnalysisType; description: string }> = [
+  { label: "商品类评论", value: "product", description: "关注评分、卖点、痛点、售后、物流和商品改进。" },
+  { label: "视频类评论", value: "video", description: "关注内容反馈、观点共鸣、争议、选题和受众互动。" },
+  { label: "推文类评论", value: "tweet", description: "关注舆情立场、传播情绪、争议焦点和回应策略。" }
+];
+
+export function inferAnalysisType(sourceChannel?: string | null): AnalysisType {
+  const channel = String(sourceChannel || "").toLowerCase();
+  if (channel.includes("youtube") || channel.includes("video") || channel.includes("bilibili")) {
+    return "video";
+  }
+  if (
+    channel.includes("tweet") ||
+    channel.includes("twitter") ||
+    channel === "x" ||
+    channel.includes("weibo") ||
+    channel.includes("threads")
+  ) {
+    return "tweet";
+  }
+  return "product";
 }
 
 export type CrawlerChannel = "api_exporter" | "api_basic" | "browser_intercept";
@@ -138,15 +216,23 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     id: "openai",
     label: "OpenAI",
     baseUrl: "https://api.openai.com/v1",
-    models: ["gpt-5.2", "gpt-5.1", "gpt-4.1-mini", "gpt-4.1"],
+    models: ["gpt-5.4-mini", "gpt-5.5", "gpt-5.4", "gpt-5.4-nano", "gpt-5.2", "gpt-5.1", "gpt-4.1"],
     apiKeyHint: "sk-...",
-    apiKeyEnv: "OPENAI_API_KEY"
+    apiKeyEnv: "OPENAI_API_KEY",
+    notes: "gpt-5.4-mini is the default balanced model for high-volume review analysis; gpt-5.5 is listed for flagship-quality runs."
   },
   {
     id: "volcengine",
     label: "火山方舟 Volcengine ARK",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-    models: ["doubao-seed-2-0-code-preview-260215", "doubao-seed-1-6-250615", "doubao-pro-32k", "doubao-pro-128k"],
+    models: [
+      "doubao-seed-1-6-251015",
+      "doubao-seed-1-6-flash-250828",
+      "doubao-seed-1-6-250615",
+      "doubao-seed-1-6-flash-250615",
+      "doubao-1-5-pro-32k-250115",
+      "doubao-pro-128k"
+    ],
     apiKeyHint: "ark-...",
     apiKeyEnv: "VOLC_ARK_API_KEY"
   },
@@ -154,15 +240,16 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     id: "deepseek",
     label: "DeepSeek",
     baseUrl: "https://api.deepseek.com/v1",
-    models: ["deepseek-chat", "deepseek-reasoner"],
+    models: ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-chat", "deepseek-reasoner"],
     apiKeyHint: "sk-...",
-    apiKeyEnv: "DEEPSEEK_API_KEY"
+    apiKeyEnv: "DEEPSEEK_API_KEY",
+    notes: "deepseek-chat / deepseek-reasoner are legacy aliases for deepseek-v4-flash non-thinking / thinking compatibility modes."
   },
   {
     id: "moonshot",
     label: "Moonshot Kimi",
     baseUrl: "https://api.moonshot.cn/v1",
-    models: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
+    models: ["kimi-k2.6", "kimi-k2.5", "moonshot-v1-128k", "moonshot-v1-32k", "moonshot-v1-8k"],
     apiKeyHint: "sk-...",
     apiKeyEnv: "MOONSHOT_API_KEY"
   },
@@ -170,7 +257,17 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     id: "dashscope",
     label: "阿里云百炼 DashScope",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    models: ["qwen-max", "qwen-plus", "qwen-turbo", "qwen-long"],
+    models: [
+      "qwen3.6-plus",
+      "qwen3.7-max",
+      "qwen3.6-flash",
+      "qwen3.5-plus",
+      "qwen3.5-flash",
+      "qwen-max",
+      "qwen-plus",
+      "qwen-turbo",
+      "qwen-long"
+    ],
     apiKeyHint: "sk-...",
     apiKeyEnv: "DASHSCOPE_API_KEY"
   },
@@ -178,7 +275,7 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     id: "zhipu",
     label: "智谱 ChatGLM",
     baseUrl: "https://open.bigmodel.cn/api/paas/v4",
-    models: ["glm-4-plus", "glm-4-air", "glm-4-flash", "glm-4-long"],
+    models: ["glm-5.1", "glm-5", "glm-4.7", "glm-4.6", "glm-4.5", "glm-4.5-air", "glm-4-plus", "glm-4-air", "glm-4-flash"],
     apiKeyHint: "id.secret",
     apiKeyEnv: "ZHIPU_API_KEY"
   },
@@ -247,6 +344,129 @@ export const DEFAULT_INSIGHTS_PROMPT = [
   "中性评论样本：",
   "{neutralSamples}"
 ].join("\n");
+
+export const VIDEO_USER_PROMPT_TEMPLATE = [
+  "你是视频内容评论分析助手，擅长识别观众对视频选题、叙事、观点、证据、情绪和互动的反馈。",
+  "请优先理解原始评论语言，comment_tr 仅作为辅助参考；如果原文和翻译冲突，以原文语义为准。",
+  "你必须输出中文结果，topicLabels / painPoints / highlights 只能从以下标签中选择：",
+  "{taxonomy}",
+  "",
+  "要求：",
+  "1. topicLabels 选择 1-5 个最核心主题。",
+  "2. painPoints 表示观众明确质疑、反感、争议或需要澄清的点。",
+  "3. highlights 表示观众认可、共鸣、赞赏或希望延展的点。",
+  "4. keywords 输出 4-10 个中文或英文短词，用于后续检索和词云。",
+  "5. summary 用一句中文概括评论重点和情绪，不要超过 80 字。",
+  "6. suggestion 给内容团队一条选题、标题、剪辑、澄清或互动建议，不要超过 70 字。",
+  "7. sentimentScore 为 0 到 1，小数越高表示情感越强烈。",
+  "",
+  "comment_original: {comment}",
+  "comment_translated: {commentTr}"
+].join("\n");
+
+export const TWEET_USER_PROMPT_TEMPLATE = [
+  "你是社交媒体舆情评论分析助手，擅长分析推文/短帖评论中的立场、传播情绪、争议焦点和回应风险。",
+  "请优先理解原始评论语言，comment_tr 仅作为辅助参考；如果原文和翻译冲突，以原文语义为准。",
+  "你必须输出中文结果，topicLabels / painPoints / highlights 只能从以下标签中选择：",
+  "{taxonomy}",
+  "",
+  "要求：",
+  "1. topicLabels 选择 1-5 个最核心主题。",
+  "2. painPoints 表示反对、质疑、误解、攻击、风险或需要回应的点。",
+  "3. highlights 表示支持、共鸣、扩散理由或可放大的传播点。",
+  "4. keywords 输出 4-10 个中文或英文短词，用于后续检索和词云。",
+  "5. summary 用一句中文概括评论重点、立场和情绪，不要超过 80 字。",
+  "6. suggestion 给社媒运营一条回应、澄清、控评或放大传播的建议，不要超过 70 字。",
+  "7. sentimentScore 为 0 到 1，小数越高表示情感越强烈。",
+  "",
+  "comment_original: {comment}",
+  "comment_translated: {commentTr}"
+].join("\n");
+
+export const VIDEO_SUMMARY_PROMPT = [
+  "你是资深视频内容分析师，请根据以下评论分析数据，用 100-150 字中文生成视频评论总结。",
+  "需要包含观众情绪、内容亮点、争议焦点和下一期内容建议，直接输出文字，不要加标题。",
+  "",
+  "评论总数：{reviewCount}",
+  "正向占比：{positivePercent}%",
+  "中性占比：{neutralPercent}%",
+  "负向占比：{negativePercent}%",
+  "主要争议/问题：{topIssues}"
+].join("\n");
+
+export const TWEET_SUMMARY_PROMPT = [
+  "你是资深社交媒体舆情分析师，请根据以下评论分析数据，用 100-150 字中文生成推文/短帖舆情总结。",
+  "需要包含整体立场、传播情绪、风险点和回应建议，直接输出文字，不要加标题。",
+  "",
+  "评论总数：{reviewCount}",
+  "正向占比：{positivePercent}%",
+  "中性占比：{neutralPercent}%",
+  "负向占比：{negativePercent}%",
+  "主要风险/争议：{topIssues}"
+].join("\n");
+
+export const VIDEO_INSIGHTS_PROMPT = [
+  "你是资深视频内容策略分析师。基于以下观众评论数据，输出视频内容反馈报告。",
+  "请严格输出 JSON，不要 markdown 代码块，包含 6 个字符串字段：",
+  "userPersonas, usageScenarios, sellingPoints, advantages, improvements, expectations。",
+  "字段含义分别对应：观众画像、观看场景、传播/推荐理由、内容优势、待优化点、观众期待。",
+  "",
+  "评论总数：{reviewCount}",
+  "主要争议/问题：{topIssues}",
+  "",
+  "正向评论样本：",
+  "{positiveSamples}",
+  "",
+  "负向评论样本：",
+  "{negativeSamples}",
+  "",
+  "中性评论样本：",
+  "{neutralSamples}"
+].join("\n");
+
+export const TWEET_INSIGHTS_PROMPT = [
+  "你是资深社交媒体舆情策略分析师。基于以下评论数据，输出推文/短帖舆情报告。",
+  "请严格输出 JSON，不要 markdown 代码块，包含 6 个字符串字段：",
+  "userPersonas, usageScenarios, sellingPoints, advantages, improvements, expectations。",
+  "字段含义分别对应：参与人群、讨论场景、支持/扩散理由、传播优势、风险与误解、后续回应期待。",
+  "",
+  "评论总数：{reviewCount}",
+  "主要风险/争议：{topIssues}",
+  "",
+  "正向评论样本：",
+  "{positiveSamples}",
+  "",
+  "负向评论样本：",
+  "{negativeSamples}",
+  "",
+  "中性评论样本：",
+  "{neutralSamples}"
+].join("\n");
+
+export function getAnalysisPromptProfile(analysisType?: AnalysisType | string | null) {
+  if (analysisType === "video") {
+    return {
+      userPromptTemplate: VIDEO_USER_PROMPT_TEMPLATE,
+      summaryPrompt: VIDEO_SUMMARY_PROMPT,
+      insightsPrompt: VIDEO_INSIGHTS_PROMPT,
+      taxonomy: ["内容选题", "叙事结构", "观点立场", "事实证据", "情绪共鸣", "表达节奏", "标题封面", "剪辑包装", "争议澄清", "互动引导", "受众期待", "账号信任"]
+    };
+  }
+  if (analysisType === "tweet") {
+    return {
+      userPromptTemplate: TWEET_USER_PROMPT_TEMPLATE,
+      summaryPrompt: TWEET_SUMMARY_PROMPT,
+      insightsPrompt: TWEET_INSIGHTS_PROMPT,
+      taxonomy: ["支持立场", "反对立场", "中立观望", "事实质疑", "情绪宣泄", "讽刺调侃", "传播扩散", "误解谣言", "品牌风险", "回应诉求", "行动号召", "受众期待"]
+    };
+  }
+  return {
+    userPromptTemplate: DEFAULT_USER_PROMPT_TEMPLATE,
+    summaryPrompt: DEFAULT_SUMMARY_PROMPT,
+    insightsPrompt: DEFAULT_INSIGHTS_PROMPT,
+    taxonomy: ["综合体验", "物流速度", "包装保护", "清洁效果", "吸力表现", "噪音控制", "续航表现", "建图导航", "APP连接", "越障爬坡", "质量做工", "性价比", "售后服务", "客服响应"]
+  };
+}
 
 export interface ReviewRowDTO {
   id: string;
@@ -360,6 +580,48 @@ export interface AnalysisRunDTO {
   lastError: string | null;
 }
 
+export interface AnalysisRunLogDTO {
+  id: string;
+  runId: string;
+  level: string;
+  message: string;
+  meta: unknown | null;
+  createdAt: string;
+}
+
+export interface SavedReviewViewDTO {
+  id: string;
+  taskId: string;
+  name: string;
+  filters: Record<string, unknown>;
+  groupBy: string;
+  viewMode: string;
+  sortBy: string;
+  sortOrder: string;
+  visibleColumnKeys: string[];
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewActionItemDTO {
+  id: string;
+  taskId: string;
+  runId: string | null;
+  assigneeUserId: string | null;
+  assignee: { id: string; name: string; email: string } | null;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  source: string;
+  relatedReviewIds: string[];
+  dueAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ImportTaskResponse {
   taskId: string;
   importId: string;
@@ -413,21 +675,23 @@ function round(value: number) {
 
 export function buildDashboardSnapshot(taskId: string, analyses: DashboardReviewLike[]): DashboardDTO {
   const total = analyses.length;
-  const negativeCount = analyses.filter((item) => item.review.ratingStar <= 3).length;
-  const promoters = analyses.filter((item) => item.review.ratingStar === 5).length;
-  const passives = analyses.filter((item) => item.review.ratingStar === 4).length;
-  const detractors = analyses.filter((item) => item.review.ratingStar <= 3).length;
-  const nps = total ? round(((promoters - detractors) / total) * 100) : 0;
-  const avgRating = total ? round(analyses.reduce((sum, item) => sum + item.review.ratingStar, 0) / total) : 0;
+  const ratedAnalyses = analyses.filter((item) => item.review.ratingStar > 0);
+  const ratingTotal = ratedAnalyses.length;
+  const negativeCount = analyses.filter((item) => item.sentiment === "negative").length;
+  const promoters = ratedAnalyses.filter((item) => item.review.ratingStar === 5).length;
+  const passives = ratedAnalyses.filter((item) => item.review.ratingStar === 4).length;
+  const detractors = ratedAnalyses.filter((item) => item.review.ratingStar <= 3).length;
+  const nps = ratingTotal ? round(((promoters - detractors) / ratingTotal) * 100) : 0;
+  const avgRating = ratingTotal ? round(ratedAnalyses.reduce((sum, item) => sum + item.review.ratingStar, 0) / ratingTotal) : 0;
 
   const npsBreakdown = [
-    { label: "批评者 1-3 星", count: detractors, percent: total ? round((detractors / total) * 100) : 0 },
-    { label: "中立者 4 星", count: passives, percent: total ? round((passives / total) * 100) : 0 },
-    { label: "推荐者 5 星", count: promoters, percent: total ? round((promoters / total) * 100) : 0 }
+    { label: "批评者 1-3 星", count: detractors, percent: ratingTotal ? round((detractors / ratingTotal) * 100) : 0 },
+    { label: "中立者 4 星", count: passives, percent: ratingTotal ? round((passives / ratingTotal) * 100) : 0 },
+    { label: "推荐者 5 星", count: promoters, percent: ratingTotal ? round((promoters / ratingTotal) * 100) : 0 }
   ];
 
   const ratingSentiment = [1, 2, 3, 4, 5].map((ratingStar) => {
-    const byStar = analyses.filter((item) => item.review.ratingStar === ratingStar);
+    const byStar = ratedAnalyses.filter((item) => item.review.ratingStar === ratingStar);
     return {
       ratingStar,
       positive: byStar.filter((item) => item.sentiment === "positive").length,
@@ -438,7 +702,7 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
 
   const ratingDistribution = [1, 2, 3, 4, 5].map((star) => ({
     star,
-    count: analyses.filter((item) => item.review.ratingStar === star).length
+    count: ratedAnalyses.filter((item) => item.review.ratingStar === star).length
   }));
 
   const sentiments: Sentiment[] = ["positive", "neutral", "negative"];

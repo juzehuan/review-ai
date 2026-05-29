@@ -10,15 +10,15 @@
   <div v-else class="dashboard-grid">
     <div class="page-toolbar dashboard-toolbar">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">经营看板</div>
+        <div class="toolbar-title">分析报告</div>
         <div class="toolbar-subtitle">
-          面向商品、运营和客服团队的评论洞察中心。
+          基于当前任务评论与 AI 分析结果生成的洞察报告。
         </div>
       </div>
       <a-space wrap>
         <a-button @click="load" :loading="loading">
           <template #icon><ReloadOutlined /></template>
-          刷新看板
+          刷新报告
         </a-button>
         <a-tag :color="dashboard?.runId ? 'green' : 'default'">
           {{ dashboard?.runId ? "已生成分析结果" : "等待首次分析" }}
@@ -30,7 +30,7 @@
       <div class="overview-copy">
         <div class="overview-kicker">当前项目</div>
         <h2>{{ selectedTask.productName }}</h2>
-        <p>{{ selectedTask.name }} · {{ selectedTask.sourceChannel }} · {{ selectedTask.status }}</p>
+        <p>{{ selectedTask.name }} · {{ selectedTask.sourceChannel }} · {{ analysisTypeLabel(selectedTask.analysisType) }} · {{ selectedTask.status }}</p>
       </div>
       <div class="pipeline-strip">
         <div v-for="step in pipelineSteps" :key="step.label" class="pipeline-step" :class="{ active: step.active }">
@@ -125,11 +125,31 @@
       <EChartCard title="用户声音词云" :option="wordCloudOption" />
       <EChartCard title="用户问题统计" :option="issueOption" />
     </div>
+
+    <section v-if="dashboard?.issues?.length" class="evidence-panel">
+      <div class="settings-section-head">
+        <div>
+          <div class="panel-label">Evidence</div>
+          <div class="settings-section-title">问题证据入口</div>
+        </div>
+      </div>
+      <div class="evidence-grid">
+        <article v-for="item in dashboard.issues.slice(0, 8)" :key="item.issueName" class="evidence-card">
+          <div>
+            <div class="evidence-title">{{ item.issueName }}</div>
+            <div class="muted">{{ item.count }} 条相关评论 · {{ item.sampleReviewIds.length }} 条样本</div>
+          </div>
+          <a-button size="small" type="primary" ghost @click="openIssueEvidence(item.issueName)">
+            查看评论证据
+          </a-button>
+        </article>
+      </div>
+    </section>
     <section v-if="dashboard?.productInsights" class="product-insights-panel">
       <div class="settings-section-head">
         <div>
           <div class="panel-label">Product Insights</div>
-          <div class="settings-section-title">产品洞察报告</div>
+          <div class="settings-section-title">{{ insightReportTitle }}</div>
         </div>
       </div>
       <div class="product-insights-grid">
@@ -144,6 +164,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import type { EChartsOption } from "echarts";
 import * as echarts from "echarts";
 import {
@@ -170,7 +191,9 @@ import {
   getYAxis
 } from "@/composables/useChartConfig";
 
-const { selectedTask } = useTaskStore();
+const route = useRoute();
+const router = useRouter();
+const { selectedTask, setSelectedTask } = useTaskStore();
 const dashboard = ref<DashboardDTO | null>(null);
 const loading = ref(false);
 const gaugeRef = ref<HTMLDivElement | null>(null);
@@ -190,6 +213,15 @@ const pipelineSteps = computed(() => [
 ]);
 
 const issueCount = computed(() => dashboard.value?.issues?.length || 0);
+const insightReportTitle = computed(() => {
+  if (selectedTask.value?.analysisType === "video") {
+    return "视频内容反馈报告";
+  }
+  if (selectedTask.value?.analysisType === "tweet") {
+    return "推文舆情报告";
+  }
+  return "产品洞察报告";
+});
 const positivePercent = computed(() => {
   const positive = dashboard.value?.sentimentDistribution?.find((item) => item.sentiment === "positive");
   return positive?.percent || 0;
@@ -198,6 +230,26 @@ const productInsightSections = computed(() => {
   const insights = dashboard.value?.productInsights;
   if (!insights) {
     return [];
+  }
+  if (selectedTask.value?.analysisType === "video") {
+    return [
+      { key: "userPersonas", title: "观众画像", content: insights.userPersonas },
+      { key: "usageScenarios", title: "观看场景", content: insights.usageScenarios },
+      { key: "sellingPoints", title: "传播理由", content: insights.sellingPoints },
+      { key: "advantages", title: "内容优势", content: insights.advantages },
+      { key: "improvements", title: "待优化点", content: insights.improvements },
+      { key: "expectations", title: "观众期待", content: insights.expectations }
+    ].filter((item) => item.content);
+  }
+  if (selectedTask.value?.analysisType === "tweet") {
+    return [
+      { key: "userPersonas", title: "参与人群", content: insights.userPersonas },
+      { key: "usageScenarios", title: "讨论场景", content: insights.usageScenarios },
+      { key: "sellingPoints", title: "支持/扩散理由", content: insights.sellingPoints },
+      { key: "advantages", title: "传播优势", content: insights.advantages },
+      { key: "improvements", title: "风险与误解", content: insights.improvements },
+      { key: "expectations", title: "回应期待", content: insights.expectations }
+    ].filter((item) => item.content);
   }
   return [
     { key: "userPersonas", title: "用户画像", content: insights.userPersonas },
@@ -217,6 +269,16 @@ function sentimentText(sentiment: Sentiment) {
     return "负向";
   }
   return "中性";
+}
+
+function analysisTypeLabel(type?: string | null) {
+  if (type === "video") {
+    return "视频评论";
+  }
+  if (type === "tweet") {
+    return "推文评论";
+  }
+  return "商品评论";
 }
 
 function renderGauge() {
@@ -290,6 +352,19 @@ async function load() {
   } finally {
     loading.value = false;
   }
+}
+
+function openIssueEvidence(issueName: string) {
+  if (!selectedTask.value) {
+    return;
+  }
+  router.push({
+    path: `/tasks/${selectedTask.value.id}/reviews`,
+    query: {
+      issue: issueName,
+      ...(dashboard.value?.runId ? { runId: dashboard.value.runId } : {})
+    }
+  });
 }
 
 function startPolling() {
@@ -425,6 +500,16 @@ watch(
   async () => {
     await load();
     startPolling();
+  },
+  { immediate: true }
+);
+
+watch(
+  () => route.params.taskId,
+  (taskId) => {
+    if (typeof taskId === "string" && taskId !== selectedTask.value?.id) {
+      setSelectedTask(taskId);
+    }
   },
   { immediate: true }
 );
