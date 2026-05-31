@@ -2,8 +2,8 @@
   <div class="workspace-overview-page">
     <div class="page-toolbar overview-hero">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">空间概览</div>
-        <div class="toolbar-subtitle">从空间维度查看任务、用量和整体分析推进状态。</div>
+        <div class="toolbar-title">用户后台</div>
+        <div class="toolbar-subtitle">查看你的分析任务、评论额度和最近的处理进度。</div>
       </div>
       <a-space wrap>
         <a-button @click="refreshTasks" :loading="loadingTasks">
@@ -12,24 +12,24 @@
         </a-button>
         <a-button type="primary" @click="router.push('/analysis-runs')">
           <template #icon><UnorderedListOutlined /></template>
-          分析任务
+          分析记录
         </a-button>
       </a-space>
     </div>
 
     <div class="overview-band workspace-band">
       <div class="overview-copy">
-        <div class="overview-kicker">当前空间</div>
-        <h2>{{ workspace?.name || "Workspace" }}</h2>
-        <p>{{ workspace?.slug || "-" }} · {{ workspace?.planTier || "free" }}</p>
+        <div class="overview-kicker">当前账号</div>
+        <h2>{{ currentUser?.name || "ReviewIQ 用户" }}</h2>
+        <p>{{ currentUser?.email || "-" }} · {{ workspace?.planTier || "pro" }}</p>
       </div>
       <div class="quota-strip">
         <div>
-          <span>评论用量</span>
+          <span>评论额度</span>
           <strong>{{ reviewUsage }}</strong>
         </div>
         <div>
-          <span>分析用量</span>
+          <span>分析次数</span>
           <strong>{{ runUsage }}</strong>
         </div>
       </div>
@@ -39,7 +39,7 @@
       <div class="stat-card stat-card-primary">
         <div class="stat-label">任务总数</div>
         <div class="stat-value">{{ totalTasks }}</div>
-        <div class="stat-note">空间内所有分析项目</div>
+        <div class="stat-note">当前账号下的分析项目</div>
       </div>
       <div class="stat-card stat-card-success">
         <div class="stat-label">已完成分析</div>
@@ -106,7 +106,7 @@ import type { TaskListItem } from "@review-ai/shared";
 import { useTaskStore } from "@/composables";
 
 const router = useRouter();
-const { tasks, workspace, loadingTasks, refreshTasks, setSelectedTask } = useTaskStore();
+const { tasks, workspace, currentUser, loadingTasks, refreshTasks, setSelectedTask } = useTaskStore();
 
 const columns = [
   { title: "任务", key: "name", width: 260 },
@@ -158,7 +158,7 @@ function analysisTypeLabel(type?: string | null) {
     return "视频评论";
   }
   if (type === "tweet") {
-    return "推文评论";
+    return "社媒评论";
   }
   return "商品评论";
 }
@@ -184,102 +184,25 @@ function runStatusLabel(status?: string | null) {
     partial_failed: "部分失败",
     failed: "失败"
   };
-  return status ? labels[status] || status : "尚未分析";
+  return status ? labels[status] || status : "未分析";
 }
 
 function runStatusColor(status?: string | null) {
-  if (status === "running" || status === "queued") {
-    return "processing";
-  }
   if (status === "completed") {
     return "success";
   }
-  if (status === "partial_failed") {
-    return "warning";
+  if (status === "queued" || status === "running") {
+    return "processing";
   }
-  if (status === "failed") {
+  if (status === "failed" || status === "partial_failed") {
     return "error";
   }
   return "default";
 }
 
-function formatTime(value?: string | null) {
-  if (!value) {
-    return "-";
-  }
+function formatTime(value: string) {
   return new Date(value).toLocaleString();
 }
 
-onMounted(() => {
-  if (!tasks.value.length) {
-    refreshTasks();
-  }
-});
+onMounted(refreshTasks);
 </script>
-
-<style scoped>
-.workspace-overview-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.overview-hero {
-  align-items: center;
-  justify-content: space-between;
-}
-
-.workspace-band {
-  align-items: center;
-}
-
-.quota-strip {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.quota-strip > div {
-  min-width: 140px;
-  padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.18);
-  display: grid;
-  gap: 4px;
-}
-
-.quota-strip span {
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 12px;
-}
-
-.quota-strip strong {
-  color: #fff;
-  font-size: 20px;
-}
-
-.workspace-table-panel {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  padding: 16px;
-}
-
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.task-name-cell {
-  display: grid;
-  gap: 4px;
-}
-
-.task-name-cell span {
-  color: #64748b;
-  font-size: 12px;
-}
-</style>

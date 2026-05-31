@@ -77,12 +77,19 @@ export function normalizeCrawlUrl(value: string) {
 export function detectCrawlerPlatform(url: string) {
   const normalizedUrl = normalizeCrawlUrl(url);
   try {
-    const host = new URL(normalizedUrl).hostname.toLowerCase().replace(/^www\./, "");
+    const parsed = new URL(normalizedUrl);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
     if (host === "youtu.be" || host === "youtube.com" || host.endsWith(".youtube.com")) {
       return "youtube";
     }
     if (host.includes("shopee.")) {
       return "shopee";
+    }
+    if ((host === "tiktok.com" || host.endsWith(".tiktok.com")) && /\/@[^/]+\/video\/\d+/i.test(parsed.pathname)) {
+      return "tiktok-video";
+    }
+    if ((host === "facebook.com" || host.endsWith(".facebook.com")) && isFacebookPostPath(parsed)) {
+      return "facebook-post";
     }
   } catch {
     const text = normalizedUrl.toLowerCase();
@@ -92,8 +99,22 @@ export function detectCrawlerPlatform(url: string) {
     if (text.includes("shopee.")) {
       return "shopee";
     }
+    if (text.includes("tiktok.") && /\/@[^/]+\/video\/\d+/i.test(text)) {
+      return "tiktok-video";
+    }
+    if (text.includes("facebook.") && /(story_fbid=|fbid=|\/posts\/|\/videos\/|\/reel\/|\/share\/[pv]\/|\/groups\/[^/]+\/posts\/)/i.test(text)) {
+      return "facebook-post";
+    }
   }
   return "";
+}
+
+function isFacebookPostPath(url: URL) {
+  const path = url.pathname || "";
+  if (url.searchParams.get("story_fbid") || url.searchParams.get("fbid") || url.searchParams.get("v")) {
+    return /(story\.php|permalink\.php|photo\.php|watch|posts|videos|reel|share\/[pv])/i.test(path);
+  }
+  return /\/(?:groups\/[^/]+\/posts|posts|videos|reel|share\/[pv])\/[^/?#]+/i.test(path);
 }
 
 export function detectSourceChannelFromUrl(url: string) {
@@ -106,6 +127,12 @@ export function detectSourceChannelFromUrl(url: string) {
   }
   if (text.includes("lazada.")) {
     return "Lazada";
+  }
+  if (text.includes("tiktok.") && /\/@[^/]+\/video\/\d+/i.test(text)) {
+    return "TikTok Video";
+  }
+  if (text.includes("facebook.") && /(story_fbid=|fbid=|\/posts\/|\/videos\/|\/reel\/|\/share\/[pv]\/|\/groups\/[^/]+\/posts\/)/i.test(text)) {
+    return "Facebook";
   }
   if (text.includes("tiktok.")) {
     return "TikTok Shop";
@@ -148,9 +175,10 @@ export function normalizeRequestedCrawlInput(body: Record<string, unknown>, defa
   const analysisType = ["product", "video", "tweet"].includes(rawAnalysisType)
     ? rawAnalysisType
     : inferAnalysisType(sourceChannel);
-  const maxReviews = Math.min(Math.max(Number(body.maxReviews || defaults.defaultMaxReviews), 1), 1000);
+  const requestedMaxReviews = Number(body.maxReviews ?? defaults.defaultMaxReviews);
+  const maxReviews = requestedMaxReviews <= 0 ? 0 : Math.min(Math.max(requestedMaxReviews, 1), 1000);
   const bodyChannels = Array.isArray(body.crawlChannels) ? parseCrawlerChannels(body.crawlChannels.join(",")) : null;
-  const crawlChannels = crawlerPlatform === "youtube"
+  const crawlChannels = crawlerPlatform === "youtube" || crawlerPlatform === "tiktok-video" || crawlerPlatform === "facebook-post"
     ? (["browser_intercept"] as CrawlerChannel[])
     : bodyChannels?.length
       ? bodyChannels

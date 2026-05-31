@@ -21,7 +21,7 @@
 
       <div class="auth-footer">
         还没有账号？
-        <router-link to="/register">注册新空间</router-link>
+        <router-link to="/register">使用邀请码注册</router-link>
       </div>
     </div>
   </div>

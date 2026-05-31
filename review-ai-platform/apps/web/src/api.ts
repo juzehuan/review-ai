@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   AdminOverviewDTO,
+  AdminUserDTO,
   AdminWorkspaceDTO,
   AnalysisRunLogDTO,
   AnalysisRunDTO,
@@ -11,6 +12,7 @@ import type {
   CrawlTaskResponse,
   DashboardDTO,
   ImportTaskResponse,
+  InviteCodeDTO,
   AnalysisType,
   MemberRole,
   MyWorkspaceDTO,
@@ -19,7 +21,6 @@ import type {
   SavedReviewViewDTO,
   StartCrawlAnalysisResponse,
   TaskListItem,
-  UserDTO,
   WorkspaceAiSettingDTO,
   WorkspaceCrawlerSettingDTO,
   WorkspaceDTO,
@@ -87,7 +88,7 @@ export async function login(payload: { email: string; password: string }) {
   return data;
 }
 
-export async function register(payload: { name: string; email: string; password: string; workspaceName: string }) {
+export async function register(payload: { name: string; email: string; password: string; inviteCode: string }) {
   const { data } = await api.post<AuthResponseDTO>("/auth/register", payload);
   setAuthToken(data.token);
   setWorkspaceSlug(data.workspace.slug);
@@ -178,12 +179,35 @@ export async function fetchAdminOverview() {
 }
 
 export async function fetchAdminUsers() {
-  const { data } = await api.get<UserDTO[]>("/admin/users");
+  const { data } = await api.get<AdminUserDTO[]>("/admin/users");
   return data;
 }
 
 export async function createAdminUser(payload: { email: string; name: string; isSuperAdmin: boolean }) {
-  const { data } = await api.post<UserDTO>("/admin/users", payload);
+  const { data } = await api.post<AdminUserDTO>("/admin/users", payload);
+  return data;
+}
+
+export async function updateAdminUser(
+  userId: string,
+  payload: { name?: string; isSuperAdmin?: boolean; monthlyReviewLimit?: number; monthlyRunLimit?: number }
+) {
+  const { data } = await api.patch<AdminUserDTO>(`/admin/users/${userId}`, payload);
+  return data;
+}
+
+export async function fetchInviteCodes() {
+  const { data } = await api.get<InviteCodeDTO[]>("/admin/invite-codes");
+  return data;
+}
+
+export async function createInviteCode(payload: {
+  note?: string;
+  monthlyReviewLimit: number;
+  monthlyRunLimit: number;
+  expiresAt?: string | null;
+}) {
+  const { data } = await api.post<InviteCodeDTO>("/admin/invite-codes", payload);
   return data;
 }
 

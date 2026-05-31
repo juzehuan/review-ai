@@ -1039,7 +1039,7 @@ const crawlWorker = new Worker(
       proxyUrl: storedSetting?.proxyUrl || process.env.SCRAPLING_PROXY || null,
       shopeeCookie: storedSetting?.shopeeCookie || process.env.SHOPEE_COOKIE || null,
       crawlChannels:
-        crawlJob.platform === "youtube"
+        crawlJob.platform === "youtube" || crawlJob.platform === "tiktok-video" || crawlJob.platform === "facebook-post"
           ? ["browser_intercept"]
           : parseCrawlerChannels(crawlJob.crawlChannels || storedSetting?.crawlChannels).length
             ? parseCrawlerChannels(crawlJob.crawlChannels || storedSetting?.crawlChannels)

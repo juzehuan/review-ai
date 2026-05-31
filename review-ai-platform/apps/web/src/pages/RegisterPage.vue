@@ -5,7 +5,7 @@
         <div class="brand-mark">RI</div>
         <div>
           <div class="brand-title">ReviewIQ Cloud</div>
-          <div class="brand-subtitle">创建你的 SaaS 工作空间</div>
+          <div class="brand-subtitle">使用邀请码开通用户后台</div>
         </div>
       </div>
 
@@ -19,10 +19,16 @@
         <a-form-item label="密码">
           <a-input-password v-model:value="form.password" placeholder="至少 6 位" />
         </a-form-item>
-        <a-form-item label="工作空间名称">
-          <a-input v-model:value="form.workspaceName" placeholder="例如：品牌增长团队" />
+        <a-form-item label="邀请码">
+          <a-input v-model:value="form.inviteCode" placeholder="RI-XXXXXXXX-XXXXXX" />
         </a-form-item>
-        <a-button type="primary" html-type="submit" size="large" block :loading="loading">注册并进入</a-button>
+        <a-alert
+          class="import-alert"
+          type="info"
+          show-icon
+          message="普通用户注册必须使用超管生成的邀请码；每个邀请码只能使用一次。"
+        />
+        <a-button type="primary" html-type="submit" size="large" block :loading="loading">注册并进入用户后台</a-button>
       </a-form>
 
       <div class="auth-footer">
@@ -48,18 +54,18 @@ const form = reactive({
   name: "",
   email: "",
   password: "",
-  workspaceName: ""
+  inviteCode: ""
 });
 
 async function submit() {
-  if (!form.name || !form.email || form.password.length < 6 || !form.workspaceName) {
-    message.error("请完整填写注册信息，密码至少 6 位。");
+  if (!form.name || !form.email || form.password.length < 6 || !form.inviteCode) {
+    message.error("请完整填写注册信息，密码至少 6 位，并输入邀请码。");
     return;
   }
 
   loading.value = true;
   try {
-    const result = await register({ ...form });
+    const result = await register({ ...form, inviteCode: form.inviteCode.trim().toUpperCase() });
     setAuthState(result.user, result.workspace);
     await refreshTasks();
     router.push("/dashboard");

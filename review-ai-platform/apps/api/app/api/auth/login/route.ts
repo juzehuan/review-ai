@@ -2,6 +2,7 @@ import type { AuthResponseDTO } from "@review-ai/shared";
 import { prisma } from "@review-ai/db";
 import { createSession, verifyPassword } from "@/lib/auth";
 import { fail, ok } from "@/lib/http";
+import { ensurePersonalWorkspace } from "@/lib/personal-workspace";
 import { serializeUser, serializeWorkspace } from "@/lib/serializers";
 
 export async function POST(request: Request) {
@@ -18,33 +19,7 @@ export async function POST(request: Request) {
     return fail("邮箱或密码错误", 401);
   }
 
-  const membership = await prisma.workspaceMember.findFirst({
-    where: { userId: user.id },
-    orderBy: { createdAt: "asc" },
-    include: {
-      workspace: {
-        include: { subscription: true }
-      }
-    }
-  });
-
-  const workspace =
-    membership?.workspace ||
-    (await prisma.workspace.create({
-      data: {
-        name: `${user.name} Team`,
-        slug: `workspace-${Date.now().toString(36)}`,
-        ownerUserId: user.id,
-        subscription: { create: {} },
-        memberships: {
-          create: {
-            userId: user.id,
-            role: "owner"
-          }
-        }
-      },
-      include: { subscription: true }
-    }));
+  const workspace = await ensurePersonalWorkspace(prisma, user);
 
   const token = await createSession(user.id);
   return ok({

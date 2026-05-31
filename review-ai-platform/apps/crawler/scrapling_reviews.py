@@ -42,8 +42,12 @@ CHANNEL_LABELS = {
     "api_basic": "基础接口",
     "browser_intercept": "浏览器拦截",
     "youtube_dom": "YouTube DOM",
+    "tiktok_video": "TikTok Video DOM",
+    "facebook_post": "Facebook Post DOM",
 }
 YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"}
+TIKTOK_HOSTS = {"tiktok.com", "www.tiktok.com", "m.tiktok.com"}
+FACEBOOK_HOSTS = {"facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"}
 NESTED_URL_PARAM_NAMES = ("url", "u", "q", "target", "redirect", "redirect_url")
 
 
@@ -88,6 +92,26 @@ def is_shopee_url(url: str) -> bool:
     return "shopee." in host
 
 
+def is_tiktok_video_url(url: str) -> bool:
+    url = unwrap_nested_url(url)
+    parsed = urlparse(url)
+    host = parsed.netloc.lower().removeprefix("www.")
+    return (host in TIKTOK_HOSTS or host.endswith(".tiktok.com")) and bool(re.search(r"/@[^/]+/video/\d+", parsed.path))
+
+
+def is_facebook_post_url(url: str) -> bool:
+    url = unwrap_nested_url(url)
+    parsed = urlparse(url)
+    host = parsed.netloc.lower().removeprefix("www.")
+    if host not in FACEBOOK_HOSTS and not host.endswith(".facebook.com"):
+        return False
+    path = parsed.path or ""
+    params = parse_qs(parsed.query)
+    if params.get("story_fbid") or params.get("fbid") or params.get("v"):
+        return bool(re.search(r"/(story\.php|permalink\.php|photo\.php|watch|posts|videos|reel|share/[pv])", path, re.IGNORECASE))
+    return bool(re.search(r"/(?:groups/[^/]+/posts|posts|videos|reel|share/[pv])/[^/?#]+", path, re.IGNORECASE))
+
+
 def parse_youtube_video_id(url: str) -> str:
     url = unwrap_nested_url(url)
     parsed = urlparse(url)
@@ -109,9 +133,50 @@ def parse_youtube_video_id(url: str) -> str:
     raise ValueError("Could not parse YouTube video id from URL")
 
 
+def parse_tiktok_video_id(url: str) -> str:
+    url = unwrap_nested_url(url)
+    parsed = urlparse(url)
+    match = re.search(r"/@[^/]+/video/(\d+)", parsed.path)
+    if match:
+        return match.group(1)
+    params = parse_qs(parsed.query)
+    video_id = params.get("aweme_id", [None])[0] or params.get("item_id", [None])[0]
+    if video_id:
+        return video_id
+    raise ValueError("Could not parse TikTok video id from URL")
+
+
+def parse_facebook_post_id(url: str) -> str:
+    url = unwrap_nested_url(url)
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query)
+    for name in ("story_fbid", "fbid", "v"):
+        value = params.get(name, [None])[0]
+        if value:
+            return value
+    match = re.search(r"/groups/[^/]+/posts/([^/?#]+)", parsed.path, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    match = re.search(r"/(?:posts|videos|reel|share/[pv])/([^/?#]+)", parsed.path, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    digest = hashlib.sha1(url.encode("utf-8")).hexdigest()
+    return f"fbpost_{digest[:18]}"
+
+
 def stable_youtube_comment_id(video_id: str, author: str, published_time: str, content: str, index: int) -> str:
     digest = hashlib.sha1(f"{video_id}|{author}|{published_time}|{content}|{index}".encode("utf-8")).hexdigest()
     return f"yt_{video_id}_{digest[:18]}"
+
+
+def stable_tiktok_comment_id(video_id: str, author: str, content: str, index: int) -> str:
+    digest = hashlib.sha1(f"{video_id}|{author}|{content}|{index}".encode("utf-8")).hexdigest()
+    return f"tt_{video_id}_{digest[:18]}"
+
+
+def stable_facebook_comment_id(post_id: str, author: str, content: str, index: int) -> str:
+    digest = hashlib.sha1(f"{post_id}|{author}|{content}|{index}".encode("utf-8")).hexdigest()
+    return f"fb_{post_id}_{digest[:18]}"
 
 
 def iter_dicts(value: Any):
@@ -293,6 +358,27 @@ def request_json(url: str, referer: str, proxy: str | None, timeout: int = 30) -
     if proxy:
         kwargs["proxy"] = proxy
 
+    page = Fetcher.get(url, **kwargs)
+    if getattr(page, "status", 200) >= 400:
+        raise RuntimeError(f"HTTP {page.status} from {url}")
+    return page.json()
+
+
+def request_tiktok_json(url: str, referer: str, proxy: str | None, timeout: int = 30) -> dict[str, Any]:
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "en-US,en;q=0.9,zh-CN;q=0.7,zh;q=0.6",
+        "origin": "https://www.tiktok.com",
+        "referer": referer,
+    }
+    kwargs: dict[str, Any] = {
+        "headers": headers,
+        "impersonate": "chrome",
+        "stealthy_headers": True,
+        "timeout": timeout,
+    }
+    if proxy:
+        kwargs["proxy"] = proxy
     page = Fetcher.get(url, **kwargs)
     if getattr(page, "status", 200) >= 400:
         raise RuntimeError(f"HTTP {page.status} from {url}")
@@ -562,6 +648,349 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
         "dom_content_text_count": 0,
     }
 
+
+def collect_tiktok_api_comments(
+    payload: dict[str, Any],
+    video_id: str,
+    source_url: str,
+    comments_by_id: dict[str, dict[str, Any]],
+    max_reviews: int,
+) -> int:
+    comments = payload.get("comments")
+    if not isinstance(comments, list):
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        comments = data.get("comments") if isinstance(data.get("comments"), list) else []
+
+    added = 0
+    for index, comment in enumerate(comments):
+        if not isinstance(comment, dict):
+            continue
+        content = str(comment.get("text") or comment.get("comment") or "").strip()
+        if not content:
+            continue
+        user = comment.get("user") if isinstance(comment.get("user"), dict) else {}
+        author = str(user.get("unique_id") or user.get("uniqueId") or user.get("nickname") or "").strip()
+        comment_id = str(comment.get("cid") or comment.get("comment_id") or comment.get("id") or "").strip()
+        if not comment_id:
+            comment_id = stable_tiktok_comment_id(video_id, author, content, len(comments_by_id) + index)
+        if comment_id in comments_by_id:
+            continue
+
+        create_time = comment.get("create_time") or comment.get("createTime")
+        comment_time = None
+        try:
+            timestamp = int(create_time)
+            if timestamp > 0:
+                comment_time = dt.datetime.fromtimestamp(timestamp, tz=dt.timezone.utc).isoformat()
+        except Exception:
+            comment_time = None
+
+        comments_by_id[comment_id] = {
+            "cmtId": comment_id,
+            "shopId": "tiktok",
+            "itemId": video_id,
+            "ratingStar": 0,
+            "comment": content,
+            "commentTr": None,
+            "modelName": author or None,
+            "hasMedia": False,
+            "commentTime": comment_time,
+            "rawJson": {
+                "platform": "TikTok Video",
+                "videoId": video_id,
+                "author": author,
+                "authorId": user.get("uid") or user.get("id") or "",
+                "likeCount": comment.get("digg_count") or comment.get("like_count") or 0,
+                "replyCount": comment.get("reply_comment_total") or comment.get("reply_count") or 0,
+                "sourceUrl": source_url,
+                "source": "tiktok_comment_list",
+            },
+        }
+        added += 1
+        if max_reviews > 0 and len(comments_by_id) >= max_reviews:
+            break
+    return added
+
+
+def build_tiktok_comment_url(video_id: str, cursor: int, count: int) -> str:
+    params = {
+        "aid": "1988",
+        "aweme_id": video_id,
+        "count": str(count),
+        "cursor": str(cursor),
+    }
+    return f"https://www.tiktok.com/api/comment/list/?{urlencode(params)}"
+
+
+def parse_tiktok_has_more(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"", "0", "false", "no", "none"}:
+            return False
+        if normalized in {"1", "true", "yes"}:
+            return True
+    return bool(value)
+
+
+def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: str | None, timeout: int) -> dict[str, Any]:
+    video_id = parse_tiktok_video_id(video_url)
+    comments_by_id: dict[str, dict[str, Any]] = {}
+    cursor = 0
+    count = 50
+    page_count = 0
+    has_more = True
+    deadline = time.time() + timeout
+
+    while has_more and time.time() < deadline:
+        if max_reviews > 0 and len(comments_by_id) >= max_reviews:
+            break
+        url = build_tiktok_comment_url(video_id, cursor, count)
+        payload = request_tiktok_json(url, video_url, proxy, min(30, max(5, timeout)))
+        page_count += 1
+        comments = payload.get("comments")
+        if not isinstance(comments, list):
+            data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+            comments = data.get("comments") if isinstance(data.get("comments"), list) else []
+        collect_tiktok_api_comments(payload, video_id, video_url, comments_by_id, max_reviews)
+        parsed_has_more = parse_tiktok_has_more(payload.get("has_more"))
+        has_more = False if parsed_has_more is False or not comments else bool(parsed_has_more)
+        try:
+            next_cursor = int(payload.get("cursor") or 0)
+        except Exception:
+            next_cursor = 0
+        if next_cursor <= cursor:
+            break
+        cursor = next_cursor
+        time.sleep(0.8)
+
+    rows = list(comments_by_id.values())
+    if max_reviews > 0:
+        rows = rows[:max_reviews]
+    return {
+        "source": "TikTok Video",
+        "crawlChannel": "tiktok_video",
+        "crawlChannelLabel": CHANNEL_LABELS["tiktok_video"],
+        "productUrl": video_url,
+        "productName": f"TikTok {video_id}",
+        "shopId": "tiktok",
+        "itemId": video_id,
+        "videoId": video_id,
+        "nextRequests": page_count,
+        "payloadComments": len(rows),
+        "domCommentCount": 0,
+        "endReached": not has_more,
+        "rows": rows,
+    }
+
+
+def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | None, timeout: int) -> dict[str, Any]:
+    try:
+        direct_result = fetch_tiktok_video_comments_direct(video_url, max_reviews, proxy, timeout)
+        if direct_result["rows"]:
+            return direct_result
+    except Exception:
+        pass
+
+    if DynamicFetcher is None:
+        raise RuntimeError("Scrapling DynamicFetcher is not available. Reinstall with: pip install 'scrapling[fetchers]'")
+
+    video_id = parse_tiktok_video_id(video_url)
+    comments_by_id: dict[str, dict[str, Any]] = {}
+    state: dict[str, Any] = {
+        "comment_requests": 0,
+        "payload_comments": 0,
+        "dom_comment_count": 0,
+        "title": "",
+        "has_more": None,
+    }
+
+    def page_action(page: Any) -> None:
+        def limit_reached() -> bool:
+            return max_reviews > 0 and len(comments_by_id) >= max_reviews
+
+        def on_response(response: Any) -> None:
+            try:
+                if "/api/comment/list/" not in response.url or "/api/comment/list/reply/" in response.url:
+                    return
+                state["comment_requests"] = int(state.get("comment_requests") or 0) + 1
+                try:
+                    payload = json.loads(response.text())
+                    added = collect_tiktok_api_comments(payload, video_id, video_url, comments_by_id, max_reviews)
+                    state["payload_comments"] = int(state.get("payload_comments") or 0) + added
+                    if "has_more" in payload:
+                        state["has_more"] = parse_tiktok_has_more(payload.get("has_more"))
+                except Exception:
+                    return
+            except Exception:
+                return
+
+        page.on("response", on_response)
+        page.wait_for_timeout(3000)
+
+        try:
+            state["title"] = (page.title() or "").replace("| TikTok", "").strip()
+        except Exception:
+            state["title"] = ""
+
+        def extract_dom_comments() -> list[dict[str, Any]]:
+            return page.evaluate(
+                """() => {
+                    const clean = (value) => (value || "").replace(/\\s+/g, " ").trim();
+                    const nodes = Array.from(document.querySelectorAll(
+                      "[data-e2e='comment-item'], [data-e2e*='comment-level-1'], div[class*='CommentItem'], div[class*='DivCommentItem']"
+                    ));
+                    return nodes.map((node, index) => {
+                      const authorLink = node.querySelector("a[href^='/@'], a[href*='tiktok.com/@']");
+                      const author = clean(authorLink?.textContent).replace(/^@/, "");
+                      const textEl =
+                        node.querySelector("[data-e2e*='comment-level-1'] p, [data-e2e*='comment'] p") ||
+                        node.querySelector("p, span");
+                      const content = clean(textEl?.innerText || textEl?.textContent);
+                      const likeEl = node.querySelector("[data-e2e*='comment-like-count'], [class*='like-count' i], strong");
+                      const likeText = clean(likeEl?.textContent);
+                      const commentId = node.getAttribute("data-id") || node.getAttribute("id") || "";
+                      if (!content) return null;
+                      return { index, author, content, likeText, commentId };
+                    }).filter(Boolean);
+                }"""
+            )
+
+        def scroll_comments() -> None:
+            page.evaluate(
+                """() => {
+                    const target =
+                      document.querySelector("[data-e2e='comment-list'], [class*='CommentList'], [class*='DivCommentList']") ||
+                      document.querySelector("[data-e2e='browse-comment']") ||
+                      document.scrollingElement ||
+                      document.documentElement;
+                    if (target && target !== document.documentElement && target !== document.body) {
+                      target.scrollBy({ top: Math.max(700, Math.floor((target.clientHeight || 800) * 0.9)), behavior: "smooth" });
+                    } else {
+                      window.scrollBy({ top: Math.max(900, Math.floor(window.innerHeight * 0.9)), behavior: "smooth" });
+                    }
+                }"""
+            )
+
+        idle_rounds = 0
+        last_count = 0
+        last_requests = int(state.get("comment_requests") or 0)
+        deadline = time.time() + timeout
+
+        try:
+            page.evaluate(
+                """() => {
+                    const comments =
+                      document.querySelector("[data-e2e='comment-list'], [class*='CommentList'], [class*='DivCommentList']") ||
+                      document.querySelector("[data-e2e='browse-comment']");
+                    if (comments) comments.scrollIntoView({ block: "center" });
+                    else window.scrollBy(0, Math.max(700, Math.floor(window.innerHeight * 0.8)));
+                }"""
+            )
+            page.wait_for_timeout(1800)
+        except Exception:
+            page.wait_for_timeout(1200)
+
+        while not limit_reached() and time.time() < deadline:
+            try:
+                scroll_comments()
+                page.wait_for_timeout(1800)
+            except Exception:
+                page.wait_for_timeout(1200)
+
+            try:
+                dom_items = extract_dom_comments()
+                state["dom_comment_count"] = len(dom_items)
+            except Exception:
+                dom_items = []
+
+            for item in dom_items:
+                content = str(item.get("content") or "").strip()
+                if not content:
+                    continue
+                author = str(item.get("author") or "").strip()
+                comment_id = str(item.get("commentId") or "").strip() or stable_tiktok_comment_id(
+                    video_id,
+                    author,
+                    content,
+                    int(item.get("index") or len(comments_by_id)),
+                )
+                if comment_id in comments_by_id:
+                    continue
+                comments_by_id[comment_id] = {
+                    "cmtId": comment_id,
+                    "shopId": "tiktok",
+                    "itemId": video_id,
+                    "ratingStar": 0,
+                    "comment": content,
+                    "commentTr": None,
+                    "modelName": author or None,
+                    "hasMedia": False,
+                    "commentTime": None,
+                    "rawJson": {
+                        "platform": "TikTok Video",
+                        "videoId": video_id,
+                        "author": author,
+                        "likeText": item.get("likeText") or "",
+                        "sourceUrl": video_url,
+                        "source": "tiktok_dom",
+                    },
+                }
+                if limit_reached():
+                    break
+
+            current_count = len(comments_by_id)
+            current_requests = int(state.get("comment_requests") or 0)
+            if current_count == last_count and current_requests == last_requests:
+                idle_rounds += 1
+            else:
+                idle_rounds = 0
+            last_count = current_count
+            last_requests = current_requests
+
+            if state.get("has_more") is False and idle_rounds >= 1:
+                break
+            if idle_rounds >= 4:
+                break
+
+    fetch_kwargs: dict[str, Any] = {
+        "headless": True,
+        "disable_resources": False,
+        "network_idle": False,
+        "timeout": timeout * 1000,
+        "wait": 1000,
+        "page_action": page_action,
+        "locale": "en-US",
+        "extra_headers": {"accept-language": "en-US,en;q=0.9,zh-CN;q=0.7,zh;q=0.6"},
+    }
+    if proxy:
+        fetch_kwargs["proxy"] = proxy
+
+    DynamicFetcher.fetch(video_url, **fetch_kwargs)
+    rows = list(comments_by_id.values())
+    if max_reviews > 0:
+        rows = rows[:max_reviews]
+    return {
+        "source": "TikTok Video",
+        "crawlChannel": "tiktok_video",
+        "crawlChannelLabel": CHANNEL_LABELS["tiktok_video"],
+        "productUrl": video_url,
+        "productName": state.get("title") or f"TikTok {video_id}",
+        "shopId": "tiktok",
+        "itemId": video_id,
+        "videoId": video_id,
+        "nextRequests": state.get("comment_requests"),
+        "payloadComments": state.get("payload_comments"),
+        "domCommentCount": state.get("dom_comment_count"),
+        "endReached": state.get("has_more") is False,
+        "rows": rows,
+    }
+
     def page_action(page: Any) -> None:
         def on_response(response: Any) -> None:
             try:
@@ -798,6 +1227,217 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
     }
 
 
+def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | None, timeout: int) -> dict[str, Any]:
+    if DynamicFetcher is None:
+        raise RuntimeError("Scrapling DynamicFetcher is not available. Reinstall with: pip install 'scrapling[fetchers]'")
+
+    post_id = parse_facebook_post_id(post_url)
+    comments_by_id: dict[str, dict[str, Any]] = {}
+    state: dict[str, Any] = {
+        "title": "",
+        "dom_comment_count": 0,
+        "end_reached": False,
+    }
+
+    def page_action(page: Any) -> None:
+        def limit_reached() -> bool:
+            return max_reviews > 0 and len(comments_by_id) >= max_reviews
+
+        page.wait_for_timeout(3000)
+        try:
+            state["title"] = (page.title() or "").replace("| Facebook", "").strip()
+        except Exception:
+            state["title"] = ""
+
+        def click_more_comments() -> bool:
+            try:
+                return bool(
+                    page.evaluate(
+                        """() => {
+                            const clean = (value) => (value || "").replace(/\\s+/g, " ").trim().toLowerCase();
+                            const labels = [
+                              "view more comments",
+                              "view previous comments",
+                              "more comments",
+                              "see more comments",
+                              "查看更多评论",
+                              "查看更多留言",
+                              "更多评论",
+                              "查看之前的评论"
+                            ];
+                            const nodes = Array.from(document.querySelectorAll("div[role='button'], span[role='button'], a[role='link']"));
+                            const target = nodes.find((node) => labels.some((label) => clean(node.textContent).includes(label.toLowerCase())));
+                            if (target) {
+                              target.click();
+                              return true;
+                            }
+                            return false;
+                        }"""
+                    )
+                )
+            except Exception:
+                return False
+
+        def scroll_comments() -> None:
+            page.evaluate(
+                """() => {
+                    const comments = Array.from(document.querySelectorAll("span, div"))
+                      .find((node) => /comment|评论|留言/i.test((node.textContent || "").trim()));
+                    if (comments) comments.scrollIntoView({ block: "center" });
+                    window.scrollBy({ top: Math.max(900, Math.floor(window.innerHeight * 0.9)), behavior: "smooth" });
+                }"""
+            )
+
+        def extract_dom_comments() -> list[dict[str, Any]]:
+            return page.evaluate(
+                """() => {
+                    const clean = (value) => (value || "").replace(/\\s+/g, " ").trim();
+                    const hash = (input) => {
+                      let h = 2166136261;
+                      for (let i = 0; i < input.length; i += 1) {
+                        h ^= input.charCodeAt(i);
+                        h = Math.imul(h, 16777619);
+                      }
+                      return (h >>> 0).toString(36);
+                    };
+                    const nodes = Array.from(document.querySelectorAll(
+                      "div[aria-label^='Comment by' i], div[aria-label*=' comment by ' i], div[role='article'][aria-label*='Comment' i], div[role='article']"
+                    ));
+                    return nodes.map((node, index) => {
+                      const aria = node.getAttribute("aria-label") || "";
+                      const ariaMatch = aria.match(/comment by\\s+(.+?)(?:$|,|\\.|\\s+on\\s+)/i);
+                      const authorLink = node.querySelector("a[role='link'][href*='facebook.com'], a[href^='/profile.php'], a[href^='/people/'], a[href^='/'][tabindex='0']");
+                      const author = clean(ariaMatch?.[1] || authorLink?.textContent || "");
+                      const blocks = Array.from(node.querySelectorAll("div[dir='auto'], span[dir='auto']"))
+                        .map((el) => clean(el.textContent))
+                        .filter(Boolean)
+                        .filter((text) => text !== author)
+                        .filter((text) => !/^(like|reply|share|edited|top fan|author|all comments|most relevant)$/i.test(text))
+                        .filter((text) => !/^\\d+\\s*(m|h|d|w|mo|y|分钟|小时|天|周|月|年)$/i.test(text));
+                      const unique = [];
+                      for (const text of blocks) {
+                        if (!unique.includes(text)) unique.push(text);
+                      }
+                      const content = unique.join(" ").trim();
+                      if (!content || content.length < 2) return null;
+                      const link = node.querySelector("a[href*='comment_id='], a[href*='comment/replies']");
+                      let commentId = "";
+                      let commentUrl = "";
+                      try {
+                        if (link?.href) {
+                          const url = new URL(link.href, location.origin);
+                          commentId = url.searchParams.get("comment_id") || url.searchParams.get("reply_comment_id") || "";
+                          commentUrl = url.href;
+                        }
+                      } catch {}
+                      if (!commentId) commentId = hash(`${author}|${content}|${index}`);
+                      return { index, author, content, commentId, commentUrl };
+                    }).filter(Boolean);
+                }"""
+            )
+
+        idle_rounds = 0
+        last_count = 0
+        deadline = time.time() + timeout
+
+        try:
+            scroll_comments()
+            page.wait_for_timeout(1800)
+        except Exception:
+            page.wait_for_timeout(1200)
+
+        while not limit_reached() and time.time() < deadline:
+            clicked = click_more_comments()
+            try:
+                scroll_comments()
+                page.wait_for_timeout(1800 if clicked else 1400)
+            except Exception:
+                page.wait_for_timeout(1200)
+
+            try:
+                dom_items = extract_dom_comments()
+                state["dom_comment_count"] = len(dom_items)
+            except Exception:
+                dom_items = []
+
+            for item in dom_items:
+                content = str(item.get("content") or "").strip()
+                if not content:
+                    continue
+                author = str(item.get("author") or "").strip()
+                raw_id = str(item.get("commentId") or "").strip()
+                comment_id = raw_id or stable_facebook_comment_id(
+                    post_id,
+                    author,
+                    content,
+                    int(item.get("index") or len(comments_by_id)),
+                )
+                if comment_id in comments_by_id:
+                    continue
+                comments_by_id[comment_id] = {
+                    "cmtId": comment_id,
+                    "shopId": "facebook",
+                    "itemId": post_id,
+                    "ratingStar": 0,
+                    "comment": content,
+                    "commentTr": None,
+                    "modelName": author or None,
+                    "hasMedia": False,
+                    "commentTime": None,
+                    "rawJson": {
+                        "platform": "Facebook",
+                        "postId": post_id,
+                        "author": author,
+                        "commentUrl": item.get("commentUrl") or "",
+                        "sourceUrl": post_url,
+                        "source": "facebook_dom",
+                    },
+                }
+                if limit_reached():
+                    break
+
+            current_count = len(comments_by_id)
+            if current_count == last_count:
+                idle_rounds += 1
+            else:
+                idle_rounds = 0
+            last_count = current_count
+            if idle_rounds >= 5:
+                state["end_reached"] = True
+                break
+
+    fetch_kwargs: dict[str, Any] = {
+        "headless": True,
+        "disable_resources": False,
+        "network_idle": False,
+        "timeout": timeout * 1000,
+        "wait": 1000,
+        "page_action": page_action,
+        "locale": "en-US",
+        "extra_headers": {"accept-language": "en-US,en;q=0.9,zh-CN;q=0.7,zh;q=0.6"},
+    }
+    if proxy:
+        fetch_kwargs["proxy"] = proxy
+
+    DynamicFetcher.fetch(post_url, **fetch_kwargs)
+    rows = list(comments_by_id.values())
+    if max_reviews > 0:
+        rows = rows[:max_reviews]
+    return {
+        "source": "Facebook",
+        "crawlChannel": "facebook_post",
+        "crawlChannelLabel": CHANNEL_LABELS["facebook_post"],
+        "productUrl": post_url,
+        "productName": state.get("title") or f"Facebook {post_id}",
+        "shopId": "facebook",
+        "itemId": post_id,
+        "postId": post_id,
+        "domCommentCount": state.get("dom_comment_count"),
+        "endReached": state.get("end_reached"),
+        "rows": rows,
+    }
+
+
 def parse_channels(value: str) -> list[str]:
     channels = [item.strip() for item in value.split(",") if item.strip()]
     valid = [item for item in channels if item in CHANNEL_LABELS]
@@ -836,10 +1476,14 @@ def main() -> int:
         crawl_url = unwrap_nested_url(args.url)
         if is_youtube_url(crawl_url):
             result = fetch_youtube_comments(crawl_url, args.max_reviews, args.proxy, args.timeout)
+        elif is_tiktok_video_url(crawl_url):
+            result = fetch_tiktok_video_comments(crawl_url, args.max_reviews, args.proxy, args.timeout)
+        elif is_facebook_post_url(crawl_url):
+            result = fetch_facebook_post_comments(crawl_url, args.max_reviews, args.proxy, args.timeout)
         elif is_shopee_url(crawl_url):
             result = fetch_shopee_reviews(crawl_url, args.max_reviews, args.proxy, parse_channels(args.channels), args.timeout)
         else:
-            raise RuntimeError("Unsupported crawl URL. Currently supports Shopee product links and YouTube video links.")
+            raise RuntimeError("Unsupported crawl URL. Currently supports Shopee product links, YouTube video links, TikTok video links and Facebook post links.")
     except Exception as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=True), file=sys.stderr)
         return 1

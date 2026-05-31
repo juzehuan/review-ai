@@ -1,7 +1,8 @@
 import { prisma } from "@review-ai/db";
 import { fail, ok } from "@/lib/http";
 import { requireSuperAdmin } from "@/lib/auth";
-import { serializeUser } from "@/lib/serializers";
+import { ensurePersonalWorkspace } from "@/lib/personal-workspace";
+import { serializeAdminUser } from "@/lib/serializers";
 
 export async function GET(request: Request) {
   const auth = await requireSuperAdmin(request);
@@ -10,10 +11,21 @@ export async function GET(request: Request) {
   }
 
   const users = await prisma.user.findMany({
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
+    include: {
+      usedInviteCode: true,
+      memberships: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          workspace: {
+            include: { subscription: true }
+          }
+        }
+      }
+    }
   });
 
-  return ok(users.map(serializeUser));
+  return ok(users.map(serializeAdminUser));
 }
 
 export async function POST(request: Request) {
@@ -36,6 +48,22 @@ export async function POST(request: Request) {
     update: { name, isSuperAdmin },
     create: { email, name, isSuperAdmin }
   });
+  await ensurePersonalWorkspace(prisma, user);
 
-  return ok(serializeUser(user), 201);
+  const withQuota = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    include: {
+      usedInviteCode: true,
+      memberships: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          workspace: {
+            include: { subscription: true }
+          }
+        }
+      }
+    }
+  });
+
+  return ok(serializeAdminUser(withQuota), 201);
 }

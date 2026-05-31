@@ -1,4 +1,5 @@
 import type {
+  AdminUserDTO,
   AdminWorkspaceDTO,
   AnalysisType,
   AnalysisRunLogDTO,
@@ -27,6 +28,7 @@ import type {
   Workspace,
   WorkspaceMember
 } from "@review-ai/db";
+import type { InviteCode } from "@review-ai/db";
 import { parseCrawlerChannels } from "@/lib/crawler-settings";
 
 export function serializeTask(task: Task & { analysisRuns?: AnalysisRun[] }): TaskListItem {
@@ -77,6 +79,42 @@ export function serializeUser(user: User): UserDTO {
     name: user.name,
     isSuperAdmin: user.isSuperAdmin,
     createdAt: user.createdAt.toISOString()
+  };
+}
+
+export function serializeInviteCode(
+  inviteCode: InviteCode & { createdBy: User; usedBy?: User | null }
+) {
+  return {
+    id: inviteCode.id,
+    code: inviteCode.code,
+    note: inviteCode.note,
+    monthlyReviewLimit: inviteCode.monthlyReviewLimit,
+    monthlyRunLimit: inviteCode.monthlyRunLimit,
+    usedAt: inviteCode.usedAt?.toISOString() || null,
+    expiresAt: inviteCode.expiresAt?.toISOString() || null,
+    createdAt: inviteCode.createdAt.toISOString(),
+    createdBy: serializeUser(inviteCode.createdBy),
+    usedBy: inviteCode.usedBy ? serializeUser(inviteCode.usedBy) : null
+  };
+}
+
+export function serializeAdminUser(
+  user: User & {
+    memberships?: Array<WorkspaceMember & { workspace: Workspace & { subscription?: Subscription | null } }>;
+    usedInviteCode?: InviteCode | null;
+  }
+): AdminUserDTO {
+  const primaryWorkspace = user.memberships?.find((member) => member.role === "owner")?.workspace || user.memberships?.[0]?.workspace || null;
+  const subscription = primaryWorkspace?.subscription || null;
+  return {
+    ...serializeUser(user),
+    workspaceId: primaryWorkspace?.id || null,
+    monthlyReviewLimit: subscription?.monthlyReviewLimit || 0,
+    monthlyRunLimit: subscription?.monthlyRunLimit || 0,
+    currentPeriodReviewCount: subscription?.currentPeriodReviewCount || 0,
+    currentPeriodRunCount: subscription?.currentPeriodRunCount || 0,
+    inviteCode: user.usedInviteCode?.code || null
   };
 }
 

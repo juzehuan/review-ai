@@ -9,17 +9,21 @@ export async function GET(request: Request) {
     return auth.response;
   }
 
-  const [userCount, workspaceCount, taskCount, analysisRunCount] = await Promise.all([
+  const [userCount, workspaceCount, taskCount, analysisRunCount, inviteCodeCount, availableInviteCodeCount] = await Promise.all([
     prisma.user.count(),
     prisma.workspace.count(),
     prisma.task.count(),
-    prisma.analysisRun.count()
+    prisma.analysisRun.count(),
+    prisma.inviteCode.count(),
+    prisma.inviteCode.count({ where: { usedAt: null, usedByUserId: null } })
   ]);
 
   return ok({
     userCount,
     workspaceCount,
     taskCount,
-    analysisRunCount
+    analysisRunCount,
+    inviteCodeCount,
+    availableInviteCodeCount
   } satisfies AdminOverviewDTO);
 }

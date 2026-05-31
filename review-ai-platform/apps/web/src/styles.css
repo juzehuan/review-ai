@@ -183,6 +183,17 @@ select {
   font-weight: 900;
 }
 
+.quota-card-title {
+  margin: 10px 0 6px;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.quota-card-secondary {
+  margin-top: 8px;
+}
+
 .side-nav {
   margin-top: 22px;
   display: flex;
@@ -981,6 +992,28 @@ select {
 
 .full-input {
   width: 100%;
+}
+
+.admin-tabs {
+  padding: 14px 16px 18px;
+  border: 1px solid #e4e7ee;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.quota-editor {
+  display: grid;
+  grid-template-columns: 132px 120px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.usage-cell {
+  display: grid;
+  gap: 5px;
+  color: #4b5565;
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .group-list {

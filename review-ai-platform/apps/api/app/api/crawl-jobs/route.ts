@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     return fail("请填写任务名称");
   }
   if (!input.crawlerPlatform) {
-    return fail("暂不支持该链接抓取，目前支持 Shopee 商品链接和 YouTube 视频链接", 400);
+    return fail("暂不支持该链接抓取，目前支持 Shopee 商品链接、YouTube 视频链接、TikTok 视频链接和 Facebook 帖子链接", 400);
   }
   if (!crawlerSetting.enabled) {
     return fail("当前空间没有启用链接抓取，请先在空间设置中开启评论爬虫");

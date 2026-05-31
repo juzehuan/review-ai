@@ -67,8 +67,29 @@ model User {
   memberships  WorkspaceMember[]
   sessions     AuthSession[]
   assignedActionItems ReviewActionItem[] @relation("ActionItemAssignee")
+  createdInviteCodes InviteCode[] @relation("InviteCodeCreator")
+  usedInviteCode      InviteCode?  @relation("InviteCodeUser")
 
   @@map("user_account")
+}
+
+model InviteCode {
+  id                 String    @id @default(cuid())
+  code               String    @unique
+  note               String    @default("")
+  monthlyReviewLimit Int       @default(20000) @map("monthly_review_limit")
+  monthlyRunLimit    Int       @default(200) @map("monthly_run_limit")
+  createdByUserId    String    @map("created_by_user_id")
+  usedByUserId       String?   @unique @map("used_by_user_id")
+  usedAt             DateTime? @map("used_at")
+  expiresAt          DateTime? @map("expires_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  createdBy          User      @relation("InviteCodeCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  usedBy             User?     @relation("InviteCodeUser", fields: [usedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([usedAt])
+  @@map("invite_code")
 }
 
 model AuthSession {

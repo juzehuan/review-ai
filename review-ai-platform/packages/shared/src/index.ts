@@ -14,6 +14,28 @@ export interface UserDTO {
   createdAt: string;
 }
 
+export interface AdminUserDTO extends UserDTO {
+  workspaceId: string | null;
+  monthlyReviewLimit: number;
+  monthlyRunLimit: number;
+  currentPeriodReviewCount: number;
+  currentPeriodRunCount: number;
+  inviteCode: string | null;
+}
+
+export interface InviteCodeDTO {
+  id: string;
+  code: string;
+  note: string;
+  monthlyReviewLimit: number;
+  monthlyRunLimit: number;
+  usedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  createdBy: UserDTO;
+  usedBy: UserDTO | null;
+}
+
 export interface AuthResponseDTO {
   token: string;
   user: UserDTO;
@@ -70,6 +92,8 @@ export interface AdminOverviewDTO {
   workspaceCount: number;
   taskCount: number;
   analysisRunCount: number;
+  inviteCodeCount: number;
+  availableInviteCodeCount: number;
 }
 
 export interface WorkspaceAiSettingDTO {
@@ -149,7 +173,9 @@ export const SOURCE_CHANNEL_PRESETS = [
   { label: "Shopee TH", value: "Shopee" },
   { label: "Lazada TH", value: "Lazada" },
   { label: "TikTok Shop TH", value: "TikTok Shop" },
-  { label: "YouTube", value: "YouTube" }
+  { label: "TikTok Video", value: "TikTok Video" },
+  { label: "YouTube", value: "YouTube" },
+  { label: "Facebook", value: "Facebook" }
 ] as const;
 
 export const ANALYSIS_TYPE_PRESETS: Array<{ label: string; value: AnalysisType; description: string }> = [
@@ -166,6 +192,7 @@ export function inferAnalysisType(sourceChannel?: string | null): AnalysisType {
   if (
     channel.includes("tweet") ||
     channel.includes("twitter") ||
+    channel.includes("facebook") ||
     channel === "x" ||
     channel.includes("weibo") ||
     channel.includes("threads")

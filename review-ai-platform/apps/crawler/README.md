@@ -6,6 +6,8 @@ Supported links:
 
 - Shopee product links: uses API-first channels and falls back to browser interception.
 - YouTube video links: uses browser DOM scrolling, extracts top-level comments only, and stops when no new `youtubei/v1/next` requests/comments appear or YouTube shows the sorted-comments end hint.
+- TikTok video links: uses the public comment list endpoint first, then falls back to browser DOM scrolling.
+- Facebook post links: uses browser DOM scrolling and "view more comments" buttons for public or otherwise visible post comments.
 
 Model usage:
 
@@ -25,4 +27,4 @@ Optional environment variables:
 - `SCRAPLING_PROXY`: proxy URL passed to Scrapling, for example `http://127.0.0.1:7890`.
 - `SHOPEE_COOKIE`: cookie header for Shopee pages that require a logged-in/session context.
 
-The first implementation targets Shopee product URLs and normalizes reviews into the same shape as uploaded CSV rows.
+The crawler normalizes reviews and social comments into the same shape as uploaded CSV rows.

@@ -26,9 +26,9 @@ export const router = createRouter({
     { path: "/reviews", component: ReviewsPage },
     { path: "/analysis-runs", component: AnalysisRunsPage },
     { path: "/crawl-jobs", component: CrawlJobsPage },
-    { path: "/users", redirect: "/settings/workspace" },
-    { path: "/settings", redirect: "/settings/workspace" },
-    { path: "/settings/workspace", component: WorkspaceSettingsPage },
+    { path: "/users", redirect: "/admin" },
+    { path: "/settings", redirect: "/settings/ai" },
+    { path: "/settings/workspace", redirect: "/settings/ai" },
     { path: "/settings/ai", component: WorkspaceSettingsPage },
     { path: "/settings/crawler", component: WorkspaceSettingsPage },
     { path: "/admin", component: AdminPage }

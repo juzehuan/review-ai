@@ -49,7 +49,7 @@
           <template v-else-if="column.key === 'progress'">
             <div class="run-progress-cell">
               <a-progress :percent="record.progress" size="small" :status="progressStatus(record.status)" />
-              <span>已抓取 {{ record.fetchedRows }}/{{ record.maxReviews }}</span>
+              <span>已抓取 {{ record.fetchedRows }}/{{ record.maxReviews || '不限' }}</span>
             </div>
           </template>
           <template v-else-if="column.key === 'meta'">
@@ -109,7 +109,7 @@
           <a-input v-model:value="form.productName" placeholder="可选，留空时会尽量从页面标题识别" />
         </a-form-item>
         <a-form-item label="评论链接">
-          <a-input v-model:value="form.productUrl" placeholder="例如：https://www.youtube.com/watch?v=... 或 https://shopee.co.th/xxx-i.123.456" />
+          <a-input v-model:value="form.productUrl" placeholder="例如：https://www.tiktok.com/@user/video/...、YouTube 视频或 Facebook 帖子链接" />
         </a-form-item>
         <a-form-item label="来源渠道">
           <a-select v-model:value="form.sourceChannel" :options="sourceChannelOptions" />
@@ -119,11 +119,12 @@
           <div class="settings-help">{{ currentAnalysisTypeDescription }}</div>
         </a-form-item>
         <a-form-item label="最多采集条数">
-          <a-input-number v-model:value="form.maxReviews" :min="1" :max="1000" class="full-input" />
+          <a-input-number v-model:value="form.maxReviews" :min="0" :max="1000" class="full-input" />
+          <div class="settings-help">填 0 表示不限，直到平台没有更多评论或采集超时。</div>
         </a-form-item>
         <a-form-item label="采集渠道">
           <a-select v-model:value="form.crawlChannels" mode="multiple" :options="crawlerChannelOptions" />
-          <div class="settings-help">YouTube 链接会自动使用 DOM 滚动采集；采集渠道只影响 Shopee 商品链接。</div>
+          <div class="settings-help">YouTube、TikTok 视频和 Facebook 帖子链接会自动使用浏览器滚动采集；采集渠道只影响 Shopee 商品链接。</div>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -249,7 +250,13 @@ function inferSourceChannelFromUrl(value?: string | null) {
     return "Lazada";
   }
   if (text.includes("tiktok.")) {
+    if (/\/@[^/]+\/video\/\d+/i.test(text)) {
+      return "TikTok Video";
+    }
     return "TikTok Shop";
+  }
+  if (text.includes("facebook.") && /(story_fbid=|fbid=|\/posts\/|\/videos\/|\/reel\/|\/share\/[pv]\/|\/groups\/[^/]+\/posts\/)/i.test(text)) {
+    return "Facebook";
   }
   return "";
 }
@@ -375,10 +382,18 @@ watch(
     }
     form.sourceChannel = sourceChannel;
     form.analysisType = inferAnalysisType(sourceChannel);
-    if (sourceChannel === "YouTube") {
+    if (sourceChannel === "YouTube" || sourceChannel === "TikTok Video" || sourceChannel === "Facebook") {
       form.crawlChannels = ["browser_intercept"];
+      if (sourceChannel === "TikTok Video" || sourceChannel === "Facebook") {
+        form.maxReviews = 0;
+      }
       if (!form.productName.trim()) {
-        form.productName = "YouTube 视频评论";
+        form.productName =
+          sourceChannel === "YouTube"
+            ? "YouTube 视频评论"
+            : sourceChannel === "TikTok Video"
+              ? "TikTok 视频评论"
+              : "Facebook 帖子评论";
       }
     }
   }

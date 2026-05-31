@@ -7,27 +7,21 @@
         <div class="brand-mark">RI</div>
         <div class="brand-copy">
           <div class="brand-title">ReviewIQ</div>
-          <div class="brand-subtitle">Customer Intelligence</div>
+          <div class="brand-subtitle">{{ currentUser?.isSuperAdmin ? "Admin Console" : "User Console" }}</div>
         </div>
       </div>
 
       <div class="workspace-card">
         <div class="workspace-card-top">
-          <span>Workspace</span>
-          <a-tag color="blue">{{ workspace?.planTier || "pro" }}</a-tag>
+          <span>用户配额</span>
+          <a-tag :color="currentUser?.isSuperAdmin ? 'purple' : 'blue'">
+            {{ currentUser?.isSuperAdmin ? "超管" : "用户" }}
+          </a-tag>
         </div>
-        <a-select
-          :value="workspace?.slug"
-          class="workspace-select"
-          :bordered="false"
-          @change="handleWorkspaceChange"
-        >
-          <a-select-option v-for="item in workspaces" :key="item.slug" :value="item.slug">
-            {{ item.name }}
-          </a-select-option>
-        </a-select>
-        <div class="workspace-card-meta">{{ usageText }} reviews used</div>
+        <div class="quota-card-title">{{ currentUser?.name || "当前账号" }}</div>
+        <div class="workspace-card-meta">{{ usageText }} 评论额度已用</div>
         <a-progress :percent="usagePercent" :show-info="false" size="small" />
+        <div class="workspace-card-meta quota-card-secondary">{{ runUsageText }} 分析次数已用</div>
       </div>
 
       <nav class="side-nav">
@@ -56,8 +50,8 @@
     <a-layout class="app-main">
       <header class="topbar">
         <div class="topbar-left">
-          <div class="topbar-eyebrow">ReviewIQ Cloud</div>
-          <div class="topbar-title">{{ workspace?.name || "Workspace" }}</div>
+          <div class="topbar-eyebrow">{{ currentUser?.isSuperAdmin ? "Super Admin" : "User Backend" }}</div>
+          <div class="topbar-title">{{ pageTitle }}</div>
         </div>
 
         <div class="topbar-actions">
@@ -91,6 +85,7 @@
 import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
+  DatabaseOutlined,
   FolderOpenOutlined,
   LogoutOutlined,
   SettingOutlined,
@@ -101,43 +96,38 @@ import { useTaskStore } from "@/composables";
 
 const router = useRouter();
 const route = useRoute();
-const {
-  workspace,
-  workspaces,
-  currentUser,
-  bootstrapAuth,
-  switchWorkspace,
-  clearAuthState
-} = useTaskStore();
+const { workspace, currentUser, bootstrapAuth, clearAuthState } = useTaskStore();
 
 type NavItem = { path: string; label: string; disabled: boolean };
 type NavSection = { label: string; icon: unknown; items: NavItem[] };
 
 const navSections = computed<NavSection[]>(() => [
   {
-    label: "工作台",
+    label: "用户后台",
     icon: FolderOpenOutlined,
     items: [
-      { path: "/dashboard", label: "空间概览", disabled: false },
+      { path: "/dashboard", label: "任务看板", disabled: false },
       { path: "/crawl-jobs", label: "评论采集", disabled: false },
-      { path: "/analysis-runs", label: "分析任务", disabled: false }
+      { path: "/analysis-runs", label: "分析记录", disabled: false }
     ]
   },
   {
-    label: "平台",
-    icon: TeamOutlined,
-    items: [
-      ...(currentUser.value?.isSuperAdmin ? [{ path: "/admin", label: "超管后台", disabled: false }] : [])
-    ]
-  },
-  {
-    label: "设置",
+    label: "模型与抓取",
     icon: SettingOutlined,
     items: [
-      { path: "/settings/workspace", label: "空间与成员", disabled: false },
-      { path: "/settings/ai", label: "AI 设置", disabled: false },
-      { path: "/settings/crawler", label: "爬虫设置", disabled: false }
+      { path: "/settings/ai", label: "提示词与模型", disabled: false },
+      { path: "/settings/crawler", label: "抓取设置", disabled: false }
     ]
+  },
+  {
+    label: "平台管理",
+    icon: TeamOutlined,
+    items: currentUser.value?.isSuperAdmin ? [{ path: "/admin", label: "超管后台", disabled: false }] : []
+  },
+  {
+    label: "数据",
+    icon: DatabaseOutlined,
+    items: [{ path: "/reviews", label: "评论明细", disabled: !workspace.value }]
   }
 ].filter((section) => section.items.length));
 
@@ -149,6 +139,13 @@ const usageText = computed(() => {
   return `${workspace.value.currentPeriodReviewCount}/${workspace.value.monthlyReviewLimit}`;
 });
 
+const runUsageText = computed(() => {
+  if (!workspace.value) {
+    return "0/0";
+  }
+  return `${workspace.value.currentPeriodRunCount}/${workspace.value.monthlyRunLimit}`;
+});
+
 const usagePercent = computed(() => {
   if (!workspace.value?.monthlyReviewLimit) {
     return 0;
@@ -156,13 +153,32 @@ const usagePercent = computed(() => {
   return Math.min(Math.round((workspace.value.currentPeriodReviewCount / workspace.value.monthlyReviewLimit) * 100), 100);
 });
 
+const pageTitle = computed(() => {
+  if (route.path === "/admin") {
+    return "超管后台";
+  }
+  if (route.path.startsWith("/settings/ai")) {
+    return "提示词与模型设置";
+  }
+  if (route.path.startsWith("/settings/crawler")) {
+    return "抓取设置";
+  }
+  if (route.path === "/crawl-jobs") {
+    return "评论采集";
+  }
+  if (route.path.includes("/reviews") || route.path === "/reviews") {
+    return "评论明细";
+  }
+  if (route.path.includes("/runs") || route.path === "/analysis-runs") {
+    return "分析记录";
+  }
+  return "用户后台";
+});
+
 const accountInitial = computed(() => (currentUser.value?.name || currentUser.value?.email || "U").slice(0, 1).toUpperCase());
 
 function sectionActive(section: NavSection) {
-  if (section.label === "工作台" && ["/reviews", "/report"].includes(route.path)) {
-    return true;
-  }
-  if (section.label === "工作台" && route.path.startsWith("/tasks/")) {
+  if (section.label === "用户后台" && route.path.startsWith("/tasks/")) {
     return true;
   }
   return section.items.some((item) => item.path === route.path);
@@ -179,13 +195,6 @@ async function handleLogout() {
   await logout();
   clearAuthState();
   router.push("/login");
-}
-
-async function handleWorkspaceChange(slug: unknown) {
-  if (typeof slug !== "string") {
-    return;
-  }
-  await switchWorkspace(slug);
 }
 
 onMounted(() => {
