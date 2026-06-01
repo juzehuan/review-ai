@@ -4,6 +4,7 @@ import WorkspaceOverviewPage from "./pages/WorkspaceOverviewPage.vue";
 import ReviewsPage from "./pages/ReviewsPage.vue";
 import AnalysisRunsPage from "./pages/AnalysisRunsPage.vue";
 import CrawlJobsPage from "./pages/CrawlJobsPage.vue";
+import GrowthOpsPage from "./pages/GrowthOpsPage.vue";
 import ActionItemsPage from "./pages/ActionItemsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
 import LoginPage from "./pages/LoginPage.vue";
@@ -20,6 +21,7 @@ export const router = createRouter({
     { path: "/share/:token", component: SharedReportPage, meta: { public: true } },
     { path: "/", redirect: "/dashboard" },
     { path: "/dashboard", component: WorkspaceOverviewPage },
+    { path: "/growth", component: GrowthOpsPage },
     { path: "/tasks/:taskId/report", component: DashboardPage },
     { path: "/tasks/:taskId/reviews", component: ReviewsPage },
     { path: "/tasks/:taskId/runs", component: AnalysisRunsPage },

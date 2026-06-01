@@ -382,7 +382,13 @@ function openEvidence(item: ReviewActionItemDTO) {
   if (!selectedTask.value || !item.relatedReviewIds.length) {
     return;
   }
-  router.push(`/tasks/${selectedTask.value.id}/reviews`);
+  router.push({
+    path: `/tasks/${selectedTask.value.id}/reviews`,
+    query: {
+      reviewIds: item.relatedReviewIds.join(","),
+      ...(item.runId ? { runId: item.runId } : {})
+    }
+  });
 }
 
 function openReport() {

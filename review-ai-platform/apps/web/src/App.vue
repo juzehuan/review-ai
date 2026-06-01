@@ -142,6 +142,7 @@ const navSections = computed<NavSection[]>(() => [
     icon: FolderOpenOutlined,
     items: [
       { path: "/dashboard", label: "任务看板", disabled: false },
+      { path: "/growth", label: "增长运营", disabled: false },
       { path: "/crawl-jobs", label: "评论采集", disabled: false },
       { path: "/analysis-runs", label: "分析记录", disabled: false }
     ]
@@ -201,6 +202,9 @@ const pageTitle = computed(() => {
   if (route.path === "/crawl-jobs") {
     return "评论采集";
   }
+  if (route.path === "/growth") {
+    return "增长运营";
+  }
   if (route.path.includes("/reviews") || route.path === "/reviews") {
     return "评论明细";
   }
@@ -220,6 +224,9 @@ function sectionActive(section: NavSection) {
 }
 
 function itemActive(item: NavItem) {
+  if (item.path === "/growth" && route.path === "/growth") {
+    return true;
+  }
   if (item.path === "/analysis-runs" && route.path.startsWith("/tasks/")) {
     return true;
   }

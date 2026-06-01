@@ -22,6 +22,7 @@
           <span>评论 {{ report.dashboard.reviewCount }}</span>
           <span>NPS {{ report.dashboard.nps }}</span>
           <span>浏览 {{ report.share.viewCount }}</span>
+          <a-button size="small" @click="printReport">打印/PDF</a-button>
         </div>
       </section>
 
@@ -180,6 +181,10 @@ function analysisTypeLabel(type?: string | null) {
     return "社媒评论";
   }
   return "商品评论";
+}
+
+function printReport() {
+  window.print();
 }
 
 const sentimentOption = computed<EChartsOption>(() => ({
@@ -384,6 +389,25 @@ onMounted(load);
 
   .shared-meta {
     justify-content: flex-start;
+  }
+}
+
+@media print {
+  .shared-report-page {
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .shared-meta :deep(.ant-btn) {
+    display: none;
+  }
+
+  .shared-hero,
+  .shared-summary,
+  .shared-insights,
+  .shared-evidence {
+    box-shadow: none;
+    break-inside: avoid;
   }
 }
 </style>

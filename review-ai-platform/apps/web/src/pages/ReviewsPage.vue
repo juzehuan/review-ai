@@ -49,11 +49,11 @@
     </div>
 
     <a-alert
-      v-if="evidenceIssue"
+      v-if="evidenceIssue || evidenceReviewIds.length"
       type="info"
       show-icon
       class="evidence-alert"
-      :message="`正在查看「${evidenceIssue}」相关评论证据`"
+      :message="evidenceAlertMessage"
     >
       <template #action>
         <a-button size="small" @click="clearEvidenceFilter">清除筛选</a-button>
@@ -348,6 +348,7 @@ const allRuns = ref<AnalysisRunDTO[]>([]);
 const latestRun = ref<AnalysisRunDTO | null>(null);
 const selectedResultRunId = ref<string | undefined>();
 const evidenceIssue = ref("");
+const evidenceReviewIds = ref<string[]>([]);
 const actionItems = ref<ReviewActionItemDTO[]>([]);
 const selectedRow = ref<ReviewRowDTO | null>(null);
 const exporting = ref(false);
@@ -415,6 +416,12 @@ const progressStatus = computed(() => {
     return "success";
   }
   return "active";
+});
+const evidenceAlertMessage = computed(() => {
+  if (evidenceReviewIds.value.length) {
+    return `正在查看行动项关联的 ${evidenceReviewIds.value.length} 条评论证据`;
+  }
+  return `正在查看「${evidenceIssue.value}」相关评论证据`;
 });
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -734,7 +741,8 @@ async function loadReviews() {
       sortBy: sortState.sortBy,
       sortOrder: sortState.sortOrder,
       runId: selectedResultRunId.value,
-      issue: evidenceIssue.value || undefined
+      issue: evidenceIssue.value || undefined,
+      reviewIds: evidenceReviewIds.value.length ? evidenceReviewIds.value.join(",") : undefined
     });
     rows.value = result.items;
     pagination.total = result.total;
@@ -807,7 +815,8 @@ async function handleExport() {
       hasMedia: filters.hasMedia,
       keyword: filters.keyword || undefined,
       runId: selectedResultRunId.value,
-      issue: evidenceIssue.value || undefined
+      issue: evidenceIssue.value || undefined,
+      reviewIds: evidenceReviewIds.value.length ? evidenceReviewIds.value.join(",") : undefined
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -838,6 +847,7 @@ function resetFilters() {
 
 function clearEvidenceFilter() {
   evidenceIssue.value = "";
+  evidenceReviewIds.value = [];
   if (selectedTask.value) {
     router.replace(`/tasks/${selectedTask.value.id}/reviews`);
   }
@@ -883,9 +893,16 @@ watch(
 );
 
 watch(
-  () => [route.query.issue, route.query.runId],
-  ([issue, runId]) => {
+  () => [route.query.issue, route.query.runId, route.query.reviewIds],
+  ([issue, runId, reviewIds]) => {
     evidenceIssue.value = typeof issue === "string" ? issue : "";
+    evidenceReviewIds.value =
+      typeof reviewIds === "string"
+        ? reviewIds
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [];
     if (typeof runId === "string") {
       selectedResultRunId.value = runId;
     }

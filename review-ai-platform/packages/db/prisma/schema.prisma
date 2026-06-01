@@ -70,6 +70,7 @@ model User {
   createdInviteCodes InviteCode[] @relation("InviteCodeCreator")
   usedInviteCode      InviteCode?  @relation("InviteCodeUser")
   createdReportShares ReportShare[] @relation("ReportShareCreator")
+  reviewCorrections   ReviewCorrection[] @relation("ReviewCorrectionCreator")
 
   @@map("user_account")
 }
@@ -217,6 +218,7 @@ model Task {
   crawlJobs       CrawlJob[]
   crawlMonitors   CrawlMonitor[]
   reportShares    ReportShare[]
+  reviewCorrections ReviewCorrection[]
 
   @@index([workspaceId])
   @@map("task")
@@ -388,6 +390,7 @@ model Review {
   task          Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
   importRecord  ImportRecord     @relation(fields: [importId], references: [id], onDelete: Cascade)
   analyses      ReviewAnalysis[]
+  corrections   ReviewCorrection[]
 
   @@unique([taskId, cmtId])
   @@map("review")
@@ -413,6 +416,7 @@ model AnalysisRun {
   issueStats        IssueStat[]
   tagStats          TagStat[]
   logs              AnalysisRunLog[]
+  reviewCorrections ReviewCorrection[]
 
   @@map("analysis_run")
 }
@@ -449,6 +453,30 @@ model ReviewAnalysis {
 
   @@unique([runId, reviewId])
   @@map("review_analysis")
+}
+
+model ReviewCorrection {
+  id              String       @id @default(cuid())
+  taskId          String       @map("task_id")
+  reviewId        String       @map("review_id")
+  runId           String?      @map("run_id")
+  createdByUserId String       @map("created_by_user_id")
+  sentiment       Sentiment?
+  topicLabels     String[]     @default([]) @map("topic_labels")
+  painPoints      String[]     @default([]) @map("pain_points")
+  highlights      String[]     @default([])
+  summary         String       @default("")
+  suggestion      String       @default("")
+  note            String       @default("")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  task            Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  review          Review       @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  run             AnalysisRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  createdBy       User         @relation("ReviewCorrectionCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@index([reviewId])
+  @@map("review_correction")
 }
 
 model IssueStat {

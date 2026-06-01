@@ -621,6 +621,93 @@ export interface DashboardDTO {
   aiSummary: string | null;
 }
 
+export type AlertLevel = "info" | "warning" | "critical";
+
+export interface DailyBriefAlertDTO {
+  id: string;
+  level: AlertLevel;
+  title: string;
+  detail: string;
+  metric: string;
+  current: number;
+  baseline: number;
+}
+
+export interface DailyBriefDTO {
+  taskId: string;
+  taskName: string;
+  productName: string;
+  generatedAt: string;
+  runId: string | null;
+  summary: string;
+  metrics: {
+    totalReviews: number;
+    reviewsToday: number;
+    reviews7d: number;
+    negativeCount: number;
+    negativePercent: number;
+    avgRating: number;
+    nps: number;
+  };
+  alerts: DailyBriefAlertDTO[];
+  topIssues: IssueStatDTO[];
+  actions: Array<{ title: string; detail: string; priority: "high" | "medium" | "low" }>;
+}
+
+export interface TaskCompareItemDTO {
+  taskId: string;
+  taskName: string;
+  productName: string;
+  sourceChannel: string;
+  runId: string | null;
+  reviewCount: number;
+  negativeCount: number;
+  negativePercent: number;
+  avgRating: number;
+  nps: number;
+  topIssue: string | null;
+  latestRunStatus: RunStatus | null;
+  latestRunFinishedAt: string | null;
+}
+
+export interface TaskCompareDTO {
+  generatedAt: string;
+  items: TaskCompareItemDTO[];
+  winner: {
+    taskId: string;
+    label: string;
+    reason: string;
+  } | null;
+  risks: Array<{ taskId: string; label: string; reason: string }>;
+}
+
+export interface ReviewCorrectionDTO {
+  id: string;
+  taskId: string;
+  reviewId: string;
+  runId: string | null;
+  sentiment: Sentiment | null;
+  topicLabels: string[];
+  painPoints: string[];
+  highlights: string[];
+  summary: string;
+  suggestion: string;
+  note: string;
+  createdAt: string;
+  createdBy: UserDTO;
+}
+
+export interface PromptEvalDTO {
+  generatedAt: string;
+  provider: string;
+  modelName: string;
+  promptVersion: string;
+  score: number;
+  checks: Array<{ key: string; label: string; passed: boolean; detail: string }>;
+  sampleCount: number;
+  recommendations: string[];
+}
+
 export interface ReviewAnalysisDTO {
   reviewId: string;
   runId: string;

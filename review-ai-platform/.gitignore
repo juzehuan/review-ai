@@ -5,6 +5,7 @@ dist
 .next
 .vite
 coverage
+.logs/
 *.log
 *.tsbuildinfo
 __pycache__/

@@ -13,17 +13,21 @@ import type {
   CreateCrawlMonitorResponse,
   CrawlTaskResponse,
   DashboardDTO,
+  DailyBriefDTO,
   ImportTaskResponse,
   InviteCodeDTO,
   AnalysisType,
   MemberRole,
   MyWorkspaceDTO,
+  PromptEvalDTO,
   ReportShareDTO,
+  ReviewCorrectionDTO,
   ReviewActionItemDTO,
   ReviewRowDTO,
   SavedReviewViewDTO,
   SharedReportDTO,
   StartCrawlAnalysisResponse,
+  TaskCompareDTO,
   TaskListItem,
   WorkspaceAiSettingDTO,
   WorkspaceCrawlerSettingDTO,
@@ -355,6 +359,26 @@ export async function fetchDashboard(taskId: string, params?: { runId?: string }
   return data;
 }
 
+export async function fetchDailyBrief(taskId: string) {
+  const { data } = await api.get<DailyBriefDTO>(`/tasks/${taskId}/brief`);
+  return data;
+}
+
+export async function compareTasks(taskIds: string[]) {
+  const { data } = await api.post<TaskCompareDTO>("/tasks/compare", { taskIds });
+  return data;
+}
+
+export async function evaluatePrompts(payload?: {
+  systemPrompt?: string;
+  userPromptTemplate?: string;
+  summaryPrompt?: string;
+  insightsPrompt?: string;
+}) {
+  const { data } = await api.post<PromptEvalDTO>("/workspace/prompt-eval", payload || {});
+  return data;
+}
+
 export async function fetchTaskReportShares(taskId: string) {
   const { data } = await api.get<ReportShareDTO[]>(`/tasks/${taskId}/shares`);
   return data;
@@ -380,6 +404,20 @@ export async function fetchReviews(taskId: string, params: Record<string, string
     `/tasks/${taskId}/reviews`,
     { params }
   );
+  return data;
+}
+
+export async function fetchReviewCorrections(taskId: string, reviewId: string) {
+  const { data } = await api.get<ReviewCorrectionDTO[]>(`/tasks/${taskId}/reviews/${reviewId}/correction`);
+  return data;
+}
+
+export async function createReviewCorrection(
+  taskId: string,
+  reviewId: string,
+  payload: Partial<ReviewCorrectionDTO> & { runId?: string | null }
+) {
+  const { data } = await api.post<ReviewCorrectionDTO>(`/tasks/${taskId}/reviews/${reviewId}/correction`, payload);
   return data;
 }
 

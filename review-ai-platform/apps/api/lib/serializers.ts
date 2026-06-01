@@ -8,6 +8,7 @@ import type {
   CrawlMonitorDTO,
   MyWorkspaceDTO,
   ReportShareDTO,
+  ReviewCorrectionDTO,
   ReviewActionItemDTO,
   ReviewRowDTO,
   SavedReviewViewDTO,
@@ -25,6 +26,7 @@ import type {
   Review,
   ReviewActionItem,
   ReviewAnalysis,
+  ReviewCorrection,
   SavedReviewView,
   Subscription,
   Task,
@@ -286,6 +288,24 @@ export function serializeActionItem(item: ReviewActionItem & { assignee?: User |
     completedAt: item.completedAt?.toISOString() || null,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString()
+  };
+}
+
+export function serializeCorrection(correction: ReviewCorrection & { createdBy: User }): ReviewCorrectionDTO {
+  return {
+    id: correction.id,
+    taskId: correction.taskId,
+    reviewId: correction.reviewId,
+    runId: correction.runId,
+    sentiment: correction.sentiment,
+    topicLabels: correction.topicLabels,
+    painPoints: correction.painPoints,
+    highlights: correction.highlights,
+    summary: correction.summary,
+    suggestion: correction.suggestion,
+    note: correction.note,
+    createdAt: correction.createdAt.toISOString(),
+    createdBy: serializeUser(correction.createdBy)
   };
 }
 
