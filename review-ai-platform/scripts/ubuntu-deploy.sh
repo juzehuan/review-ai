@@ -13,7 +13,9 @@ set -Eeuo pipefail
 #   APP_DIR=/opt/review-ai-platform
 #   REPO_URL=https://github.com/juzehuan/review-ai.git
 #   DEPLOY_BRANCH=codex/saas-analysis-core
-#   WEB_PORT=5173 API_PORT=3001 POSTGRES_PORT=15432 REDIS_PORT=16379
+#   WEB_PORT=8080 API_PORT=3999 POSTGRES_PORT=15432 REDIS_PORT=16379
+#   USE_EXTERNAL_POSTGRES=true EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db
+#   USE_EXTERNAL_REDIS=true EXTERNAL_REDIS_URL=redis://host:6379
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -68,6 +70,10 @@ Environment:
   REPO_URL=${REPO_URL}
   DEPLOY_BRANCH=${DEPLOY_BRANCH}
   BACKUP_DIR=${BACKUP_DIR}
+
+External services:
+  USE_EXTERNAL_POSTGRES=true EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db
+  USE_EXTERNAL_REDIS=true EXTERNAL_REDIS_URL=redis://host:6379
 EOF
 }
 
@@ -180,6 +186,50 @@ env_set_if_empty() {
   fi
 }
 
+env_set_if_empty_or_legacy() {
+  local key="$1"
+  local value="$2"
+  local legacy="$3"
+  local current
+  current="$(env_get "${key}")"
+  if [[ -z "${current}" || "${current}" == "${legacy}" ]]; then
+    env_set "${key}" "${value}"
+  fi
+}
+
+is_true() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+using_external_postgres() {
+  is_true "$(env_get USE_EXTERNAL_POSTGRES)" || [[ -n "$(env_get EXTERNAL_DATABASE_URL)" ]]
+}
+
+using_external_redis() {
+  is_true "$(env_get USE_EXTERNAL_REDIS)" || [[ -n "$(env_get EXTERNAL_REDIS_URL)" ]]
+}
+
+external_database_url() {
+  local url
+  url="$(env_get EXTERNAL_DATABASE_URL)"
+  if [[ -z "${url}" ]] && is_true "$(env_get USE_EXTERNAL_POSTGRES)"; then
+    url="$(env_get DATABASE_URL)"
+  fi
+  printf '%s' "${url}"
+}
+
+external_redis_url() {
+  local url
+  url="$(env_get EXTERNAL_REDIS_URL)"
+  if [[ -z "${url}" ]] && is_true "$(env_get USE_EXTERNAL_REDIS)"; then
+    url="$(env_get REDIS_URL)"
+  fi
+  printf '%s' "${url}"
+}
+
 ensure_env() {
   [[ -f "${APP_DIR}/docker-compose.yml" ]] || ensure_repo
   mkdir -p "${APP_DIR}"
@@ -193,27 +243,50 @@ ensure_env() {
     fi
   fi
 
-  local db_password
-  db_password="$(env_get POSTGRES_PASSWORD)"
-  if [[ -z "${db_password}" || "${db_password}" == "postgres" ]]; then
-    db_password="$(random_secret)"
-    env_set POSTGRES_PASSWORD "${db_password}"
-  fi
-
   env_set_if_empty POSTGRES_DB "review_ai"
   env_set_if_empty POSTGRES_USER "postgres"
   env_set_if_empty POSTGRES_PORT "${POSTGRES_PORT:-15432}"
   env_set_if_empty REDIS_PORT "${REDIS_PORT:-16379}"
-  env_set_if_empty API_PORT "${API_PORT:-3001}"
-  env_set_if_empty WEB_PORT "${WEB_PORT:-5173}"
+  env_set_if_empty_or_legacy API_PORT "${API_PORT:-3999}" "3001"
+  env_set_if_empty_or_legacy WEB_PORT "${WEB_PORT:-8080}" "5173"
+  env_set_if_empty USE_EXTERNAL_POSTGRES "false"
+  env_set_if_empty USE_EXTERNAL_REDIS "false"
 
-  local db_name db_user db_port redis_port
+  local db_password db_name db_user db_port redis_port external_db external_redis
+  db_password="$(env_get POSTGRES_PASSWORD)"
+  if ! using_external_postgres && [[ -z "${db_password}" || "${db_password}" == "postgres" ]]; then
+    db_password="$(random_secret)"
+    env_set POSTGRES_PASSWORD "${db_password}"
+  fi
+  db_password="$(env_get POSTGRES_PASSWORD)"
   db_name="$(env_get POSTGRES_DB)"
   db_user="$(env_get POSTGRES_USER)"
   db_port="$(env_get POSTGRES_PORT)"
   redis_port="$(env_get REDIS_PORT)"
-  env_set DATABASE_URL "postgresql://${db_user}:${db_password}@127.0.0.1:${db_port}/${db_name}"
-  env_set REDIS_URL "redis://127.0.0.1:${redis_port}"
+
+  if using_external_postgres; then
+    external_db="$(external_database_url)"
+    [[ -n "${external_db}" ]] || fail "USE_EXTERNAL_POSTGRES=true requires EXTERNAL_DATABASE_URL or DATABASE_URL."
+    env_set EXTERNAL_DATABASE_URL "${external_db}"
+    env_set APP_DATABASE_URL "${external_db}"
+    log "Using external Postgres."
+  else
+    env_set DATABASE_URL "postgresql://${db_user}:${db_password}@127.0.0.1:${db_port}/${db_name}"
+    env_set APP_DATABASE_URL "postgresql://${db_user}:${db_password}@postgres:5432/${db_name}"
+    env_set EXTERNAL_DATABASE_URL ""
+  fi
+
+  if using_external_redis; then
+    external_redis="$(external_redis_url)"
+    [[ -n "${external_redis}" ]] || fail "USE_EXTERNAL_REDIS=true requires EXTERNAL_REDIS_URL or REDIS_URL."
+    env_set EXTERNAL_REDIS_URL "${external_redis}"
+    env_set APP_REDIS_URL "${external_redis}"
+    log "Using external Redis."
+  else
+    env_set REDIS_URL "redis://127.0.0.1:${redis_port}"
+    env_set APP_REDIS_URL "redis://redis:6379"
+    env_set EXTERNAL_REDIS_URL ""
+  fi
 
   env_set_if_empty DEFAULT_ADMIN_EMAIL "admin"
   env_set_if_empty DEFAULT_ADMIN_PASSWORD "123456"
@@ -244,8 +317,26 @@ ensure_env() {
 }
 
 start_core() {
-  run_in_app compose up -d postgres redis
-  wait_for_postgres
+  local services=()
+  if using_external_postgres; then
+    wait_for_postgres
+  else
+    services+=(postgres)
+  fi
+
+  if using_external_redis; then
+    wait_for_redis
+  else
+    services+=(redis)
+  fi
+
+  if [[ "${#services[@]}" -gt 0 ]]; then
+    run_in_app compose up -d "${services[@]}"
+  fi
+
+  if ! using_external_postgres; then
+    wait_for_postgres
+  fi
 }
 
 wait_for_postgres() {
@@ -255,7 +346,11 @@ wait_for_postgres() {
 
   log "Waiting for Postgres..."
   for _ in $(seq 1 60); do
-    if run_in_app compose exec -T postgres pg_isready -U "${db_user}" -d "${db_name}" >/dev/null 2>&1; then
+    if using_external_postgres; then
+      if docker run --rm --network host postgres:16-alpine pg_isready -d "$(external_database_url)" >/dev/null 2>&1; then
+        return
+      fi
+    elif run_in_app compose exec -T postgres pg_isready -U "${db_user}" -d "${db_name}" >/dev/null 2>&1; then
       return
     fi
     sleep 2
@@ -264,19 +359,41 @@ wait_for_postgres() {
   fail "Postgres is not ready after waiting."
 }
 
+wait_for_redis() {
+  log "Waiting for Redis..."
+  for _ in $(seq 1 60); do
+    if docker run --rm --network host redis:7-alpine redis-cli -u "$(external_redis_url)" ping >/dev/null 2>&1; then
+      return
+    fi
+    sleep 2
+  done
+
+  fail "Redis is not ready after waiting."
+}
+
 run_migrate() {
   ensure_env
   log "Running database migration and admin seed..."
-  run_in_app compose up --build migrate
+  start_core
+  if using_external_postgres || using_external_redis; then
+    run_in_app compose build migrate
+    run_in_app compose run --rm --no-deps migrate
+  else
+    run_in_app compose up --build migrate
+  fi
 }
 
 start_app() {
   ensure_env
   log "Starting ReviewIQ services..."
-  run_in_app compose up -d --build postgres redis
+  start_core
   run_migrate
-  run_in_app compose up -d --build api worker web
-  log "Started. Web: http://127.0.0.1:$(env_get WEB_PORT)"
+  if using_external_postgres || using_external_redis; then
+    run_in_app compose up -d --build --no-deps api worker web
+  else
+    run_in_app compose up -d --build api worker web
+  fi
+  log "Started. Web: http://127.0.0.1:$(env_get WEB_PORT) API: http://127.0.0.1:$(env_get API_PORT)"
 }
 
 deploy() {
@@ -334,7 +451,11 @@ backup() {
 
   log "Backing up database to ${db_file}..."
   start_core
-  run_in_app compose exec -T postgres pg_dump --clean --if-exists --no-owner -U "${db_user}" -d "${db_name}" | gzip -9 > "${db_file}"
+  if using_external_postgres; then
+    docker run --rm --network host postgres:16-alpine pg_dump --clean --if-exists --no-owner "$(external_database_url)" | gzip -9 > "${db_file}"
+  else
+    run_in_app compose exec -T postgres pg_dump --clean --if-exists --no-owner -U "${db_user}" -d "${db_name}" | gzip -9 > "${db_file}"
+  fi
   cp "${ENV_FILE}" "${env_file}"
   chmod 600 "${env_file}" || true
 
@@ -367,9 +488,15 @@ restore() {
 
   start_core
   log "Restoring ${file}..."
-  run_in_app compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
-    -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
-  gunzip -c "${file}" | run_in_app compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}"
+  if using_external_postgres; then
+    docker run --rm --network host postgres:16-alpine psql -v ON_ERROR_STOP=1 "$(external_database_url)" \
+      -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+    gunzip -c "${file}" | docker run --rm -i --network host postgres:16-alpine psql -v ON_ERROR_STOP=1 "$(external_database_url)"
+  else
+    run_in_app compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+      -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+    gunzip -c "${file}" | run_in_app compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}"
+  fi
   log "Restore complete."
 }
 

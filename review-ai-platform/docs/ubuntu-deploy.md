@@ -17,7 +17,7 @@ sudo bash scripts/ubuntu-deploy.sh deploy
 - 安装 Docker、Docker Compose、Git 等基础依赖
 - 拉取或使用当前项目代码
 - 创建 `.env`
-- 构建并启动 Postgres、Redis、API、Worker、Web
+- 构建并启动 Postgres、Redis、API、Worker、Web。也可以通过外部数据库变量跳过内置 Postgres/Redis
 - 执行数据库初始化和唯一超管账号种子
 
 默认超管：
@@ -47,8 +47,10 @@ bash scripts/ubuntu-deploy.sh restore /opt/review-ai-platform/backups/review-ai-
 APP_DIR=/opt/review-ai-platform
 REPO_URL=https://github.com/juzehuan/review-ai.git
 DEPLOY_BRANCH=codex/saas-analysis-core
-WEB_PORT=5173
-API_PORT=3001
+WEB_PORT=8080
+API_PORT=3999
+POSTGRES_PORT=15432
+REDIS_PORT=16379
 ```
 
 示例：
@@ -56,6 +58,20 @@ API_PORT=3001
 ```bash
 sudo APP_DIR=/opt/review-ai-platform DEPLOY_BRANCH=main bash scripts/ubuntu-deploy.sh deploy
 ```
+
+## 使用已有数据库服务
+
+如果服务器上已经有可用的 PostgreSQL 或 Redis，可以显式启用外部服务模式：
+
+```bash
+sudo USE_EXTERNAL_POSTGRES=true \
+  EXTERNAL_DATABASE_URL='postgresql://user:password@127.0.0.1:5432/review_ai' \
+  USE_EXTERNAL_REDIS=true \
+  EXTERNAL_REDIS_URL='redis://127.0.0.1:6379' \
+  bash scripts/ubuntu-deploy.sh deploy
+```
+
+启用后脚本会跳过对应的内置容器，迁移、启动、备份和恢复都会使用外部连接串。
 
 备份文件默认保存在：
 
