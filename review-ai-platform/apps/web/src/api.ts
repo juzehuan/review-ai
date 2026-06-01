@@ -107,6 +107,11 @@ export async function logout() {
   clearAuthToken();
 }
 
+export async function changePassword(payload: { oldPassword: string; newPassword: string }) {
+  const { data } = await api.patch<{ success: boolean }>("/auth/password", payload);
+  return data;
+}
+
 export async function fetchTasks() {
   const { data } = await api.get<TaskListItem[]>("/tasks");
   return data;

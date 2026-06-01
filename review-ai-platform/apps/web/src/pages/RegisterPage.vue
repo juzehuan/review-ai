@@ -17,7 +17,7 @@
           <a-input v-model:value="form.email" placeholder="name@example.com" />
         </a-form-item>
         <a-form-item label="密码">
-          <a-input-password v-model:value="form.password" placeholder="至少 6 位" />
+          <a-input-password v-model:value="form.password" autocomplete="new-password" placeholder="至少 6 位" />
         </a-form-item>
         <a-form-item label="邀请码">
           <a-input v-model:value="form.inviteCode" placeholder="RI-XXXXXXXX-XXXXXX" />

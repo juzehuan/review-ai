@@ -66,7 +66,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     process.env.ENABLE_MOCK_AI !== "true" &&
     !resolveApiKey(aiSetting.provider, "apiKey" in aiSetting ? aiSetting.apiKey : null)
   ) {
-    return fail("AI 模型尚未配置 API Key，请先到空间设置中配置模型。", 400);
+    return fail("AI 模型尚未配置 API Key，请先到提示词与模型设置中配置模型。", 400);
   }
 
   const seen = new Set<string>();

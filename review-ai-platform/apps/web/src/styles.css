@@ -1316,3 +1316,662 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+/* Visual refresh: command-center SaaS skin */
+:root {
+  --bg-0: #070b13;
+  --bg-1: #0d1524;
+  --bg-2: #111c2d;
+  --panel: rgba(255, 255, 255, 0.88);
+  --panel-strong: #ffffff;
+  --ink: #101624;
+  --ink-soft: #5c667a;
+  --line: rgba(120, 143, 178, 0.24);
+  --blue: #2f6bff;
+  --cyan: #00bfd8;
+  --green: #10b981;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --shadow-xl: 0 24px 70px rgba(12, 20, 36, 0.18);
+  --shadow-md: 0 14px 36px rgba(12, 20, 36, 0.12);
+}
+
+body {
+  background:
+    linear-gradient(135deg, rgba(8, 14, 26, 0.96), rgba(18, 30, 48, 0.96) 42%, rgba(10, 18, 30, 0.98)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 96px);
+}
+
+.app-shell {
+  background:
+    linear-gradient(118deg, rgba(0, 191, 216, 0.1), transparent 28%),
+    linear-gradient(135deg, #08101d 0%, #0f1a2b 40%, #edf3fb 40.1%, #f7f9fd 100%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 104px);
+}
+
+.app-sidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(13, 21, 36, 0.98), rgba(8, 13, 24, 0.98)),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 44px) !important;
+  box-shadow: 18px 0 48px rgba(2, 8, 20, 0.28);
+}
+
+.brand-block {
+  position: relative;
+  padding-bottom: 18px;
+}
+
+.brand-block::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 191, 216, 0.58), transparent);
+}
+
+.brand-mark {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background:
+    linear-gradient(135deg, #2f6bff, #00bfd8 58%, #10b981);
+  box-shadow: 0 14px 32px rgba(0, 191, 216, 0.28);
+}
+
+.brand-title {
+  color: #ffffff;
+  letter-spacing: 0;
+}
+
+.brand-subtitle,
+.workspace-card-top,
+.workspace-card-meta,
+.side-nav-group,
+.project-desc,
+.project-footer {
+  color: rgba(226, 235, 248, 0.68);
+}
+
+.workspace-card {
+  border-color: rgba(255, 255, 255, 0.13);
+  background:
+    linear-gradient(135deg, rgba(21, 36, 60, 0.96), rgba(9, 18, 33, 0.94)),
+    linear-gradient(90deg, rgba(47, 107, 255, 0.18), rgba(0, 191, 216, 0.12));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 18px 40px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
+}
+
+.quota-card-title {
+  color: #ffffff;
+}
+
+.workspace-card .ant-tag {
+  border-color: rgba(140, 239, 255, 0.36);
+  background: rgba(47, 107, 255, 0.18);
+  color: #c6f8ff;
+}
+
+.workspace-card .ant-progress-text,
+.workspace-card .workspace-card-meta,
+.workspace-card .quota-card-secondary {
+  color: rgba(226, 235, 248, 0.7) !important;
+}
+
+.workspace-card .ant-progress-inner {
+  background: rgba(255, 255, 255, 0.16) !important;
+}
+
+.workspace-card .ant-progress-bg {
+  background: linear-gradient(90deg, var(--cyan), var(--green)) !important;
+}
+
+.side-nav {
+  gap: 18px;
+}
+
+.side-nav-group {
+  padding: 0 4px;
+  letter-spacing: 0;
+}
+
+.side-nav-group.active {
+  color: #8cefff;
+}
+
+.side-nav-subitem {
+  position: relative;
+  min-height: 42px;
+  padding-left: 18px;
+  border: 1px solid transparent;
+  color: rgba(238, 244, 255, 0.78);
+  background: transparent;
+}
+
+.side-nav-subitem::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  margin-right: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.side-nav-subitem:hover {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.side-nav-subitem.active {
+  color: #ffffff;
+  border-color: rgba(0, 191, 216, 0.4);
+  background:
+    linear-gradient(90deg, rgba(47, 107, 255, 0.22), rgba(0, 191, 216, 0.12));
+  box-shadow: 0 12px 28px rgba(0, 191, 216, 0.13);
+}
+
+.side-nav-subitem.active::before {
+  width: 6px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--cyan), var(--green));
+  box-shadow: 0 0 16px rgba(0, 191, 216, 0.72);
+}
+
+.side-nav-subitem.disabled {
+  color: rgba(238, 244, 255, 0.28);
+}
+
+.app-main {
+  background:
+    linear-gradient(180deg, rgba(248, 251, 255, 0.92), rgba(241, 246, 252, 0.96)),
+    repeating-linear-gradient(90deg, rgba(21, 34, 54, 0.045) 0 1px, transparent 1px 78px);
+}
+
+.topbar {
+  height: 78px;
+  border-bottom: 1px solid rgba(105, 128, 160, 0.18);
+  background: rgba(248, 251, 255, 0.78);
+  box-shadow: 0 12px 34px rgba(11, 20, 35, 0.08);
+}
+
+.topbar-eyebrow {
+  color: #3870e8;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.topbar-title {
+  color: #0e1626;
+  font-size: 21px;
+}
+
+.account-chip {
+  height: 40px;
+  padding-right: 14px;
+  border-color: rgba(47, 107, 255, 0.18);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 10px 26px rgba(12, 20, 36, 0.08);
+}
+
+.account-avatar,
+.member-avatar {
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  box-shadow: 0 8px 18px rgba(47, 107, 255, 0.24);
+}
+
+.app-content {
+  padding: 30px 32px 38px;
+}
+
+.workspace-card,
+.project-card,
+.usage-panel,
+.page-toolbar,
+.table-shell,
+.settings-panel,
+.chart-card,
+.stat-card,
+.mini-stat-card,
+.group-card,
+.insight-panel,
+.ai-summary-card,
+.product-insights-panel,
+.product-insight-card,
+.overview-band,
+.admin-tabs,
+.auth-panel {
+  border: 1px solid rgba(116, 139, 174, 0.22);
+  background: var(--panel);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px);
+}
+
+.app-sidebar .workspace-card {
+  border-color: rgba(255, 255, 255, 0.13);
+  background:
+    linear-gradient(135deg, rgba(21, 36, 60, 0.96), rgba(9, 18, 33, 0.94)),
+    linear-gradient(90deg, rgba(47, 107, 255, 0.18), rgba(0, 191, 216, 0.12));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 18px 40px rgba(0, 0, 0, 0.24);
+}
+
+.page-toolbar {
+  position: relative;
+  overflow: hidden;
+  padding: 24px 26px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(240, 248, 255, 0.84)),
+    repeating-linear-gradient(90deg, rgba(47, 107, 255, 0.05) 0 1px, transparent 1px 64px);
+}
+
+.page-toolbar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--blue), var(--cyan), var(--green), var(--amber));
+}
+
+.toolbar-title {
+  color: var(--ink);
+  font-size: 25px;
+}
+
+.toolbar-subtitle {
+  color: var(--ink-soft);
+}
+
+.overview-band {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(135deg, rgba(13, 21, 36, 0.98), rgba(21, 34, 54, 0.94)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 62px);
+  box-shadow: 0 24px 70px rgba(7, 11, 19, 0.28);
+}
+
+.overview-band::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), var(--green), transparent);
+}
+
+.stat-card,
+.mini-stat-card,
+.settings-panel,
+.chart-card,
+.group-card,
+.table-shell,
+.ai-summary-card,
+.product-insights-panel,
+.product-insight-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before,
+.mini-stat-card::before,
+.settings-panel::before,
+.chart-card::before,
+.group-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(47, 107, 255, 0.9), rgba(0, 191, 216, 0.72), rgba(16, 185, 129, 0.65));
+  opacity: 0.88;
+}
+
+.stat-card:hover,
+.mini-stat-card:hover,
+.settings-panel:hover,
+.chart-card:hover,
+.group-card:hover,
+.table-shell:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-xl);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.stat-value,
+.mini-stat-value,
+.settings-title {
+  color: #0b1322;
+}
+
+.stat-label,
+.mini-stat-label,
+.panel-label {
+  color: #536078;
+  letter-spacing: 0;
+}
+
+.stat-card-primary,
+.mini-stat-cool {
+  border-top-color: transparent;
+}
+
+.stat-card-accent,
+.mini-stat-alert {
+  border-top-color: transparent;
+}
+
+.stat-card-success,
+.mini-stat-warm {
+  border-top-color: transparent;
+}
+
+.settings-layout {
+  align-items: start;
+}
+
+.settings-panel-wide {
+  padding: 22px;
+}
+
+.settings-section-title,
+.chart-title,
+.insight-title,
+.table-title,
+.group-title {
+  color: #0f172a;
+}
+
+.settings-form .ant-input,
+.settings-form .ant-input-password,
+.settings-form .ant-input-number,
+.import-form .ant-input,
+.import-form .ant-input-number,
+.auth-panel .ant-input,
+.auth-panel .ant-input-password {
+  border-color: rgba(116, 139, 174, 0.28);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.settings-form .ant-input:focus,
+.settings-form .ant-input-focused,
+.settings-form .ant-input-number-focused,
+.import-form .ant-input:focus,
+.auth-panel .ant-input:focus {
+  border-color: rgba(0, 191, 216, 0.72);
+  box-shadow: 0 0 0 3px rgba(0, 191, 216, 0.12);
+}
+
+.settings-help {
+  color: #637083;
+  line-height: 1.65;
+}
+
+.ant-btn-primary,
+.new-project-button {
+  border: 0;
+  background: linear-gradient(135deg, var(--blue), var(--cyan)) !important;
+  box-shadow: 0 14px 28px rgba(47, 107, 255, 0.22);
+}
+
+.ant-btn-primary:hover,
+.new-project-button:hover {
+  filter: brightness(1.04);
+  box-shadow: 0 18px 34px rgba(0, 191, 216, 0.24);
+}
+
+.ant-btn-default {
+  border-color: rgba(116, 139, 174, 0.28);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.table-shell {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.ant-table-wrapper .ant-table {
+  background: transparent;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th {
+  border-bottom: 1px solid rgba(116, 139, 174, 0.18);
+  color: #25324a;
+  background: linear-gradient(180deg, rgba(243, 248, 255, 0.98), rgba(233, 241, 252, 0.92));
+}
+
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  border-bottom: 1px solid rgba(116, 139, 174, 0.13);
+}
+
+.ant-table-wrapper .ant-table-tbody > tr:hover > td {
+  background: rgba(47, 107, 255, 0.055) !important;
+}
+
+.ant-tag {
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.ant-modal .ant-modal-content {
+  border: 1px solid rgba(116, 139, 174, 0.2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 80px rgba(7, 11, 19, 0.24);
+  backdrop-filter: blur(18px);
+}
+
+.ant-modal .ant-modal-header {
+  background: transparent;
+}
+
+.auth-page {
+  background:
+    linear-gradient(135deg, #07101d, #111f33 48%, #f3f7fc 48.1%, #ffffff);
+}
+
+.auth-panel {
+  border-radius: 16px;
+}
+
+.auth-page::after {
+  background:
+    linear-gradient(135deg, rgba(7, 16, 29, 0.28), rgba(15, 31, 51, 0.2)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 80px),
+    url("https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1400&q=80") center/cover;
+}
+
+.file-drop {
+  border-color: rgba(0, 191, 216, 0.55);
+  background:
+    linear-gradient(135deg, rgba(47, 107, 255, 0.08), rgba(0, 191, 216, 0.1));
+  color: #1763cf;
+}
+
+.empty-state {
+  border-color: rgba(0, 191, 216, 0.28);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.workspace-overview-page,
+.runs-page {
+  width: min(1480px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.overview-hero,
+.runs-hero {
+  min-height: 112px;
+  align-items: center;
+}
+
+.overview-hero .toolbar-title-block,
+.runs-hero .toolbar-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workspace-band {
+  min-height: 132px;
+  padding: 28px 30px;
+  border-radius: 12px;
+}
+
+.quota-strip {
+  min-width: 260px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.quota-strip > div {
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.quota-strip span {
+  display: block;
+  color: rgba(226, 235, 248, 0.66);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.quota-strip strong {
+  display: block;
+  margin-top: 8px;
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.workspace-overview-page .summary-grid {
+  gap: 18px;
+}
+
+.workspace-overview-page .stat-card {
+  min-height: 138px;
+  padding: 22px 24px;
+  border-radius: 12px;
+}
+
+.workspace-table-panel,
+.task-list-panel {
+  padding: 18px;
+  border: 1px solid rgba(116, 139, 174, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.workspace-table-panel .ant-table-wrapper,
+.task-list-panel .ant-table-wrapper {
+  overflow: hidden;
+  border: 1px solid rgba(116, 139, 174, 0.14);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.task-name-cell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.task-name-cell strong {
+  color: #0b1322;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.task-name-cell span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.crawler-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.crawler-stats-grid .mini-stat-card {
+  min-height: 132px;
+  padding: 20px 22px;
+  border-radius: 12px;
+}
+
+.run-progress-cell {
+  display: grid;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.run-progress-cell span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.crawl-job-table .ant-space {
+  gap: 8px !important;
+}
+
+@media (max-width: 960px) {
+  .app-shell {
+    background: #f6f9fd;
+  }
+
+  .app-sidebar {
+    background: linear-gradient(180deg, #0d1524, #111c2d) !important;
+  }
+
+  .topbar {
+    background: rgba(248, 251, 255, 0.94);
+  }
+
+  .workspace-overview-page,
+  .runs-page {
+    gap: 18px;
+  }
+
+  .overview-hero,
+  .runs-hero,
+  .panel-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-band,
+  .summary-grid,
+  .crawler-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quota-strip {
+    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-table-panel,
+  .task-list-panel {
+    padding: 12px;
+  }
+}

@@ -18,6 +18,29 @@
       </a-space>
     </div>
 
+    <div class="crawler-stats-grid">
+      <div class="mini-stat-card mini-stat-cool">
+        <div class="mini-stat-label">采集任务</div>
+        <div class="mini-stat-value">{{ jobs.length }}</div>
+        <div class="stat-note">当前账号下的全部采集队列</div>
+      </div>
+      <div class="mini-stat-card mini-stat-warm">
+        <div class="mini-stat-label">运行中</div>
+        <div class="mini-stat-value">{{ activeJobCount }}</div>
+        <div class="stat-note">排队或正在抓取</div>
+      </div>
+      <div class="mini-stat-card mini-stat-cool">
+        <div class="mini-stat-label">已采集评论</div>
+        <div class="mini-stat-value">{{ fetchedRowCount }}</div>
+        <div class="stat-note">可导入分析的评论总量</div>
+      </div>
+      <div class="mini-stat-card mini-stat-alert">
+        <div class="mini-stat-label">异常任务</div>
+        <div class="mini-stat-value">{{ failedJobCount }}</div>
+        <div class="stat-note">需要检查链接或代理</div>
+      </div>
+    </div>
+
     <section class="task-list-panel">
       <div class="panel-head">
         <div>
@@ -28,12 +51,14 @@
       </div>
 
       <a-table
+        class="crawl-job-table"
         row-key="id"
         size="middle"
         :columns="columns"
         :data-source="jobs"
         :pagination="{ pageSize: 12 }"
         :loading="loading"
+        :scroll="{ x: 1320 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'job'">
@@ -109,7 +134,7 @@
           <a-input v-model:value="form.productName" placeholder="可选，留空时会尽量从页面标题识别" />
         </a-form-item>
         <a-form-item label="评论链接">
-          <a-input v-model:value="form.productUrl" placeholder="例如：https://www.tiktok.com/@user/video/...、YouTube 视频或 Facebook 帖子链接" />
+          <a-input v-model:value="form.productUrl" placeholder="例如：https://www.youtube.com/watch?v=... 或 https://www.tiktok.com/@user/video/..." />
         </a-form-item>
         <a-form-item label="来源渠道">
           <a-select v-model:value="form.sourceChannel" :options="sourceChannelOptions" />
@@ -122,10 +147,7 @@
           <a-input-number v-model:value="form.maxReviews" :min="0" :max="1000" class="full-input" />
           <div class="settings-help">填 0 表示不限，直到平台没有更多评论或采集超时。</div>
         </a-form-item>
-        <a-form-item label="采集渠道">
-          <a-select v-model:value="form.crawlChannels" mode="multiple" :options="crawlerChannelOptions" />
-          <div class="settings-help">YouTube、TikTok 视频和 Facebook 帖子链接会自动使用浏览器滚动采集；采集渠道只影响 Shopee 商品链接。</div>
-        </a-form-item>
+        <div class="settings-help">AI 链接抓取当前仅支持 YouTube 视频和 TikTok 视频评论，系统会自动使用浏览器滚动/接口采集。</div>
       </a-form>
     </a-modal>
   </div>
@@ -139,7 +161,6 @@ import { ExclamationCircleOutlined, FileSearchOutlined, PlayCircleOutlined, Plus
 import { createCrawlJob, fetchCrawlJobs, fetchWorkspaceCrawlerSettings, startCrawlJobAnalysis } from "@/api";
 import {
   ANALYSIS_TYPE_PRESETS,
-  CRAWLER_CHANNEL_PRESETS,
   SOURCE_CHANNEL_PRESETS,
   inferAnalysisType,
   type AnalysisType,
@@ -168,12 +189,7 @@ const form = reactive({
   crawlChannels: ["browser_intercept"] as CrawlerChannel[]
 });
 
-const crawlerChannelOptions = CRAWLER_CHANNEL_PRESETS.map((channel) => ({
-  label: channel.label,
-  value: channel.id
-}));
-
-const sourceChannelOptions = SOURCE_CHANNEL_PRESETS.map((channel) => ({
+const sourceChannelOptions = SOURCE_CHANNEL_PRESETS.filter((channel) => ["YouTube", "TikTok Video"].includes(channel.value)).map((channel) => ({
   label: channel.label,
   value: channel.value
 }));
@@ -198,6 +214,9 @@ const columns = [
 ];
 
 const hasActiveJobs = computed(() => jobs.value.some((job) => ["queued", "running"].includes(job.status)));
+const activeJobCount = computed(() => jobs.value.filter((job) => ["queued", "running"].includes(job.status)).length);
+const failedJobCount = computed(() => jobs.value.filter((job) => job.status === "failed").length);
+const fetchedRowCount = computed(() => jobs.value.reduce((total, job) => total + job.fetchedRows, 0));
 
 function statusLabel(status: CrawlJobStatus) {
   return {
@@ -243,20 +262,10 @@ function inferSourceChannelFromUrl(value?: string | null) {
   if (text.includes("youtube.com") || text.includes("youtu.be")) {
     return "YouTube";
   }
-  if (text.includes("shopee.")) {
-    return "Shopee";
-  }
-  if (text.includes("lazada.")) {
-    return "Lazada";
-  }
   if (text.includes("tiktok.")) {
     if (/\/@[^/]+\/video\/\d+/i.test(text)) {
       return "TikTok Video";
     }
-    return "TikTok Shop";
-  }
-  if (text.includes("facebook.") && /(story_fbid=|fbid=|\/posts\/|\/videos\/|\/reel\/|\/share\/[pv]\/|\/groups\/[^/]+\/posts\/)/i.test(text)) {
-    return "Facebook";
   }
   return "";
 }
@@ -359,8 +368,8 @@ async function openCreateModal() {
     showCreateModal.value = true;
     form.sourceChannel = normalizeSourceChannel(setting.defaultSourceChannel);
     form.analysisType = inferAnalysisType(form.sourceChannel);
-    form.maxReviews = setting.defaultMaxReviews || 200;
-    form.crawlChannels = setting.crawlChannels.length ? setting.crawlChannels : ["api_exporter", "api_basic"];
+    form.maxReviews = setting.defaultMaxReviews ?? 200;
+    form.crawlChannels = ["browser_intercept"];
   } catch {
     // 采集设置加载失败时保留默认值，不阻塞创建任务。
   }
@@ -382,18 +391,13 @@ watch(
     }
     form.sourceChannel = sourceChannel;
     form.analysisType = inferAnalysisType(sourceChannel);
-    if (sourceChannel === "YouTube" || sourceChannel === "TikTok Video" || sourceChannel === "Facebook") {
+    if (sourceChannel === "YouTube" || sourceChannel === "TikTok Video") {
       form.crawlChannels = ["browser_intercept"];
-      if (sourceChannel === "TikTok Video" || sourceChannel === "Facebook") {
+      if (sourceChannel === "TikTok Video") {
         form.maxReviews = 0;
       }
       if (!form.productName.trim()) {
-        form.productName =
-          sourceChannel === "YouTube"
-            ? "YouTube 视频评论"
-            : sourceChannel === "TikTok Video"
-              ? "TikTok 视频评论"
-              : "Facebook 帖子评论";
+        form.productName = sourceChannel === "YouTube" ? "YouTube 视频评论" : "TikTok 视频评论";
       }
     }
   }
@@ -413,11 +417,6 @@ async function submitCrawlJob() {
     message.error("请填写评论链接。");
     return;
   }
-  if (!form.crawlChannels.length) {
-    message.error("请至少选择一个采集渠道。");
-    return;
-  }
-
   creating.value = true;
   try {
     await createCrawlJob({
@@ -427,7 +426,7 @@ async function submitCrawlJob() {
       analysisType: form.analysisType,
       productUrl: form.productUrl,
       maxReviews: form.maxReviews,
-      crawlChannels: form.crawlChannels
+      crawlChannels: ["browser_intercept"]
     });
     message.success("评论采集任务已加入队列。");
     showCreateModal.value = false;

@@ -63,12 +63,14 @@
       </div>
 
       <a-table
+        class="overview-task-table"
         row-key="id"
         size="middle"
         :columns="columns"
         :data-source="recentTasks"
         :pagination="false"
         :loading="loadingTasks"
+        :scroll="{ x: 1040 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">

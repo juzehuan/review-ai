@@ -1,5 +1,5 @@
 import { prisma } from "@review-ai/db";
-import { defaultCrawlerSetting, serializeCrawlerChannels, serializeCrawlerSetting } from "@/lib/crawler-settings";
+import { defaultCrawlerSetting, serializeCrawlerSetting } from "@/lib/crawler-settings";
 import { fail, ok } from "@/lib/http";
 import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -33,20 +33,14 @@ export async function PATCH(request: Request) {
   const pythonBin = String(body.pythonBin || defaults.pythonBin).trim();
   const proxyUrl =
     typeof body.proxyUrl === "string" ? body.proxyUrl.trim() || null : body.proxyUrl === null ? null : defaults.proxyUrl;
-  const defaultSourceChannel = String(body.defaultSourceChannel || defaults.defaultSourceChannel).trim();
-  const defaultMaxReviews = Math.min(Math.max(Number(body.defaultMaxReviews || defaults.defaultMaxReviews), 1), 1000);
+  const defaultSourceChannel = "YouTube";
+  const defaultMaxReviews = Math.min(Math.max(Number(body.defaultMaxReviews ?? defaults.defaultMaxReviews), 0), 1000);
   const requestTimeoutSec = Math.min(Math.max(Number(body.requestTimeoutSec || defaults.requestTimeoutSec), 30), 900);
-  const shopeeCookie =
-    typeof body.shopeeCookie === "string" && body.shopeeCookie.trim() && !body.shopeeCookie.includes("*")
-      ? body.shopeeCookie.trim()
-      : undefined;
-  const crawlChannels = serializeCrawlerChannels(body.crawlChannels);
+  const shopeeCookie = null;
+  const crawlChannels = "browser_intercept";
 
-  if (!pythonBin || !defaultSourceChannel) {
-    return fail("请填写 Python 命令和默认来源渠道");
-  }
-  if (!crawlChannels) {
-    return fail("请至少选择一个抓取渠道");
+  if (!pythonBin) {
+    return fail("请填写 Python 命令");
   }
 
   const setting = await prisma.workspaceCrawlerSetting.upsert({
@@ -55,7 +49,7 @@ export async function PATCH(request: Request) {
       enabled,
       pythonBin,
       proxyUrl,
-      ...(shopeeCookie !== undefined ? { shopeeCookie } : {}),
+      shopeeCookie,
       crawlChannels,
       defaultSourceChannel,
       defaultMaxReviews,

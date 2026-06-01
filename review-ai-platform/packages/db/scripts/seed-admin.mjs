@@ -13,9 +13,9 @@ function readEnv(name, fallback) {
   return String(process.env[name] || fallback || "").trim();
 }
 
-const email = readEnv("DEFAULT_ADMIN_EMAIL", "admin@reviewiq.local").toLowerCase();
-const password = readEnv("DEFAULT_ADMIN_PASSWORD", "Admin@123456");
-const name = readEnv("DEFAULT_ADMIN_NAME", "Super Admin");
+const email = readEnv("DEFAULT_ADMIN_EMAIL", "admin").toLowerCase();
+const password = readEnv("DEFAULT_ADMIN_PASSWORD", "123456");
+const name = readEnv("DEFAULT_ADMIN_NAME", "admin");
 const workspaceName = readEnv("DEFAULT_WORKSPACE_NAME", "Admin Workspace");
 const workspaceSlug = readEnv("DEFAULT_WORKSPACE_SLUG", "admin-workspace");
 
@@ -26,6 +26,18 @@ if (!email || !password || password.length < 6) {
 }
 
 const result = await prisma.$transaction(async (tx) => {
+  await tx.user.updateMany({
+    where: {
+      email: {
+        not: email,
+      },
+      isSuperAdmin: true,
+    },
+    data: {
+      isSuperAdmin: false,
+    },
+  });
+
   const user = await tx.user.upsert({
     where: { email },
     update: {
@@ -82,6 +94,5 @@ const result = await prisma.$transaction(async (tx) => {
   return { user, workspace };
 });
 
-console.log(`Default super admin ready: ${result.user.email} / workspace=${result.workspace.slug}`);
+console.log(`Default unique super admin ready: ${result.user.email} / workspace=${result.workspace.slug}`);
 await prisma.$disconnect();
-

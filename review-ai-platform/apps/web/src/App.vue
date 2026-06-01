@@ -64,6 +64,10 @@
               <a-menu>
                 <a-menu-item key="email" disabled>{{ currentUser?.email || "-" }}</a-menu-item>
                 <a-menu-divider />
+                <a-menu-item key="password" @click="openPasswordModal">
+                  <LockOutlined />
+                  修改密码
+                </a-menu-item>
                 <a-menu-item key="logout" @click="handleLogout">
                   <LogoutOutlined />
                   退出登录
@@ -79,24 +83,55 @@
       </main>
     </a-layout>
   </a-layout>
+
+  <a-modal
+    v-model:open="passwordModalOpen"
+    title="修改密码"
+    ok-text="保存"
+    cancel-text="取消"
+    :confirm-loading="changingPassword"
+    @ok="submitPasswordChange"
+    @cancel="resetPasswordForm"
+  >
+    <a-form layout="vertical">
+      <a-form-item label="旧密码">
+        <a-input-password v-model:value="passwordForm.oldPassword" autocomplete="current-password" />
+      </a-form-item>
+      <a-form-item label="新密码">
+        <a-input-password v-model:value="passwordForm.newPassword" autocomplete="new-password" placeholder="至少 6 位" />
+      </a-form-item>
+      <a-form-item label="确认新密码">
+        <a-input-password v-model:value="passwordForm.confirmPassword" autocomplete="new-password" />
+      </a-form-item>
+    </a-form>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { message } from "ant-design-vue";
 import {
   DatabaseOutlined,
   FolderOpenOutlined,
+  LockOutlined,
   LogoutOutlined,
   SettingOutlined,
   TeamOutlined
 } from "@ant-design/icons-vue";
-import { getAuthToken, logout } from "@/api";
+import { changePassword, clearAuthToken, getAuthToken, logout } from "@/api";
 import { useTaskStore } from "@/composables";
 
 const router = useRouter();
 const route = useRoute();
 const { workspace, currentUser, bootstrapAuth, clearAuthState } = useTaskStore();
+const passwordModalOpen = ref(false);
+const changingPassword = ref(false);
+const passwordForm = reactive({
+  oldPassword: "",
+  newPassword: "",
+  confirmPassword: ""
+});
 
 type NavItem = { path: string; label: string; disabled: boolean };
 type NavSection = { label: string; icon: unknown; items: NavItem[] };
@@ -195,6 +230,51 @@ async function handleLogout() {
   await logout();
   clearAuthState();
   router.push("/login");
+}
+
+function resetPasswordForm() {
+  passwordForm.oldPassword = "";
+  passwordForm.newPassword = "";
+  passwordForm.confirmPassword = "";
+}
+
+function openPasswordModal() {
+  resetPasswordForm();
+  passwordModalOpen.value = true;
+}
+
+async function submitPasswordChange() {
+  if (!passwordForm.oldPassword || !passwordForm.newPassword) {
+    message.error("请输入旧密码和新密码");
+    return;
+  }
+  if (passwordForm.newPassword.length < 6) {
+    message.error("新密码至少需要 6 位");
+    return;
+  }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    message.error("两次输入的新密码不一致");
+    return;
+  }
+
+  changingPassword.value = true;
+  try {
+    await changePassword({
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword
+    });
+    message.success("密码已修改，请重新登录");
+    passwordModalOpen.value = false;
+    resetPasswordForm();
+    clearAuthToken();
+    clearAuthState();
+    router.push("/login");
+  } catch (error: any) {
+    const text = typeof error?.response?.data?.message === "string" ? error.response.data.message : "密码修改失败";
+    message.error(text);
+  } finally {
+    changingPassword.value = false;
+  }
 }
 
 onMounted(() => {

@@ -195,33 +195,16 @@
           <a-form-item label="代理地址">
             <a-input v-model:value="crawlerForm.proxyUrl" :disabled="!canEditAi" placeholder="例如：http://127.0.0.1:7890" />
           </a-form-item>
-          <a-form-item label="Shopee Cookie">
-            <a-input-password
-              v-model:value="crawlerForm.shopeeCookie"
-              :disabled="!canEditAi"
-              :placeholder="crawlerForm.shopeeCookieSet ? `已保存（${crawlerForm.shopeeCookie || '已隐藏'}），输入新 Cookie 可替换` : '可选，用于减少风控拦截'"
-            />
-          </a-form-item>
-          <a-form-item label="抓取渠道">
-            <a-checkbox-group v-model:value="crawlerForm.crawlChannels" :disabled="!canEditAi" class="crawler-channel-list">
-              <a-checkbox v-for="channel in CRAWLER_CHANNEL_PRESETS" :key="channel.id" :value="channel.id">
-                <span class="channel-title">{{ channel.label }}</span>
-                <span class="channel-desc">{{ channel.description }}</span>
-              </a-checkbox>
-            </a-checkbox-group>
-          </a-form-item>
-          <a-form-item label="默认来源渠道">
-            <a-input v-model:value="crawlerForm.defaultSourceChannel" :disabled="!canEditAi" placeholder="Shopee" />
-          </a-form-item>
           <a-form-item label="默认抓取条数">
-            <a-input-number v-model:value="crawlerForm.defaultMaxReviews" :disabled="!canEditAi" :min="1" :max="1000" class="full-input" />
+            <a-input-number v-model:value="crawlerForm.defaultMaxReviews" :disabled="!canEditAi" :min="0" :max="1000" class="full-input" />
+            <div class="settings-help">填 0 表示不限，适用于 YouTube 和 TikTok 视频评论。</div>
           </a-form-item>
           <a-form-item label="超时时间（秒）">
             <a-input-number v-model:value="crawlerForm.requestTimeoutSec" :disabled="!canEditAi" :min="30" :max="900" class="full-input" />
           </a-form-item>
         </a-form>
         <div class="settings-help">
-          这些设置只作用于当前空间的“链接抓取”导入。Cookie 和代理会传给本地 Scrapling 脚本，不会展示明文。
+          AI 链接抓取当前仅支持 YouTube 视频和 TikTok 视频评论。代理会传给本地 Scrapling 脚本，用于访问公开视频评论接口。
         </div>
       </section>
     </div>
@@ -318,7 +301,6 @@ import { message } from "ant-design-vue";
 import {
   ANALYSIS_TYPE_PRESETS,
   AI_PROVIDER_PRESETS,
-  CRAWLER_CHANNEL_PRESETS,
   DEFAULT_INSIGHTS_PROMPT,
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_SYSTEM_PROMPT,
@@ -389,8 +371,8 @@ const crawlerForm = reactive<WorkspaceCrawlerSettingDTO>({
   proxyUrl: null,
   shopeeCookie: null,
   shopeeCookieSet: false,
-  crawlChannels: ["api_exporter", "api_basic", "browser_intercept"],
-  defaultSourceChannel: "Shopee",
+  crawlChannels: ["browser_intercept"],
+  defaultSourceChannel: "YouTube",
   defaultMaxReviews: 200,
   requestTimeoutSec: 180,
   updatedAt: null
@@ -417,10 +399,10 @@ const pageTitle = computed(() => {
 });
 const pageSubtitle = computed(() => {
   if (activeSection.value === "ai") {
-    return "配置当前空间的模型供应商、接口密钥和评论分析提示词。";
+    return "配置当前账号的模型供应商、接口密钥和评论分析提示词。";
   }
   if (activeSection.value === "crawler") {
-    return "配置当前空间的 Scrapling 评论抓取渠道、代理、Cookie 和默认抓取参数。";
+    return "配置当前账号的 YouTube/TikTok 视频评论抓取代理和默认抓取参数。";
   }
   return "管理当前空间、成员角色、我的空间列表和额度使用情况。";
 });
@@ -590,10 +572,10 @@ function assignCrawlerForm(data: WorkspaceCrawlerSettingDTO) {
   crawlerForm.enabled = data.enabled;
   crawlerForm.pythonBin = data.pythonBin;
   crawlerForm.proxyUrl = data.proxyUrl;
-  crawlerForm.shopeeCookie = data.shopeeCookie;
-  crawlerForm.shopeeCookieSet = data.shopeeCookieSet;
-  crawlerForm.crawlChannels = data.crawlChannels;
-  crawlerForm.defaultSourceChannel = data.defaultSourceChannel;
+  crawlerForm.shopeeCookie = null;
+  crawlerForm.shopeeCookieSet = false;
+  crawlerForm.crawlChannels = ["browser_intercept"];
+  crawlerForm.defaultSourceChannel = data.defaultSourceChannel === "TikTok Video" ? "TikTok Video" : "YouTube";
   crawlerForm.defaultMaxReviews = data.defaultMaxReviews;
   crawlerForm.requestTimeoutSec = data.requestTimeoutSec;
   crawlerForm.updatedAt = data.updatedAt;
@@ -632,14 +614,17 @@ function roleLabel(role?: MemberRole | null) {
 
 async function loadAiSettings() {
   try {
-    const [aiSettings, crawlerSettings] = await Promise.all([
-      fetchWorkspaceAiSettings(),
-      fetchWorkspaceCrawlerSettings()
-    ]);
-    assignAiForm(aiSettings);
-    assignCrawlerForm(crawlerSettings);
+    assignAiForm(await fetchWorkspaceAiSettings());
   } catch {
-    message.error("空间设置加载失败");
+    message.error("模型设置加载失败");
+  }
+}
+
+async function loadCrawlerSettings() {
+  try {
+    assignCrawlerForm(await fetchWorkspaceCrawlerSettings());
+  } catch {
+    message.error("抓取设置加载失败");
   }
 }
 
@@ -666,7 +651,13 @@ async function reloadCurrentSection() {
       await Promise.all([refreshTasks(), loadMembers()]);
       return;
     }
-    await loadAiSettings();
+    if (activeSection.value === "ai") {
+      await loadAiSettings();
+      return;
+    }
+    if (activeSection.value === "crawler") {
+      await loadCrawlerSettings();
+    }
   } finally {
     loading.value = false;
   }
@@ -685,13 +676,14 @@ async function saveAiSettings() {
 }
 
 async function saveCrawlerSettings() {
-  if (!crawlerForm.crawlChannels.length) {
-    message.error("请至少选择一个抓取渠道");
-    return;
-  }
   savingCrawler.value = true;
   try {
-    assignCrawlerForm(await updateWorkspaceCrawlerSettings({ ...crawlerForm }));
+    assignCrawlerForm(await updateWorkspaceCrawlerSettings({
+      ...crawlerForm,
+      shopeeCookie: null,
+      crawlChannels: ["browser_intercept"],
+      defaultSourceChannel: "YouTube"
+    }));
     message.success("爬虫设置已保存");
   } catch {
     message.error("爬虫设置保存失败，请检查权限或输入内容");

@@ -36,16 +36,7 @@ export async function POST(request: Request) {
     return fail("该邮箱已注册", 409);
   }
 
-  const usersWithPassword = await prisma.user.count({
-    where: {
-      passwordHash: {
-        not: null
-      }
-    }
-  });
-  const shouldBeSuperAdmin = usersWithPassword === 0;
-
-  if (!shouldBeSuperAdmin && !inviteCodeValue) {
+  if (!inviteCodeValue) {
     return fail("普通用户注册需要填写超管生成的邀请码", 400);
   }
 
@@ -53,22 +44,18 @@ export async function POST(request: Request) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const inviteCode = shouldBeSuperAdmin
-        ? null
-        : await tx.inviteCode.findUnique({
-            where: { code: inviteCodeValue }
-          });
+      const inviteCode = await tx.inviteCode.findUnique({
+        where: { code: inviteCodeValue }
+      });
 
-      if (!shouldBeSuperAdmin) {
-        if (!inviteCode) {
-          throw new Error("INVITE_NOT_FOUND");
-        }
-        if (inviteCode.usedAt || inviteCode.usedByUserId) {
-          throw new Error("INVITE_USED");
-        }
-        if (inviteCode.expiresAt && inviteCode.expiresAt.getTime() < Date.now()) {
-          throw new Error("INVITE_EXPIRED");
-        }
+      if (!inviteCode) {
+        throw new Error("INVITE_NOT_FOUND");
+      }
+      if (inviteCode.usedAt || inviteCode.usedByUserId) {
+        throw new Error("INVITE_USED");
+      }
+      if (inviteCode.expiresAt && inviteCode.expiresAt.getTime() < Date.now()) {
+        throw new Error("INVITE_EXPIRED");
       }
 
       const user = await tx.user.upsert({
@@ -76,13 +63,13 @@ export async function POST(request: Request) {
         update: {
           name,
           passwordHash,
-          isSuperAdmin: shouldBeSuperAdmin || existing?.isSuperAdmin || false
+          isSuperAdmin: false
         },
         create: {
           name,
           email,
           passwordHash,
-          isSuperAdmin: shouldBeSuperAdmin
+          isSuperAdmin: false
         }
       });
 

@@ -11,6 +11,8 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "db:generate": "pnpm --filter @review-ai/db prisma:generate",
-    "db:migrate": "pnpm --filter @review-ai/db prisma:push"
+    "db:migrate": "pnpm --filter @review-ai/db prisma:push",
+    "db:seed-admin": "pnpm --filter @review-ai/db seed:admin",
+    "db:init": "pnpm db:migrate && pnpm db:seed-admin"
   }
 }

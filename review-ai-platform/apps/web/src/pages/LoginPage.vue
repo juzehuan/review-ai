@@ -10,11 +10,11 @@
       </div>
 
       <a-form layout="vertical" @submit.prevent="submit">
-        <a-form-item label="邮箱">
-          <a-input v-model:value="form.email" placeholder="name@example.com" />
+        <a-form-item label="账号 / 邮箱">
+          <a-input v-model:value="form.email" placeholder="admin 或 name@example.com" />
         </a-form-item>
         <a-form-item label="密码">
-          <a-input-password v-model:value="form.password" placeholder="至少 6 位" />
+          <a-input-password v-model:value="form.password" autocomplete="current-password" placeholder="至少 6 位" />
         </a-form-item>
         <a-button type="primary" html-type="submit" size="large" block :loading="loading">登录</a-button>
       </a-form>

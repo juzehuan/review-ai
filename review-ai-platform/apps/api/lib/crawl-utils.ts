@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { inferAnalysisType, type CrawlerChannel } from "@review-ai/shared";
-import { defaultCrawlerSetting, parseCrawlerChannels } from "@/lib/crawler-settings";
+import { defaultCrawlerSetting } from "@/lib/crawler-settings";
 
 export type CrawledReview = {
   cmtId: string;
@@ -82,39 +82,19 @@ export function detectCrawlerPlatform(url: string) {
     if (host === "youtu.be" || host === "youtube.com" || host.endsWith(".youtube.com")) {
       return "youtube";
     }
-    if (host.includes("shopee.")) {
-      return "shopee";
-    }
     if ((host === "tiktok.com" || host.endsWith(".tiktok.com")) && /\/@[^/]+\/video\/\d+/i.test(parsed.pathname)) {
       return "tiktok-video";
-    }
-    if ((host === "facebook.com" || host.endsWith(".facebook.com")) && isFacebookPostPath(parsed)) {
-      return "facebook-post";
     }
   } catch {
     const text = normalizedUrl.toLowerCase();
     if (text.includes("youtube.com") || text.includes("youtu.be")) {
       return "youtube";
     }
-    if (text.includes("shopee.")) {
-      return "shopee";
-    }
     if (text.includes("tiktok.") && /\/@[^/]+\/video\/\d+/i.test(text)) {
       return "tiktok-video";
     }
-    if (text.includes("facebook.") && /(story_fbid=|fbid=|\/posts\/|\/videos\/|\/reel\/|\/share\/[pv]\/|\/groups\/[^/]+\/posts\/)/i.test(text)) {
-      return "facebook-post";
-    }
   }
   return "";
-}
-
-function isFacebookPostPath(url: URL) {
-  const path = url.pathname || "";
-  if (url.searchParams.get("story_fbid") || url.searchParams.get("fbid") || url.searchParams.get("v")) {
-    return /(story\.php|permalink\.php|photo\.php|watch|posts|videos|reel|share\/[pv])/i.test(path);
-  }
-  return /\/(?:groups\/[^/]+\/posts|posts|videos|reel|share\/[pv])\/[^/?#]+/i.test(path);
 }
 
 export function detectSourceChannelFromUrl(url: string) {
@@ -122,20 +102,8 @@ export function detectSourceChannelFromUrl(url: string) {
   if (text.includes("youtube.com") || text.includes("youtu.be")) {
     return "YouTube";
   }
-  if (text.includes("shopee.")) {
-    return "Shopee";
-  }
-  if (text.includes("lazada.")) {
-    return "Lazada";
-  }
   if (text.includes("tiktok.") && /\/@[^/]+\/video\/\d+/i.test(text)) {
     return "TikTok Video";
-  }
-  if (text.includes("facebook.") && /(story_fbid=|fbid=|\/posts\/|\/videos\/|\/reel\/|\/share\/[pv]\/|\/groups\/[^/]+\/posts\/)/i.test(text)) {
-    return "Facebook";
-  }
-  if (text.includes("tiktok.")) {
-    return "TikTok Shop";
   }
   return "";
 }
@@ -177,12 +145,7 @@ export function normalizeRequestedCrawlInput(body: Record<string, unknown>, defa
     : inferAnalysisType(sourceChannel);
   const requestedMaxReviews = Number(body.maxReviews ?? defaults.defaultMaxReviews);
   const maxReviews = requestedMaxReviews <= 0 ? 0 : Math.min(Math.max(requestedMaxReviews, 1), 1000);
-  const bodyChannels = Array.isArray(body.crawlChannels) ? parseCrawlerChannels(body.crawlChannels.join(",")) : null;
-  const crawlChannels = crawlerPlatform === "youtube" || crawlerPlatform === "tiktok-video" || crawlerPlatform === "facebook-post"
-    ? (["browser_intercept"] as CrawlerChannel[])
-    : bodyChannels?.length
-      ? bodyChannels
-      : defaults.crawlChannels;
+  const crawlChannels = ["browser_intercept"] as CrawlerChannel[];
 
   return {
     productUrl,
@@ -274,10 +237,10 @@ export function resolvedCrawlerSettingFromRecord(
     enabled: storedCrawlerSetting?.enabled ?? defaultSetting.enabled,
     pythonBin: storedCrawlerSetting?.pythonBin || defaultSetting.pythonBin,
     proxyUrl: storedCrawlerSetting?.proxyUrl || defaultSetting.proxyUrl,
-    shopeeCookie: storedCrawlerSetting?.shopeeCookie || process.env.SHOPEE_COOKIE || null,
-    crawlChannels: parseCrawlerChannels(storedCrawlerSetting?.crawlChannels || defaultSetting.crawlChannels.join(",")),
-    defaultSourceChannel: storedCrawlerSetting?.defaultSourceChannel || defaultSetting.defaultSourceChannel,
-    defaultMaxReviews: storedCrawlerSetting?.defaultMaxReviews || defaultSetting.defaultMaxReviews,
+    shopeeCookie: null,
+    crawlChannels: ["browser_intercept"],
+    defaultSourceChannel: storedCrawlerSetting?.defaultSourceChannel === "TikTok Video" ? "TikTok Video" : defaultSetting.defaultSourceChannel,
+    defaultMaxReviews: storedCrawlerSetting?.defaultMaxReviews ?? defaultSetting.defaultMaxReviews,
     requestTimeoutSec: storedCrawlerSetting?.requestTimeoutSec || defaultSetting.requestTimeoutSec
   };
 }
