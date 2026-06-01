@@ -15,6 +15,7 @@ set -Eeuo pipefail
 #   DEPLOY_BRANCH=codex/saas-analysis-core
 #   WEB_PORT=8080 API_PORT=3999 POSTGRES_PORT=15432 REDIS_PORT=16379
 #   POSTGRES_IMAGE=postgres:16 REDIS_IMAGE=redis:7
+#   DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
 #   USE_EXTERNAL_POSTGRES=true EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db
 #   USE_EXTERNAL_REDIS=true EXTERNAL_REDIS_URL=redis://host:6379
 
@@ -79,6 +80,10 @@ External services:
 Images:
   POSTGRES_IMAGE=postgres:16
   REDIS_IMAGE=redis:7
+
+Docker registry mirrors:
+  DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
+  DISABLE_DOCKER_MIRRORS=true
 EOF
 }
 
@@ -102,6 +107,43 @@ run_in_app() {
   [[ -f "${APP_DIR}/docker-compose.yml" ]] || fail "docker-compose.yml not found in ${APP_DIR}"
   cd "${APP_DIR}"
   "$@"
+}
+
+configure_docker_registry_mirrors() {
+  if is_true "${DISABLE_DOCKER_MIRRORS:-}"; then
+    warn "Skipping Docker registry mirror configuration because DISABLE_DOCKER_MIRRORS=true."
+    return
+  fi
+
+  local mirrors raw mirror json backup
+  mirrors="${DOCKER_REGISTRY_MIRRORS:-https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io}"
+  [[ -n "${mirrors}" ]] || return
+
+  mkdir -p /etc/docker
+  if [[ -f /etc/docker/daemon.json ]]; then
+    backup="/etc/docker/daemon.json.review-ai.$(date +%Y%m%d%H%M%S).bak"
+    cp /etc/docker/daemon.json "${backup}"
+    warn "Existing /etc/docker/daemon.json backed up to ${backup}."
+  fi
+
+  json=""
+  IFS=',' read -ra raw <<< "${mirrors}"
+  for mirror in "${raw[@]}"; do
+    mirror="$(printf '%s' "${mirror}" | xargs)"
+    [[ -n "${mirror}" ]] || continue
+    if [[ -n "${json}" ]]; then
+      json="${json},"
+    fi
+    json="${json}\"${mirror}\""
+  done
+  [[ -n "${json}" ]] || return
+
+  cat >/etc/docker/daemon.json <<EOF
+{
+  "registry-mirrors": [${json}]
+}
+EOF
+  log "Docker registry mirrors configured: ${mirrors}"
 }
 
 install_system_deps() {
@@ -128,6 +170,9 @@ install_system_deps() {
     DEBIAN_FRONTEND=noninteractive apt-get install -y docker-compose-plugin
   fi
 
+  configure_docker_registry_mirrors
+  systemctl daemon-reload || true
+  systemctl restart docker || systemctl start docker
   systemctl enable --now docker
   log "Docker is ready."
 }

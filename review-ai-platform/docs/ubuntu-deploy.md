@@ -51,6 +51,7 @@ WEB_PORT=8080
 API_PORT=3999
 POSTGRES_IMAGE=postgres:16
 REDIS_IMAGE=redis:7
+DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
 POSTGRES_PORT=15432
 REDIS_PORT=16379
 ```
@@ -80,10 +81,19 @@ sudo USE_EXTERNAL_POSTGRES=true \
 如果服务器无法从 Docker Hub 拉取官方镜像，可以指定可访问的镜像仓库：
 
 ```bash
-sudo POSTGRES_IMAGE='postgres:16' REDIS_IMAGE='redis:7' bash scripts/ubuntu-deploy.sh deploy
+sudo DOCKER_REGISTRY_MIRRORS='https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io' \
+  bash scripts/ubuntu-deploy.sh deploy
 ```
 
-也可以把 `POSTGRES_IMAGE`、`REDIS_IMAGE` 写入 `.env`，例如换成你服务器能访问的私有仓库镜像。
+脚本会写入 `/etc/docker/daemon.json` 并备份旧文件。公益镜像源可能波动，也可以替换成你自己的阿里云、腾讯云或私有镜像源。
+
+如果你已经手动维护 Docker 配置，不希望脚本改镜像源：
+
+```bash
+sudo DISABLE_DOCKER_MIRRORS=true bash scripts/ubuntu-deploy.sh deploy
+```
+
+仍然拉取失败时，也可以把 `POSTGRES_IMAGE`、`REDIS_IMAGE` 写入 `.env`，换成你服务器能访问的私有仓库镜像。
 
 备份文件默认保存在：
 
