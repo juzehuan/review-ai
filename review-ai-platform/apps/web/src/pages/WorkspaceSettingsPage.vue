@@ -181,9 +181,15 @@
             <div class="panel-label">爬虫设置</div>
             <div class="settings-section-title">Scrapling 评论抓取</div>
           </div>
-          <a-button type="primary" :disabled="!canEditAi" :loading="savingCrawler" @click="saveCrawlerSettings">
-            保存爬虫设置
-          </a-button>
+          <a-space wrap>
+            <a-button :href="browserExtensionDownloadUrl" download="review-exporter.zip">
+              <template #icon><DownloadOutlined /></template>
+              下载浏览器插件
+            </a-button>
+            <a-button type="primary" :disabled="!canEditAi" :loading="savingCrawler" @click="saveCrawlerSettings">
+              保存爬虫设置
+            </a-button>
+          </a-space>
         </div>
         <a-form layout="vertical" class="settings-form">
           <a-form-item label="启用链接抓取">
@@ -298,6 +304,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { message } from "ant-design-vue";
+import { DownloadOutlined } from "@ant-design/icons-vue";
 import {
   ANALYSIS_TYPE_PRESETS,
   AI_PROVIDER_PRESETS,
@@ -334,6 +341,7 @@ const loadingMembers = ref(false);
 const savingAi = ref(false);
 const syncingAiForm = ref(false);
 const savingCrawler = ref(false);
+const browserExtensionDownloadUrl = "/downloads/review-exporter.zip";
 const promptProfileType = ref<AnalysisType>("product");
 const form = reactive({
   name: "",

@@ -14,6 +14,7 @@ set -Eeuo pipefail
 #   REPO_URL=https://github.com/juzehuan/review-ai.git
 #   DEPLOY_BRANCH=codex/saas-analysis-core
 #   WEB_PORT=8080 API_PORT=3999 POSTGRES_PORT=15432 REDIS_PORT=16379
+#   POSTGRES_IMAGE=postgres:16 REDIS_IMAGE=redis:7
 #   USE_EXTERNAL_POSTGRES=true EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db
 #   USE_EXTERNAL_REDIS=true EXTERNAL_REDIS_URL=redis://host:6379
 
@@ -74,6 +75,10 @@ Environment:
 External services:
   USE_EXTERNAL_POSTGRES=true EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db
   USE_EXTERNAL_REDIS=true EXTERNAL_REDIS_URL=redis://host:6379
+
+Images:
+  POSTGRES_IMAGE=postgres:16
+  REDIS_IMAGE=redis:7
 EOF
 }
 
@@ -230,6 +235,18 @@ external_redis_url() {
   printf '%s' "${url}"
 }
 
+postgres_image() {
+  local image
+  image="$(env_get POSTGRES_IMAGE)"
+  printf '%s' "${image:-postgres:16}"
+}
+
+redis_image() {
+  local image
+  image="$(env_get REDIS_IMAGE)"
+  printf '%s' "${image:-redis:7}"
+}
+
 ensure_env() {
   [[ -f "${APP_DIR}/docker-compose.yml" ]] || ensure_repo
   mkdir -p "${APP_DIR}"
@@ -245,6 +262,8 @@ ensure_env() {
 
   env_set_if_empty POSTGRES_DB "review_ai"
   env_set_if_empty POSTGRES_USER "postgres"
+  env_set_if_empty POSTGRES_IMAGE "${POSTGRES_IMAGE:-postgres:16}"
+  env_set_if_empty REDIS_IMAGE "${REDIS_IMAGE:-redis:7}"
   env_set_if_empty POSTGRES_PORT "${POSTGRES_PORT:-15432}"
   env_set_if_empty REDIS_PORT "${REDIS_PORT:-16379}"
   env_set_if_empty_or_legacy API_PORT "${API_PORT:-3999}" "3001"
@@ -347,7 +366,7 @@ wait_for_postgres() {
   log "Waiting for Postgres..."
   for _ in $(seq 1 60); do
     if using_external_postgres; then
-      if docker run --rm --network host postgres:16-alpine pg_isready -d "$(external_database_url)" >/dev/null 2>&1; then
+      if docker run --rm --network host "$(postgres_image)" pg_isready -d "$(external_database_url)" >/dev/null 2>&1; then
         return
       fi
     elif run_in_app compose exec -T postgres pg_isready -U "${db_user}" -d "${db_name}" >/dev/null 2>&1; then
@@ -362,7 +381,7 @@ wait_for_postgres() {
 wait_for_redis() {
   log "Waiting for Redis..."
   for _ in $(seq 1 60); do
-    if docker run --rm --network host redis:7-alpine redis-cli -u "$(external_redis_url)" ping >/dev/null 2>&1; then
+    if docker run --rm --network host "$(redis_image)" redis-cli -u "$(external_redis_url)" ping >/dev/null 2>&1; then
       return
     fi
     sleep 2
@@ -452,7 +471,7 @@ backup() {
   log "Backing up database to ${db_file}..."
   start_core
   if using_external_postgres; then
-    docker run --rm --network host postgres:16-alpine pg_dump --clean --if-exists --no-owner "$(external_database_url)" | gzip -9 > "${db_file}"
+    docker run --rm --network host "$(postgres_image)" pg_dump --clean --if-exists --no-owner "$(external_database_url)" | gzip -9 > "${db_file}"
   else
     run_in_app compose exec -T postgres pg_dump --clean --if-exists --no-owner -U "${db_user}" -d "${db_name}" | gzip -9 > "${db_file}"
   fi
@@ -489,9 +508,9 @@ restore() {
   start_core
   log "Restoring ${file}..."
   if using_external_postgres; then
-    docker run --rm --network host postgres:16-alpine psql -v ON_ERROR_STOP=1 "$(external_database_url)" \
+    docker run --rm --network host "$(postgres_image)" psql -v ON_ERROR_STOP=1 "$(external_database_url)" \
       -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
-    gunzip -c "${file}" | docker run --rm -i --network host postgres:16-alpine psql -v ON_ERROR_STOP=1 "$(external_database_url)"
+    gunzip -c "${file}" | docker run --rm -i --network host "$(postgres_image)" psql -v ON_ERROR_STOP=1 "$(external_database_url)"
   else
     run_in_app compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
       -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"

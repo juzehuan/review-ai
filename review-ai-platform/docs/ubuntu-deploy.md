@@ -49,6 +49,8 @@ REPO_URL=https://github.com/juzehuan/review-ai.git
 DEPLOY_BRANCH=codex/saas-analysis-core
 WEB_PORT=8080
 API_PORT=3999
+POSTGRES_IMAGE=postgres:16
+REDIS_IMAGE=redis:7
 POSTGRES_PORT=15432
 REDIS_PORT=16379
 ```
@@ -72,6 +74,16 @@ sudo USE_EXTERNAL_POSTGRES=true \
 ```
 
 启用后脚本会跳过对应的内置容器，迁移、启动、备份和恢复都会使用外部连接串。
+
+## 镜像拉取失败
+
+如果服务器无法从 Docker Hub 拉取官方镜像，可以指定可访问的镜像仓库：
+
+```bash
+sudo POSTGRES_IMAGE='postgres:16' REDIS_IMAGE='redis:7' bash scripts/ubuntu-deploy.sh deploy
+```
+
+也可以把 `POSTGRES_IMAGE`、`REDIS_IMAGE` 写入 `.env`，例如换成你服务器能访问的私有仓库镜像。
 
 备份文件默认保存在：
 

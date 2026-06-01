@@ -9,6 +9,10 @@
         </div>
       </div>
       <a-space wrap>
+        <a-button :href="browserExtensionDownloadUrl" download="review-exporter.zip">
+          <template #icon><DownloadOutlined /></template>
+          下载浏览器插件
+        </a-button>
         <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
         <a-button @click="refreshPageData" :loading="loading">
           <template #icon><ReloadOutlined /></template>
@@ -315,6 +319,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { message } from "ant-design-vue";
 import {
+  DownloadOutlined,
   ExclamationCircleOutlined,
   FileSearchOutlined,
   PlayCircleOutlined,
@@ -356,6 +361,7 @@ const showMonitorModal = ref(false);
 const creating = ref(false);
 const monitorCreating = ref(false);
 const crawlerEnabled = ref(true);
+const browserExtensionDownloadUrl = "/downloads/review-exporter.zip";
 let timer: ReturnType<typeof setInterval> | null = null;
 
 const form = reactive({
