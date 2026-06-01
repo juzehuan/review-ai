@@ -1,9 +1,12 @@
 <template>
-  <div class="runs-page">
-    <div class="page-toolbar runs-hero">
+  <div class="runs-page crawler-page">
+    <div class="page-toolbar runs-hero crawler-hero">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">评论采集</div>
-        <div class="toolbar-subtitle">把商品、视频或内容链接放进采集队列，完成后再一键导入评论并开始分析。</div>
+        <div class="panel-label">Comment Intelligence</div>
+        <div class="toolbar-title">评论采集控制台</div>
+        <div class="toolbar-subtitle">
+          把 YouTube 和 TikTok 视频评论变成可持续监听的数据流，新评论自动入库、自动分析，任务状态一眼可见。
+        </div>
       </div>
       <a-space wrap>
         <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
@@ -11,41 +14,148 @@
           <template #icon><ReloadOutlined /></template>
           刷新
         </a-button>
-        <a-button v-if="crawlerEnabled" type="primary" @click="openCreateModal">
+        <a-button :disabled="!crawlerEnabled" @click="openCreateModal">
           <template #icon><PlusOutlined /></template>
-          新建采集任务
+          一次采集
+        </a-button>
+        <a-button type="primary" :disabled="!crawlerEnabled" @click="openMonitorModal">
+          <template #icon><ThunderboltOutlined /></template>
+          新建监听
         </a-button>
       </a-space>
     </div>
 
+    <a-alert
+      v-if="!crawlerEnabled"
+      class="import-alert"
+      type="warning"
+      show-icon
+      message="评论采集已关闭"
+      description="请先在用户后台的抓取设置中启用评论采集，然后再创建监听任务或一次性采集任务。"
+    />
+
     <div class="crawler-stats-grid">
       <div class="mini-stat-card mini-stat-cool">
-        <div class="mini-stat-label">采集任务</div>
-        <div class="mini-stat-value">{{ jobs.length }}</div>
-        <div class="stat-note">当前账号下的全部采集队列</div>
+        <div class="mini-stat-label">监听任务</div>
+        <div class="mini-stat-value">{{ monitors.length }}</div>
+        <div class="stat-note">会按设定频率自动抓取并分析</div>
       </div>
       <div class="mini-stat-card mini-stat-warm">
         <div class="mini-stat-label">运行中</div>
         <div class="mini-stat-value">{{ activeJobCount }}</div>
-        <div class="stat-note">排队或正在抓取</div>
+        <div class="stat-note">正在排队或抓取的采集任务</div>
       </div>
       <div class="mini-stat-card mini-stat-cool">
         <div class="mini-stat-label">已采集评论</div>
         <div class="mini-stat-value">{{ fetchedRowCount }}</div>
-        <div class="stat-note">可导入分析的评论总量</div>
+        <div class="stat-note">来自当前账号下的采集记录</div>
       </div>
       <div class="mini-stat-card mini-stat-alert">
-        <div class="mini-stat-label">异常任务</div>
-        <div class="mini-stat-value">{{ failedJobCount }}</div>
-        <div class="stat-note">需要检查链接或代理</div>
+        <div class="mini-stat-label">待处理异常</div>
+        <div class="mini-stat-value">{{ failedJobCount + failedMonitorCount }}</div>
+        <div class="stat-note">需要检查链接、网络代理或平台限制</div>
       </div>
     </div>
+
+    <section class="task-list-panel monitor-list-panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-label">Always-on Monitor</div>
+          <div class="settings-section-title">持续监听任务</div>
+        </div>
+        <a-space wrap>
+          <a-tag color="blue">{{ enabledMonitorCount }} 个已启用</a-tag>
+          <a-button type="primary" :disabled="!crawlerEnabled" @click="openMonitorModal">
+            <template #icon><ThunderboltOutlined /></template>
+            新建监听
+          </a-button>
+        </a-space>
+      </div>
+
+      <a-empty v-if="!loading && monitors.length === 0" description="还没有持续监听任务">
+        <a-button type="primary" :disabled="!crawlerEnabled" @click="openMonitorModal">创建第一个监听任务</a-button>
+      </a-empty>
+
+      <a-table
+        v-else
+        class="crawl-job-table"
+        row-key="id"
+        size="middle"
+        :columns="monitorColumns"
+        :data-source="monitors"
+        :pagination="{ pageSize: 8 }"
+        :loading="loading"
+        :scroll="{ x: 1280 }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'monitor'">
+            <div class="task-name-cell">
+              <strong>{{ record.name }}</strong>
+              <span>{{ record.productName || record.normalizedUrl }}</span>
+              <a class="crawl-url" :href="record.normalizedUrl" target="_blank" rel="noreferrer">{{ record.normalizedUrl }}</a>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'schedule'">
+            <div class="schedule-cell">
+              <strong>{{ intervalLabel(record.intervalMinutes) }}</strong>
+              <span>下次：{{ formatTime(record.nextRunAt) }}</span>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <div class="monitor-status-cell">
+              <a-switch
+                :checked="record.enabled"
+                :loading="monitorActionId === record.id"
+                checked-children="启用"
+                un-checked-children="暂停"
+                @change="toggleMonitor(record, Boolean($event))"
+              />
+              <a-tag :color="record.autoAnalyze ? 'green' : 'default'">
+                {{ record.autoAnalyze ? "自动分析" : "仅采集" }}
+              </a-tag>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'meta'">
+            <div>{{ record.sourceChannel }} / {{ analysisTypeLabel(record.analysisType) }}</div>
+            <div class="muted">{{ platformLabel(record.platform) }}</div>
+          </template>
+          <template v-else-if="column.key === 'last'">
+            <div>{{ formatTime(record.lastRunAt) }}</div>
+            <div class="muted">创建于 {{ formatTime(record.createdAt) }}</div>
+          </template>
+          <template v-else-if="column.key === 'error'">
+            <a-tooltip v-if="record.lastError" :title="record.lastError">
+              <div class="error-pill">
+                <ExclamationCircleOutlined />
+                <span>{{ errorSummary(record.lastError) }}</span>
+              </div>
+            </a-tooltip>
+            <span v-else class="muted">-</span>
+          </template>
+          <template v-else-if="column.key === 'actions'">
+            <a-space wrap>
+              <a-button size="small" :loading="monitorActionId === record.id" @click="runMonitorNow(record)">
+                <template #icon><PlayCircleOutlined /></template>
+                立即运行
+              </a-button>
+              <a-button v-if="record.taskId" size="small" @click="openTaskById(record.taskId)">
+                <template #icon><FileSearchOutlined /></template>
+                查看分析
+              </a-button>
+              <a-button size="small" danger @click="removeMonitor(record)">
+                删除
+              </a-button>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
+    </section>
 
     <section class="task-list-panel">
       <div class="panel-head">
         <div>
-          <div class="panel-label">Crawler</div>
-          <div class="settings-section-title">全部采集任务</div>
+          <div class="panel-label">Crawler Queue</div>
+          <div class="settings-section-title">采集记录</div>
         </div>
         <a-tag>{{ jobs.length }} 个任务</a-tag>
       </div>
@@ -74,12 +184,12 @@
           <template v-else-if="column.key === 'progress'">
             <div class="run-progress-cell">
               <a-progress :percent="record.progress" size="small" :status="progressStatus(record.status)" />
-              <span>已抓取 {{ record.fetchedRows }}/{{ record.maxReviews || '不限' }}</span>
+              <span>已抓取 {{ record.fetchedRows }}/{{ record.maxReviews || "不限" }}</span>
             </div>
           </template>
           <template v-else-if="column.key === 'meta'">
             <div>{{ record.sourceChannel }} / {{ analysisTypeLabel(record.analysisType) }}</div>
-            <div class="muted">{{ record.crawlChannelLabel || record.platform }}</div>
+            <div class="muted">{{ record.crawlChannelLabel || platformLabel(record.platform) }}</div>
           </template>
           <template v-else-if="column.key === 'time'">
             <div>{{ formatTime(record.createdAt) }}</div>
@@ -117,8 +227,55 @@
     </section>
 
     <a-modal
+      :open="showMonitorModal"
+      title="新建持续监听"
+      width="760px"
+      :confirm-loading="monitorCreating"
+      ok-text="创建监听"
+      cancel-text="取消"
+      @cancel="showMonitorModal = false"
+      @ok="submitCrawlMonitor"
+    >
+      <a-form layout="vertical" class="import-form">
+        <div class="monitor-form-grid">
+          <a-form-item label="监听名称">
+            <a-input v-model:value="monitorForm.name" placeholder="例如：竞品 TikTok 视频舆情监听" />
+          </a-form-item>
+          <a-form-item label="内容名称">
+            <a-input v-model:value="monitorForm.productName" placeholder="可选，默认使用视频标题或链接" />
+          </a-form-item>
+        </div>
+        <a-form-item label="视频链接">
+          <a-input v-model:value="monitorForm.productUrl" placeholder="支持 YouTube 视频链接或 TikTok 视频链接" />
+        </a-form-item>
+        <div class="monitor-form-grid">
+          <a-form-item label="来源渠道">
+            <a-select v-model:value="monitorForm.sourceChannel" :options="sourceChannelOptions" />
+          </a-form-item>
+          <a-form-item label="分析类型">
+            <a-select v-model:value="monitorForm.analysisType" :options="analysisTypeOptions" />
+          </a-form-item>
+        </div>
+        <div class="monitor-form-grid">
+          <a-form-item label="每次最多采集">
+            <a-input-number v-model:value="monitorForm.maxReviews" :min="0" :max="5000" class="full-input" />
+            <div class="settings-help">填 0 表示不限，直到平台没有更多评论或采集超时。</div>
+          </a-form-item>
+          <a-form-item label="监听频率">
+            <a-select v-model:value="monitorForm.intervalMinutes" :options="intervalOptions" />
+            <div class="settings-help">建议从 6 小时起步，高频任务更容易触发平台限制。</div>
+          </a-form-item>
+        </div>
+        <a-form-item label="自动处理">
+          <a-switch v-model:checked="monitorForm.autoAnalyze" checked-children="采集后自动分析" un-checked-children="只采集不分析" />
+          <div class="settings-help">{{ currentMonitorAnalysisTypeDescription }}</div>
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal
       :open="showCreateModal"
-      title="新建评论采集"
+      title="新建一次性采集"
       width="720px"
       :confirm-loading="creating"
       ok-text="开始采集"
@@ -128,26 +285,26 @@
     >
       <a-form layout="vertical" class="import-form">
         <a-form-item label="任务名称">
-          <a-input v-model:value="form.name" placeholder="例如：王局 YouTube 评论采集" />
+          <a-input v-model:value="form.name" placeholder="例如：新品发布 YouTube 评论采集" />
         </a-form-item>
-        <a-form-item label="商品/视频名称">
+        <a-form-item label="内容名称">
           <a-input v-model:value="form.productName" placeholder="可选，留空时会尽量从页面标题识别" />
         </a-form-item>
-        <a-form-item label="评论链接">
-          <a-input v-model:value="form.productUrl" placeholder="例如：https://www.youtube.com/watch?v=... 或 https://www.tiktok.com/@user/video/..." />
+        <a-form-item label="视频链接">
+          <a-input v-model:value="form.productUrl" placeholder="支持 YouTube 视频链接或 TikTok 视频链接" />
         </a-form-item>
-        <a-form-item label="来源渠道">
-          <a-select v-model:value="form.sourceChannel" :options="sourceChannelOptions" />
-        </a-form-item>
-        <a-form-item label="分析类型">
-          <a-select v-model:value="form.analysisType" :options="analysisTypeOptions" />
-          <div class="settings-help">{{ currentAnalysisTypeDescription }}</div>
-        </a-form-item>
+        <div class="monitor-form-grid">
+          <a-form-item label="来源渠道">
+            <a-select v-model:value="form.sourceChannel" :options="sourceChannelOptions" />
+          </a-form-item>
+          <a-form-item label="分析类型">
+            <a-select v-model:value="form.analysisType" :options="analysisTypeOptions" />
+          </a-form-item>
+        </div>
         <a-form-item label="最多采集条数">
-          <a-input-number v-model:value="form.maxReviews" :min="0" :max="1000" class="full-input" />
-          <div class="settings-help">填 0 表示不限，直到平台没有更多评论或采集超时。</div>
+          <a-input-number v-model:value="form.maxReviews" :min="0" :max="5000" class="full-input" />
+          <div class="settings-help">填 0 表示不限；AI 链接抓取当前只支持 YouTube 视频和 TikTok 视频评论。</div>
         </a-form-item>
-        <div class="settings-help">AI 链接抓取当前仅支持 YouTube 视频和 TikTok 视频评论，系统会自动使用浏览器滚动/接口采集。</div>
       </a-form>
     </a-modal>
   </div>
@@ -157,8 +314,25 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { message } from "ant-design-vue";
-import { ExclamationCircleOutlined, FileSearchOutlined, PlayCircleOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons-vue";
-import { createCrawlJob, fetchCrawlJobs, fetchWorkspaceCrawlerSettings, startCrawlJobAnalysis } from "@/api";
+import {
+  ExclamationCircleOutlined,
+  FileSearchOutlined,
+  PlayCircleOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  ThunderboltOutlined
+} from "@ant-design/icons-vue";
+import {
+  createCrawlJob,
+  createCrawlMonitor,
+  deleteCrawlMonitor,
+  fetchCrawlJobs,
+  fetchCrawlMonitors,
+  fetchWorkspaceCrawlerSettings,
+  runCrawlMonitorNow,
+  startCrawlJobAnalysis,
+  updateCrawlMonitor
+} from "@/api";
 import {
   ANALYSIS_TYPE_PRESETS,
   SOURCE_CHANNEL_PRESETS,
@@ -166,16 +340,21 @@ import {
   type AnalysisType,
   type CrawlJobDTO,
   type CrawlJobStatus,
+  type CrawlMonitorDTO,
   type CrawlerChannel
 } from "@review-ai/shared";
 
 const router = useRouter();
 const jobs = ref<CrawlJobDTO[]>([]);
+const monitors = ref<CrawlMonitorDTO[]>([]);
 const loading = ref(false);
 const autoRefresh = ref(true);
 const startingId = ref<string | null>(null);
+const monitorActionId = ref<string | null>(null);
 const showCreateModal = ref(false);
+const showMonitorModal = ref(false);
 const creating = ref(false);
+const monitorCreating = ref(false);
 const crawlerEnabled = ref(true);
 let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -189,18 +368,38 @@ const form = reactive({
   crawlChannels: ["browser_intercept"] as CrawlerChannel[]
 });
 
+const monitorForm = reactive({
+  name: "",
+  productName: "",
+  sourceChannel: "YouTube",
+  analysisType: "video" as AnalysisType,
+  productUrl: "",
+  maxReviews: 0,
+  intervalMinutes: 360,
+  autoAnalyze: true
+});
+
 const sourceChannelOptions = SOURCE_CHANNEL_PRESETS.filter((channel) => ["YouTube", "TikTok Video"].includes(channel.value)).map((channel) => ({
   label: channel.label,
   value: channel.value
 }));
 
-const analysisTypeOptions = ANALYSIS_TYPE_PRESETS.map((item) => ({
+const analysisTypeOptions = ANALYSIS_TYPE_PRESETS.filter((item) => item.value === "video").map((item) => ({
   label: item.label,
   value: item.value
 }));
 
-const currentAnalysisTypeDescription = computed(() => {
-  return ANALYSIS_TYPE_PRESETS.find((item) => item.value === form.analysisType)?.description || "";
+const intervalOptions = [
+  { label: "每 30 分钟", value: 30 },
+  { label: "每 1 小时", value: 60 },
+  { label: "每 3 小时", value: 180 },
+  { label: "每 6 小时", value: 360 },
+  { label: "每 12 小时", value: 720 },
+  { label: "每天", value: 1440 }
+];
+
+const currentMonitorAnalysisTypeDescription = computed(() => {
+  return ANALYSIS_TYPE_PRESETS.find((item) => item.value === monitorForm.analysisType)?.description || "";
 });
 
 const columns = [
@@ -213,15 +412,28 @@ const columns = [
   { title: "操作", key: "actions", width: 190 }
 ];
 
+const monitorColumns = [
+  { title: "监听对象", key: "monitor", width: 360 },
+  { title: "频率", key: "schedule", width: 210 },
+  { title: "状态", key: "status", width: 190 },
+  { title: "来源", key: "meta", width: 150 },
+  { title: "最近运行", key: "last", width: 190 },
+  { title: "错误", key: "error" },
+  { title: "操作", key: "actions", width: 250 }
+];
+
 const hasActiveJobs = computed(() => jobs.value.some((job) => ["queued", "running"].includes(job.status)));
 const activeJobCount = computed(() => jobs.value.filter((job) => ["queued", "running"].includes(job.status)).length);
 const failedJobCount = computed(() => jobs.value.filter((job) => job.status === "failed").length);
 const fetchedRowCount = computed(() => jobs.value.reduce((total, job) => total + job.fetchedRows, 0));
+const enabledMonitorCount = computed(() => monitors.value.filter((monitor) => monitor.enabled).length);
+const failedMonitorCount = computed(() => monitors.value.filter((monitor) => Boolean(monitor.lastError)).length);
+const hasEnabledMonitor = computed(() => monitors.value.some((monitor) => monitor.enabled));
 
 function statusLabel(status: CrawlJobStatus) {
   return {
     queued: "排队中",
-    running: "爬取中",
+    running: "抓取中",
     completed: "已完成",
     failed: "失败",
     imported: "已开始分析"
@@ -249,7 +461,28 @@ function progressStatus(status: CrawlJobStatus) {
 }
 
 function analysisTypeLabel(value: string) {
-  return value === "video" ? "视频评论" : value === "tweet" ? "推文评论" : "商品评论";
+  return value === "video" ? "视频评论" : value === "tweet" ? "社媒评论" : "商品评论";
+}
+
+function platformLabel(value?: string | null) {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("youtube")) {
+    return "YouTube 视频";
+  }
+  if (text.includes("tiktok")) {
+    return "TikTok 视频";
+  }
+  return value || "-";
+}
+
+function intervalLabel(value: number) {
+  if (value >= 1440 && value % 1440 === 0) {
+    return `每 ${value / 1440} 天`;
+  }
+  if (value >= 60 && value % 60 === 0) {
+    return `每 ${value / 60} 小时`;
+  }
+  return `每 ${value} 分钟`;
 }
 
 function normalizeSourceChannel(value?: string | null) {
@@ -262,10 +495,8 @@ function inferSourceChannelFromUrl(value?: string | null) {
   if (text.includes("youtube.com") || text.includes("youtu.be")) {
     return "YouTube";
   }
-  if (text.includes("tiktok.")) {
-    if (/\/@[^/]+\/video\/\d+/i.test(text)) {
-      return "TikTok Video";
-    }
+  if (text.includes("tiktok.") && /\/@[^/]+\/video\/\d+/i.test(text)) {
+    return "TikTok Video";
   }
   return "";
 }
@@ -274,7 +505,11 @@ function formatTime(value?: string | null) {
   if (!value) {
     return "-";
   }
-  return new Date(value).toLocaleString();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  return date.toLocaleString();
 }
 
 function errorSummary(value?: string | null) {
@@ -302,12 +537,11 @@ function canStart(job: CrawlJobDTO) {
 }
 
 async function loadJobs() {
-  loading.value = true;
-  try {
-    jobs.value = await fetchCrawlJobs();
-  } finally {
-    loading.value = false;
-  }
+  jobs.value = await fetchCrawlJobs();
+}
+
+async function loadMonitors() {
+  monitors.value = await fetchCrawlMonitors();
 }
 
 async function loadCrawlerSettings() {
@@ -317,12 +551,18 @@ async function loadCrawlerSettings() {
 }
 
 async function refreshPageData() {
-  await Promise.all([
-    loadCrawlerSettings().catch(() => {
-      crawlerEnabled.value = true;
-    }),
-    loadJobs()
-  ]);
+  loading.value = true;
+  try {
+    await Promise.all([
+      loadCrawlerSettings().catch(() => {
+        crawlerEnabled.value = true;
+      }),
+      loadJobs(),
+      loadMonitors()
+    ]);
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function startAnalysis(job: CrawlJobDTO) {
@@ -342,8 +582,12 @@ async function startAnalysis(job: CrawlJobDTO) {
 
 function openTask(job: CrawlJobDTO) {
   if (job.taskId) {
-    router.push(`/tasks/${job.taskId}/runs`);
+    openTaskById(job.taskId);
   }
+}
+
+function openTaskById(taskId: string) {
+  router.push(`/tasks/${taskId}/runs`);
 }
 
 function resetCreateForm() {
@@ -356,22 +600,66 @@ function resetCreateForm() {
   form.crawlChannels = ["browser_intercept"];
 }
 
+function resetMonitorForm() {
+  monitorForm.name = "";
+  monitorForm.productName = "";
+  monitorForm.sourceChannel = "YouTube";
+  monitorForm.analysisType = "video";
+  monitorForm.productUrl = "";
+  monitorForm.maxReviews = 0;
+  monitorForm.intervalMinutes = 360;
+  monitorForm.autoAnalyze = true;
+}
+
 async function openCreateModal() {
   resetCreateForm();
   try {
     const setting = await loadCrawlerSettings();
     if (!setting.enabled) {
       showCreateModal.value = false;
-      message.warning("链接爬取已在爬虫设置中关闭。");
+      message.warning("评论采集已在抓取设置中关闭。");
       return;
     }
-    showCreateModal.value = true;
     form.sourceChannel = normalizeSourceChannel(setting.defaultSourceChannel);
     form.analysisType = inferAnalysisType(form.sourceChannel);
     form.maxReviews = setting.defaultMaxReviews ?? 200;
     form.crawlChannels = ["browser_intercept"];
   } catch {
-    // 采集设置加载失败时保留默认值，不阻塞创建任务。
+    // 采集设置失败时仍允许用户按默认值创建。
+  }
+  showCreateModal.value = true;
+}
+
+async function openMonitorModal() {
+  resetMonitorForm();
+  try {
+    const setting = await loadCrawlerSettings();
+    if (!setting.enabled) {
+      showMonitorModal.value = false;
+      message.warning("评论采集已在抓取设置中关闭。");
+      return;
+    }
+    monitorForm.sourceChannel = normalizeSourceChannel(setting.defaultSourceChannel);
+    monitorForm.analysisType = inferAnalysisType(monitorForm.sourceChannel);
+    monitorForm.maxReviews = 0;
+  } catch {
+    // 采集设置失败时仍允许用户按默认值创建。
+  }
+  showMonitorModal.value = true;
+}
+
+function applyUrlInference(target: typeof form | typeof monitorForm, productUrl?: string | null) {
+  const sourceChannel = inferSourceChannelFromUrl(productUrl);
+  if (!sourceChannel) {
+    return;
+  }
+  target.sourceChannel = sourceChannel;
+  target.analysisType = inferAnalysisType(sourceChannel);
+  if (sourceChannel === "TikTok Video") {
+    target.maxReviews = 0;
+  }
+  if (!target.productName.trim()) {
+    target.productName = sourceChannel === "YouTube" ? "YouTube 视频评论" : "TikTok 视频评论";
   }
 }
 
@@ -383,29 +671,25 @@ watch(
 );
 
 watch(
-  () => form.productUrl,
-  (productUrl) => {
-    const sourceChannel = inferSourceChannelFromUrl(productUrl);
-    if (!sourceChannel) {
-      return;
-    }
-    form.sourceChannel = sourceChannel;
-    form.analysisType = inferAnalysisType(sourceChannel);
-    if (sourceChannel === "YouTube" || sourceChannel === "TikTok Video") {
-      form.crawlChannels = ["browser_intercept"];
-      if (sourceChannel === "TikTok Video") {
-        form.maxReviews = 0;
-      }
-      if (!form.productName.trim()) {
-        form.productName = sourceChannel === "YouTube" ? "YouTube 视频评论" : "TikTok 视频评论";
-      }
-    }
+  () => monitorForm.sourceChannel,
+  (sourceChannel) => {
+    monitorForm.analysisType = inferAnalysisType(sourceChannel);
   }
+);
+
+watch(
+  () => form.productUrl,
+  (productUrl) => applyUrlInference(form, productUrl)
+);
+
+watch(
+  () => monitorForm.productUrl,
+  (productUrl) => applyUrlInference(monitorForm, productUrl)
 );
 
 async function submitCrawlJob() {
   if (!crawlerEnabled.value) {
-    message.warning("链接爬取已在爬虫设置中关闭。");
+    message.warning("评论采集已在抓取设置中关闭。");
     showCreateModal.value = false;
     return;
   }
@@ -414,7 +698,7 @@ async function submitCrawlJob() {
     return;
   }
   if (!form.productUrl.trim()) {
-    message.error("请填写评论链接。");
+    message.error("请填写视频链接。");
     return;
   }
   creating.value = true;
@@ -436,13 +720,84 @@ async function submitCrawlJob() {
   }
 }
 
+async function submitCrawlMonitor() {
+  if (!crawlerEnabled.value) {
+    message.warning("评论采集已在抓取设置中关闭。");
+    showMonitorModal.value = false;
+    return;
+  }
+  if (!monitorForm.name.trim()) {
+    message.error("请填写监听任务名称。");
+    return;
+  }
+  if (!monitorForm.productUrl.trim()) {
+    message.error("请填写视频链接。");
+    return;
+  }
+  monitorCreating.value = true;
+  try {
+    await createCrawlMonitor({
+      name: monitorForm.name,
+      productName: monitorForm.productName,
+      sourceChannel: monitorForm.sourceChannel,
+      analysisType: monitorForm.analysisType,
+      productUrl: monitorForm.productUrl,
+      maxReviews: monitorForm.maxReviews,
+      intervalMinutes: monitorForm.intervalMinutes,
+      autoAnalyze: monitorForm.autoAnalyze
+    });
+    message.success("监听任务已创建，系统会自动发起首次采集。");
+    showMonitorModal.value = false;
+    await refreshPageData();
+  } finally {
+    monitorCreating.value = false;
+  }
+}
+
+async function toggleMonitor(monitor: CrawlMonitorDTO, checked: boolean) {
+  monitorActionId.value = monitor.id;
+  try {
+    await updateCrawlMonitor(monitor.id, { enabled: checked });
+    message.success(checked ? "监听任务已启用" : "监听任务已暂停");
+    await loadMonitors();
+  } finally {
+    monitorActionId.value = null;
+  }
+}
+
+async function runMonitorNow(monitor: CrawlMonitorDTO) {
+  monitorActionId.value = monitor.id;
+  try {
+    await runCrawlMonitorNow(monitor.id);
+    message.success("已加入采集队列。");
+    await refreshPageData();
+  } finally {
+    monitorActionId.value = null;
+  }
+}
+
+async function removeMonitor(monitor: CrawlMonitorDTO) {
+  const confirmed = window.confirm(`确定删除监听任务「${monitor.name}」吗？历史采集记录和分析任务不会被删除。`);
+  if (!confirmed) {
+    return;
+  }
+  monitorActionId.value = monitor.id;
+  try {
+    await deleteCrawlMonitor(monitor.id);
+    message.success("监听任务已删除");
+    await loadMonitors();
+  } finally {
+    monitorActionId.value = null;
+  }
+}
+
 onMounted(() => {
   refreshPageData();
   timer = setInterval(() => {
-    if (autoRefresh.value && hasActiveJobs.value) {
-      loadJobs();
+    if (autoRefresh.value && (hasActiveJobs.value || hasEnabledMonitor.value)) {
+      refreshPageData();
     }
-  }, 2500);
+  }, 5000);
 });
 
 onUnmounted(() => {
@@ -453,14 +808,44 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.crawler-page {
+  gap: 22px;
+}
+
+.crawler-hero {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(232, 247, 255, 0.9)),
+    repeating-linear-gradient(90deg, rgba(47, 107, 255, 0.06) 0 1px, transparent 1px 64px);
+}
+
+.monitor-list-panel {
+  border-color: rgba(0, 191, 216, 0.28);
+}
+
+.monitor-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.schedule-cell,
+.monitor-status-cell {
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-cell strong {
+  color: #0b1322;
+}
+
+.schedule-cell span {
+  color: #64748b;
+  font-size: 12px;
+}
+
 .crawl-url {
   color: #64748b;
   font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-.error-text {
-  color: #b91c1c;
   overflow-wrap: anywhere;
 }
 
@@ -481,5 +866,11 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .monitor-form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

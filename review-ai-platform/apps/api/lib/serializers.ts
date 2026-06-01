@@ -5,7 +5,9 @@ import type {
   AnalysisRunLogDTO,
   AnalysisRunDTO,
   CrawlJobDTO,
+  CrawlMonitorDTO,
   MyWorkspaceDTO,
+  ReportShareDTO,
   ReviewActionItemDTO,
   ReviewRowDTO,
   SavedReviewViewDTO,
@@ -18,6 +20,8 @@ import type {
   AnalysisRun,
   AnalysisRunLog,
   CrawlJob,
+  CrawlMonitor,
+  ReportShare,
   Review,
   ReviewActionItem,
   ReviewAnalysis,
@@ -197,6 +201,48 @@ export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
     updatedAt: job.updatedAt.toISOString(),
     startedAt: job.startedAt?.toISOString() || null,
     finishedAt: job.finishedAt?.toISOString() || null
+  };
+}
+
+export function serializeCrawlMonitor(monitor: CrawlMonitor): CrawlMonitorDTO {
+  return {
+    id: monitor.id,
+    workspaceId: monitor.workspaceId,
+    taskId: monitor.taskId,
+    name: monitor.name,
+    productName: monitor.productName,
+    sourceChannel: monitor.sourceChannel,
+    analysisType: monitor.analysisType as CrawlMonitorDTO["analysisType"],
+    productUrl: monitor.productUrl,
+    normalizedUrl: monitor.normalizedUrl,
+    platform: monitor.platform,
+    maxReviews: monitor.maxReviews,
+    intervalMinutes: monitor.intervalMinutes,
+    autoAnalyze: monitor.autoAnalyze,
+    enabled: monitor.enabled,
+    lastRunAt: monitor.lastRunAt?.toISOString() || null,
+    nextRunAt: monitor.nextRunAt.toISOString(),
+    lastCrawlJobId: monitor.lastCrawlJobId,
+    lastError: monitor.lastError,
+    createdAt: monitor.createdAt.toISOString(),
+    updatedAt: monitor.updatedAt.toISOString()
+  };
+}
+
+export function serializeReportShare(share: ReportShare, shareUrl: string): ReportShareDTO {
+  return {
+    id: share.id,
+    taskId: share.taskId,
+    token: share.token,
+    title: share.title,
+    enabled: share.enabled,
+    viewCount: share.viewCount,
+    lastViewedAt: share.lastViewedAt?.toISOString() || null,
+    expiresAt: share.expiresAt?.toISOString() || null,
+    revokedAt: share.revokedAt?.toISOString() || null,
+    shareUrl,
+    createdAt: share.createdAt.toISOString(),
+    updatedAt: share.updatedAt.toISOString()
   };
 }
 

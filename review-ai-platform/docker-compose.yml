@@ -32,9 +32,9 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-review_ai}
-      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin@reviewiq.local}
-      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-Admin@123456}
-      DEFAULT_ADMIN_NAME: ${DEFAULT_ADMIN_NAME:-Super Admin}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-123456}
+      DEFAULT_ADMIN_NAME: ${DEFAULT_ADMIN_NAME:-admin}
       DEFAULT_WORKSPACE_NAME: ${DEFAULT_WORKSPACE_NAME:-Admin Workspace}
       DEFAULT_WORKSPACE_SLUG: ${DEFAULT_WORKSPACE_SLUG:-admin-workspace}
     command: ["sh", "-c", "pnpm db:migrate && pnpm --filter @review-ai/db exec node scripts/seed-admin.mjs"]
@@ -63,8 +63,8 @@ services:
       SCRAPLING_ENABLED: ${SCRAPLING_ENABLED:-true}
       SCRAPLING_PYTHON_BIN: /opt/review-ai-crawler/bin/python
       SCRAPLING_PROXY: ${SCRAPLING_PROXY:-}
-      SCRAPLING_CHANNELS: ${SCRAPLING_CHANNELS:-api_exporter,api_basic,browser_intercept}
-      SCRAPLING_DEFAULT_SOURCE: ${SCRAPLING_DEFAULT_SOURCE:-Shopee}
+      SCRAPLING_CHANNELS: ${SCRAPLING_CHANNELS:-browser_intercept}
+      SCRAPLING_DEFAULT_SOURCE: ${SCRAPLING_DEFAULT_SOURCE:-YouTube}
       SCRAPLING_DEFAULT_MAX_REVIEWS: ${SCRAPLING_DEFAULT_MAX_REVIEWS:-200}
       SCRAPLING_TIMEOUT_SEC: ${SCRAPLING_TIMEOUT_SEC:-180}
       SHOPEE_COOKIE: ${SHOPEE_COOKIE:-}

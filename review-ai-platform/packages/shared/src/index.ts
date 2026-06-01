@@ -157,8 +157,63 @@ export interface CrawlJobDTO {
   finishedAt: string | null;
 }
 
+export interface CrawlMonitorDTO {
+  id: string;
+  workspaceId: string;
+  taskId: string | null;
+  name: string;
+  productName: string;
+  sourceChannel: string;
+  analysisType: AnalysisType;
+  productUrl: string;
+  normalizedUrl: string;
+  platform: string;
+  maxReviews: number;
+  intervalMinutes: number;
+  autoAnalyze: boolean;
+  enabled: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string;
+  lastCrawlJobId: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReportShareDTO {
+  id: string;
+  taskId: string;
+  token: string;
+  title: string;
+  enabled: boolean;
+  viewCount: number;
+  lastViewedAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  shareUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SharedReportDTO {
+  share: {
+    id: string;
+    token: string;
+    title: string;
+    viewCount: number;
+    createdAt: string;
+    expiresAt: string | null;
+  };
+  task: TaskListItem;
+  dashboard: DashboardDTO;
+}
+
 export interface CreateCrawlJobResponse {
   job: CrawlJobDTO;
+}
+
+export interface CreateCrawlMonitorResponse {
+  monitor: CrawlMonitorDTO;
 }
 
 export interface StartCrawlAnalysisResponse {

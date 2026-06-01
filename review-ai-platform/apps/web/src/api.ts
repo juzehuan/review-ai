@@ -8,7 +8,9 @@ import type {
   AppendImportResponse,
   AuthResponseDTO,
   CrawlJobDTO,
+  CrawlMonitorDTO,
   CreateCrawlJobResponse,
+  CreateCrawlMonitorResponse,
   CrawlTaskResponse,
   DashboardDTO,
   ImportTaskResponse,
@@ -16,9 +18,11 @@ import type {
   AnalysisType,
   MemberRole,
   MyWorkspaceDTO,
+  ReportShareDTO,
   ReviewActionItemDTO,
   ReviewRowDTO,
   SavedReviewViewDTO,
+  SharedReportDTO,
   StartCrawlAnalysisResponse,
   TaskListItem,
   WorkspaceAiSettingDTO,
@@ -287,6 +291,53 @@ export async function fetchCrawlJobs() {
   return data;
 }
 
+export async function fetchCrawlMonitors() {
+  const { data } = await api.get<CrawlMonitorDTO[]>("/crawl-monitors");
+  return data;
+}
+
+export async function createCrawlMonitor(payload: {
+  name: string;
+  productName?: string;
+  sourceChannel: string;
+  analysisType: AnalysisType;
+  productUrl: string;
+  maxReviews: number;
+  intervalMinutes: number;
+  autoAnalyze: boolean;
+}) {
+  const { data } = await api.post<CreateCrawlMonitorResponse>("/crawl-monitors", payload);
+  return data.monitor;
+}
+
+export async function updateCrawlMonitor(
+  monitorId: string,
+  payload: Partial<{
+    name: string;
+    productName: string;
+    sourceChannel: string;
+    analysisType: AnalysisType;
+    productUrl: string;
+    maxReviews: number;
+    intervalMinutes: number;
+    autoAnalyze: boolean;
+    enabled: boolean;
+  }>
+) {
+  const { data } = await api.patch<CrawlMonitorDTO>(`/crawl-monitors/${monitorId}`, payload);
+  return data;
+}
+
+export async function runCrawlMonitorNow(monitorId: string) {
+  const { data } = await api.post<CrawlMonitorDTO>(`/crawl-monitors/${monitorId}`);
+  return data;
+}
+
+export async function deleteCrawlMonitor(monitorId: string) {
+  const { data } = await api.delete<{ success: boolean }>(`/crawl-monitors/${monitorId}`);
+  return data;
+}
+
 export async function startCrawlJobAnalysis(jobId: string) {
   const { data } = await api.post<StartCrawlAnalysisResponse>(`/crawl-jobs/${jobId}/start-analysis`, {
     promptVersion: "v2-thai"
@@ -301,6 +352,26 @@ export async function fetchTask(taskId: string) {
 
 export async function fetchDashboard(taskId: string, params?: { runId?: string }) {
   const { data } = await api.get<DashboardDTO>(`/tasks/${taskId}/dashboard`, { params });
+  return data;
+}
+
+export async function fetchTaskReportShares(taskId: string) {
+  const { data } = await api.get<ReportShareDTO[]>(`/tasks/${taskId}/shares`);
+  return data;
+}
+
+export async function createTaskReportShare(taskId: string, payload?: { title?: string; expiresAt?: string | null }) {
+  const { data } = await api.post<ReportShareDTO>(`/tasks/${taskId}/shares`, payload || {});
+  return data;
+}
+
+export async function revokeTaskReportShare(taskId: string, shareId: string) {
+  const { data } = await api.delete<ReportShareDTO>(`/tasks/${taskId}/shares/${shareId}`);
+  return data;
+}
+
+export async function fetchSharedReport(token: string) {
+  const { data } = await api.get<SharedReportDTO>(`/public/reports/${token}`);
   return data;
 }
 

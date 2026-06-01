@@ -6,8 +6,11 @@
   <div v-else class="action-page">
     <div class="page-toolbar action-hero">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">行动项</div>
-        <div class="toolbar-subtitle">{{ selectedTask.name }} · 将评论洞察分派给团队并跟踪处理状态。</div>
+        <div class="panel-label">Action Loop</div>
+        <div class="toolbar-title">行动看板</div>
+        <div class="toolbar-subtitle">
+          {{ selectedTask.name }} · 把评论洞察拆成可分派、可跟进、可复盘的团队行动。
+        </div>
       </div>
       <a-space wrap>
         <a-select v-model:value="statusFilter" class="filter-select" @change="load">
@@ -16,75 +19,100 @@
             {{ item.label }}
           </a-select-option>
         </a-select>
-        <a-button @click="load" :loading="loading">刷新</a-button>
-        <a-button type="primary" @click="openCreate">新建行动项</a-button>
+        <a-button @click="load" :loading="loading">
+          <template #icon><ReloadOutlined /></template>
+          刷新
+        </a-button>
+        <a-button @click="openReport">
+          <template #icon><BarChartOutlined /></template>
+          返回报告
+        </a-button>
+        <a-button type="primary" @click="openCreate">
+          <template #icon><PlusOutlined /></template>
+          新建行动项
+        </a-button>
       </a-space>
     </div>
 
-    <div class="summary-grid">
+    <div class="summary-grid action-summary-grid">
       <div class="stat-card stat-card-primary">
         <div class="stat-label">未处理</div>
         <div class="stat-value">{{ countByStatus("open") }}</div>
+        <div class="stat-note">需要明确负责人和下一步</div>
       </div>
       <div class="stat-card stat-card-accent">
         <div class="stat-label">处理中</div>
         <div class="stat-value">{{ countByStatus("in_progress") }}</div>
+        <div class="stat-note">正在推进的风险或机会</div>
       </div>
       <div class="stat-card stat-card-success">
         <div class="stat-label">已完成</div>
         <div class="stat-value">{{ countByStatus("resolved") }}</div>
+        <div class="stat-note">本轮洞察已闭环</div>
+      </div>
+      <div class="stat-card action-health-card">
+        <div class="stat-label">逾期</div>
+        <div class="stat-value">{{ overdueCount }}</div>
+        <div class="stat-note">超过截止日期且未完成</div>
       </div>
     </div>
 
     <section class="action-board">
-      <a-table row-key="id" :columns="columns" :data-source="items" :loading="loading" :pagination="{ pageSize: 10 }">
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'title'">
-            <div class="action-title-cell">
-              <strong>{{ record.title }}</strong>
-              <span>{{ record.description || "暂无说明" }}</span>
-              <div v-if="record.relatedReviewIds.length" class="action-evidence">
-                关联评论 {{ record.relatedReviewIds.length }} 条
-              </div>
+      <div v-for="column in boardColumns" :key="column.status" class="action-column">
+        <div class="action-column-head">
+          <div>
+            <div class="panel-label">{{ column.kicker }}</div>
+            <div class="settings-section-title">{{ column.label }}</div>
+          </div>
+          <a-tag :color="column.color">{{ column.items.length }}</a-tag>
+        </div>
+
+        <a-empty v-if="!loading && column.items.length === 0" class="action-empty" description="暂无行动项" />
+
+        <div v-else class="action-card-list">
+          <article v-for="item in column.items" :key="item.id" class="action-card">
+            <div class="action-card-top">
+              <a-tag :color="priorityColor(item.priority)">{{ priorityLabel(item.priority) }}</a-tag>
+              <span :class="{ overdue: isOverdue(item.dueAt, item.status) }">{{ formatDate(item.dueAt) }}</span>
             </div>
-          </template>
-          <template v-else-if="column.key === 'priority'">
-            <a-tag :color="priorityColor(record.priority)">{{ priorityLabel(record.priority) }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-select :value="record.status" class="status-select" @change="updateStatus(record, $event)">
-              <a-select-option v-for="item in statusOptions" :key="item.value" :value="item.value">
-                {{ item.label }}
-              </a-select-option>
-            </a-select>
-          </template>
-          <template v-else-if="column.key === 'assignee'">
-            <a-select
-              :value="record.assigneeUserId || undefined"
-              allow-clear
-              class="assignee-select"
-              placeholder="未分派"
-              @change="updateAssignee(record, $event)"
-            >
-              <a-select-option v-for="member in members" :key="member.userId" :value="member.userId">
-                {{ member.user.name }}
-              </a-select-option>
-            </a-select>
-          </template>
-          <template v-else-if="column.key === 'dueAt'">
-            <div :class="{ overdue: isOverdue(record.dueAt, record.status) }">{{ formatDate(record.dueAt) }}</div>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button size="small" @click="openEdit(record)">编辑</a-button>
-              <a-button size="small" @click="openEvidence(record)" :disabled="!record.relatedReviewIds.length">证据</a-button>
-              <a-popconfirm title="确定删除该行动项？" @confirm="removeItem(record)">
+
+            <div class="action-card-title">{{ item.title }}</div>
+            <div class="action-card-desc">{{ item.description || "暂无说明" }}</div>
+
+            <div class="action-card-meta">
+              <span>{{ sourceLabel(item.source) }}</span>
+              <span v-if="item.relatedReviewIds.length">关联 {{ item.relatedReviewIds.length }} 条评论</span>
+            </div>
+
+            <div class="action-card-controls">
+              <a-select :value="item.status" size="small" @change="updateStatus(item, String($event))">
+                <a-select-option v-for="option in statusOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </a-select-option>
+              </a-select>
+              <a-select
+                :value="item.assigneeUserId || undefined"
+                allow-clear
+                size="small"
+                placeholder="负责人"
+                @change="updateAssignee(item, normalizeUserId($event))"
+              >
+                <a-select-option v-for="member in members" :key="member.userId" :value="member.userId">
+                  {{ member.user.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+
+            <div class="action-card-actions">
+              <a-button size="small" @click="openEdit(item)">编辑</a-button>
+              <a-button size="small" :disabled="!item.relatedReviewIds.length" @click="openEvidence(item)">证据</a-button>
+              <a-popconfirm title="确定删除该行动项？" @confirm="removeItem(item)">
                 <a-button size="small" danger>删除</a-button>
               </a-popconfirm>
-            </a-space>
-          </template>
-        </template>
-      </a-table>
+            </div>
+          </article>
+        </div>
+      </div>
     </section>
 
     <a-modal
@@ -98,7 +126,7 @@
     >
       <a-form layout="vertical">
         <a-form-item label="标题">
-          <a-input v-model:value="form.title" placeholder="例如：跟进包装破损问题" />
+          <a-input v-model:value="form.title" placeholder="例如：跟进高频负面反馈" />
         </a-form-item>
         <a-form-item label="说明">
           <a-textarea v-model:value="form.description" :auto-size="{ minRows: 3, maxRows: 6 }" />
@@ -110,20 +138,22 @@
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="优先级">
-          <a-select v-model:value="form.priority">
-            <a-select-option value="high">高</a-select-option>
-            <a-select-option value="medium">中</a-select-option>
-            <a-select-option value="low">低</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select v-model:value="form.status">
-            <a-select-option v-for="item in statusOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
+        <div class="action-form-grid">
+          <a-form-item label="优先级">
+            <a-select v-model:value="form.priority">
+              <a-select-option value="high">高</a-select-option>
+              <a-select-option value="medium">中</a-select-option>
+              <a-select-option value="low">低</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="状态">
+            <a-select v-model:value="form.status">
+              <a-select-option v-for="item in statusOptions" :key="item.value" :value="item.value">
+                {{ item.label }}
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+        </div>
         <a-form-item label="截止日期">
           <a-input v-model:value="form.dueAt" type="date" />
         </a-form-item>
@@ -133,9 +163,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { message } from "ant-design-vue";
+import { BarChartOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons-vue";
 import type { ReviewActionItemDTO, WorkspaceMemberDTO } from "@review-ai/shared";
 import {
   createActionItem,
@@ -174,14 +205,19 @@ const statusOptions = [
   { label: "已归档", value: "archived" }
 ];
 
-const columns = [
-  { title: "行动项", key: "title", width: 360 },
-  { title: "优先级", key: "priority", width: 100 },
-  { title: "状态", key: "status", width: 150 },
-  { title: "负责人", key: "assignee", width: 180 },
-  { title: "截止", key: "dueAt", width: 130 },
-  { title: "操作", key: "action", width: 220 }
-];
+const boardColumns = computed(() =>
+  [
+    { status: "open", label: "未处理", kicker: "Backlog", color: "blue" },
+    { status: "in_progress", label: "处理中", kicker: "Doing", color: "orange" },
+    { status: "resolved", label: "已完成", kicker: "Done", color: "green" }
+  ].map((column) => ({
+    ...column,
+    items: visibleItems.value.filter((item) => item.status === column.status)
+  }))
+);
+
+const visibleItems = computed(() => items.value.filter((item) => item.status !== "archived"));
+const overdueCount = computed(() => allItems.value.filter((item) => isOverdue(item.dueAt, item.status)).length);
 
 function countByStatus(status: string) {
   return allItems.value.filter((item) => item.status === status).length;
@@ -211,9 +247,23 @@ function priorityColor(priority: string) {
   return "orange";
 }
 
+function sourceLabel(source: string) {
+  if (source === "report_issue") {
+    return "来自报告问题";
+  }
+  if (source === "ai") {
+    return "AI 建议";
+  }
+  return "手动创建";
+}
+
+function normalizeUserId(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
 function formatDate(value?: string | null) {
   if (!value) {
-    return "-";
+    return "未设截止";
   }
   return new Date(value).toLocaleDateString();
 }
@@ -275,7 +325,7 @@ function openEdit(item: ReviewActionItemDTO) {
 
 async function submit() {
   if (!selectedTask.value || !form.title.trim()) {
-    message.error("请填写行动项标题");
+    message.error("请填写行动项标题。");
     return;
   }
   saving.value = true;
@@ -293,7 +343,7 @@ async function submit() {
     } else {
       await createActionItem(selectedTask.value.id, payload);
     }
-    message.success("行动项已保存");
+    message.success("行动项已保存。");
     modalOpen.value = false;
     await load();
   } finally {
@@ -301,23 +351,21 @@ async function submit() {
   }
 }
 
-async function updateStatus(item: ReviewActionItemDTO, status: unknown) {
-  if (!selectedTask.value || typeof status !== "string") {
-    return;
-  }
-  await updateActionItem(selectedTask.value.id, item.id, { status });
-  message.success(`已更新为${statusLabel(status)}`);
-  await load();
-}
-
-async function updateAssignee(item: ReviewActionItemDTO, userId: unknown) {
+async function updateStatus(item: ReviewActionItemDTO, status: string) {
   if (!selectedTask.value) {
     return;
   }
-  await updateActionItem(selectedTask.value.id, item.id, {
-    assigneeUserId: typeof userId === "string" ? userId : null
-  });
-  message.success("负责人已更新");
+  await updateActionItem(selectedTask.value.id, item.id, { status });
+  message.success(`已更新为${statusLabel(status)}。`);
+  await load();
+}
+
+async function updateAssignee(item: ReviewActionItemDTO, userId: string | null) {
+  if (!selectedTask.value) {
+    return;
+  }
+  await updateActionItem(selectedTask.value.id, item.id, { assigneeUserId: userId });
+  message.success("负责人已更新。");
   await load();
 }
 
@@ -326,7 +374,7 @@ async function removeItem(item: ReviewActionItemDTO) {
     return;
   }
   await deleteActionItem(selectedTask.value.id, item.id);
-  message.success("行动项已删除");
+  message.success("行动项已删除。");
   await load();
 }
 
@@ -335,6 +383,13 @@ function openEvidence(item: ReviewActionItemDTO) {
     return;
   }
   router.push(`/tasks/${selectedTask.value.id}/reviews`);
+}
+
+function openReport() {
+  if (!selectedTask.value) {
+    return;
+  }
+  router.push(`/tasks/${selectedTask.value.id}/report`);
 }
 
 watch(
@@ -360,41 +415,126 @@ onMounted(load);
 
 <style scoped>
 .action-page {
+  width: min(1480px, 100%);
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .action-hero {
   align-items: center;
-  justify-content: space-between;
+}
+
+.action-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.action-health-card {
+  border-top-color: transparent;
 }
 
 .action-board {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  padding: 16px;
-}
-
-.action-title-cell {
   display: grid;
-  gap: 5px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
 }
 
-.action-title-cell span,
-.action-evidence {
+.action-column {
+  min-height: 520px;
+  padding: 16px;
+  border: 1px solid rgba(116, 139, 174, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px);
+}
+
+.action-column-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.action-card-list {
+  display: grid;
+  gap: 12px;
+}
+
+.action-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(116, 139, 174, 0.18);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(12, 20, 36, 0.08);
+}
+
+.action-card-top,
+.action-card-actions,
+.action-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-card-top span,
+.action-card-meta {
   color: #64748b;
   font-size: 12px;
 }
 
-.status-select,
-.assignee-select {
-  width: 100%;
+.action-card-title {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
+.action-card-desc {
+  min-height: 42px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.action-card-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.action-empty {
+  margin-top: 72px;
+}
+
+.action-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .overdue {
-  color: #dc2626;
-  font-weight: 700;
+  color: #dc2626 !important;
+  font-weight: 800;
+}
+
+@media (max-width: 1280px) {
+  .action-board,
+  .action-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 960px) {
+  .action-card-controls,
+  .action-form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

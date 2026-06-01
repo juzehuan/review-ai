@@ -20,11 +20,66 @@
           <template #icon><ReloadOutlined /></template>
           刷新报告
         </a-button>
+        <a-button type="primary" @click="openShareModal">
+          <template #icon><ShareAltOutlined /></template>
+          分享报告
+        </a-button>
+        <a-button @click="openActionBoard">
+          <template #icon><CheckSquareOutlined /></template>
+          行动看板
+        </a-button>
         <a-tag :color="dashboard?.runId ? 'green' : 'default'">
           {{ dashboard?.runId ? "已生成分析结果" : "等待首次分析" }}
         </a-tag>
       </a-space>
     </div>
+
+    <a-modal
+      :open="showShareModal"
+      title="分享分析报告"
+      width="720px"
+      :footer="null"
+      @cancel="showShareModal = false"
+    >
+      <div class="share-panel">
+        <div class="share-panel-head">
+          <div>
+            <div class="panel-label">Public Link</div>
+            <div class="settings-section-title">只读报告链接</div>
+            <div class="settings-help">外部访问者无需登录，只能查看当前任务的报告汇总和图表。</div>
+          </div>
+          <a-button type="primary" :loading="shareCreating" @click="createShareLink">
+            <template #icon><ShareAltOutlined /></template>
+            生成链接
+          </a-button>
+        </div>
+
+        <a-spin :spinning="shareLoading">
+          <a-empty v-if="shares.length === 0" description="还没有分享链接" />
+          <div v-else class="share-link-list">
+            <article v-for="share in shares" :key="share.id" class="share-link-card" :class="{ disabled: !share.enabled || share.revokedAt }">
+              <div class="share-link-main">
+                <strong>{{ share.title || selectedTask?.productName || selectedTask?.name }}</strong>
+                <a-input :value="share.shareUrl" readonly />
+                <div class="muted">
+                  浏览 {{ share.viewCount }} 次 · 创建于 {{ formatTime(share.createdAt) }}
+                  <span v-if="share.revokedAt"> · 已撤销</span>
+                </div>
+              </div>
+              <a-space wrap>
+                <a-button size="small" :disabled="!share.enabled || Boolean(share.revokedAt)" @click="copyShareLink(share.shareUrl)">
+                  <template #icon><CopyOutlined /></template>
+                  复制
+                </a-button>
+                <a-button size="small" danger :disabled="!share.enabled || Boolean(share.revokedAt)" @click="revokeShareLink(share)">
+                  撤销
+                </a-button>
+              </a-space>
+            </article>
+          </div>
+        </a-spin>
+      </div>
+    </a-modal>
 
     <div class="overview-band">
       <div class="overview-copy">
@@ -130,7 +185,7 @@
       <div class="settings-section-head">
         <div>
           <div class="panel-label">Evidence</div>
-          <div class="settings-section-title">问题证据入口</div>
+          <div class="settings-section-title">问题证据与行动项</div>
         </div>
       </div>
       <div class="evidence-grid">
@@ -139,9 +194,14 @@
             <div class="evidence-title">{{ item.issueName }}</div>
             <div class="muted">{{ item.count }} 条相关评论 · {{ item.sampleReviewIds.length }} 条样本</div>
           </div>
-          <a-button size="small" type="primary" ghost @click="openIssueEvidence(item.issueName)">
-            查看评论证据
-          </a-button>
+          <a-space wrap>
+            <a-button size="small" type="primary" ghost @click="openIssueEvidence(item.issueName)">
+              查看证据
+            </a-button>
+            <a-button size="small" :loading="actionCreatingIssue === item.issueName" @click="createActionFromIssue(item)">
+              生成行动项
+            </a-button>
+          </a-space>
         </article>
       </div>
     </section>
@@ -165,19 +225,23 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { message } from "ant-design-vue";
 import type { EChartsOption } from "echarts";
 import * as echarts from "echarts";
 import {
+  CheckSquareOutlined,
   CheckCircleOutlined,
   CloudUploadOutlined,
+  CopyOutlined,
   DatabaseOutlined,
   ReloadOutlined,
-  RobotOutlined
+  RobotOutlined,
+  ShareAltOutlined
 } from "@ant-design/icons-vue";
 import EChartCard from "@/components/EChartCard.vue";
-import { fetchDashboard } from "@/api";
+import { createActionItem, createTaskReportShare, fetchDashboard, fetchTaskReportShares, revokeTaskReportShare } from "@/api";
 import { useTaskStore } from "@/composables";
-import type { DashboardDTO, Sentiment } from "@review-ai/shared";
+import type { DashboardDTO, ReportShareDTO, Sentiment } from "@review-ai/shared";
 import {
   CHART_COLORS,
   getBarGradient,
@@ -195,7 +259,12 @@ const route = useRoute();
 const router = useRouter();
 const { selectedTask, setSelectedTask } = useTaskStore();
 const dashboard = ref<DashboardDTO | null>(null);
+const shares = ref<ReportShareDTO[]>([]);
 const loading = ref(false);
+const shareLoading = ref(false);
+const shareCreating = ref(false);
+const showShareModal = ref(false);
+const actionCreatingIssue = ref<string | null>(null);
 const gaugeRef = ref<HTMLDivElement | null>(null);
 let timer: ReturnType<typeof setInterval> | null = null;
 let gaugeChart: echarts.ECharts | null = null;
@@ -342,6 +411,7 @@ function renderGauge() {
 async function load() {
   if (!selectedTask.value) {
     dashboard.value = null;
+    shares.value = [];
     return;
   }
 
@@ -351,6 +421,102 @@ async function load() {
     renderGauge();
   } finally {
     loading.value = false;
+  }
+}
+
+function formatTime(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
+}
+
+async function loadShares() {
+  if (!selectedTask.value) {
+    shares.value = [];
+    return;
+  }
+  shareLoading.value = true;
+  try {
+    shares.value = await fetchTaskReportShares(selectedTask.value.id);
+  } finally {
+    shareLoading.value = false;
+  }
+}
+
+async function openShareModal() {
+  if (!selectedTask.value) {
+    message.warning("请先选择分析任务。");
+    return;
+  }
+  showShareModal.value = true;
+  await loadShares();
+}
+
+async function createShareLink() {
+  if (!selectedTask.value) {
+    return;
+  }
+  shareCreating.value = true;
+  try {
+    const share = await createTaskReportShare(selectedTask.value.id, {
+      title: selectedTask.value.productName || selectedTask.value.name
+    });
+    await loadShares();
+    await copyShareLink(share.shareUrl);
+    message.success("分享链接已生成并复制。");
+  } finally {
+    shareCreating.value = false;
+  }
+}
+
+async function copyShareLink(shareUrl: string) {
+  await navigator.clipboard.writeText(shareUrl);
+  message.success("分享链接已复制。");
+}
+
+async function revokeShareLink(share: ReportShareDTO) {
+  if (!selectedTask.value) {
+    return;
+  }
+  const confirmed = window.confirm("确定撤销这个分享链接吗？撤销后外部访问者将无法继续查看。");
+  if (!confirmed) {
+    return;
+  }
+  await revokeTaskReportShare(selectedTask.value.id, share.id);
+  message.success("分享链接已撤销。");
+  await loadShares();
+}
+
+function openActionBoard() {
+  if (!selectedTask.value) {
+    return;
+  }
+  router.push(`/tasks/${selectedTask.value.id}/actions`);
+}
+
+async function createActionFromIssue(issue: DashboardDTO["issues"][number]) {
+  if (!selectedTask.value) {
+    return;
+  }
+  actionCreatingIssue.value = issue.issueName;
+  try {
+    const dueAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    await createActionItem(selectedTask.value.id, {
+      title: `跟进问题：${issue.issueName}`,
+      description: `报告中发现 ${issue.count} 条相关评论。建议定位样本证据、确认影响范围，并安排负责人跟进解决。`,
+      priority: issue.count >= 10 ? "high" : "medium",
+      status: "open",
+      source: "report_issue",
+      runId: dashboard.value?.runId || null,
+      relatedReviewIds: issue.sampleReviewIds,
+      dueAt
+    });
+    message.success("行动项已创建。");
+    router.push(`/tasks/${selectedTask.value.id}/actions`);
+  } finally {
+    actionCreatingIssue.value = null;
   }
 }
 
@@ -522,3 +688,56 @@ onBeforeUnmount(() => {
   gaugeChart?.dispose();
 });
 </script>
+
+<style scoped>
+.share-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.share-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.share-link-list {
+  display: grid;
+  gap: 12px;
+}
+
+.share-link-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(116, 139, 174, 0.2);
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.share-link-card.disabled {
+  opacity: 0.62;
+}
+
+.share-link-main {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.share-link-main strong {
+  color: #0f172a;
+}
+
+@media (max-width: 960px) {
+  .share-panel-head,
+  .share-link-card {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+</style>

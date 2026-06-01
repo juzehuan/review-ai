@@ -8,6 +8,7 @@ import ActionItemsPage from "./pages/ActionItemsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
 import LoginPage from "./pages/LoginPage.vue";
 import RegisterPage from "./pages/RegisterPage.vue";
+import SharedReportPage from "./pages/SharedReportPage.vue";
 import WorkspaceSettingsPage from "./pages/WorkspaceSettingsPage.vue";
 import { getAuthToken } from "./api";
 
@@ -16,6 +17,7 @@ export const router = createRouter({
   routes: [
     { path: "/login", component: LoginPage, meta: { public: true } },
     { path: "/register", component: RegisterPage, meta: { public: true } },
+    { path: "/share/:token", component: SharedReportPage, meta: { public: true } },
     { path: "/", redirect: "/dashboard" },
     { path: "/dashboard", component: WorkspaceOverviewPage },
     { path: "/tasks/:taskId/report", component: DashboardPage },
@@ -40,7 +42,7 @@ router.beforeEach((to) => {
     return "/login";
   }
 
-  if (to.meta.public && getAuthToken()) {
+  if ((to.path === "/login" || to.path === "/register") && getAuthToken()) {
     return "/dashboard";
   }
 

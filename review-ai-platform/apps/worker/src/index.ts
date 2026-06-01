@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { Worker } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import { OpenAI } from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
@@ -21,6 +21,8 @@ import Redis from "ioredis";
 
 const redisUrl = process.env.REDIS_URL || "redis://127.0.0.1:6379";
 const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
+const analysisQueue = new Queue("analysis-runs", { connection });
+const crawlQueue = new Queue("crawl-jobs", { connection });
 const CRAWLER_CHANNELS = new Set<CrawlerChannel>(["api_exporter", "api_basic", "browser_intercept"]);
 
 type CrawlResult = {
@@ -254,8 +256,37 @@ async function loadAiSetting(taskId: string): Promise<ResolvedAiSetting> {
     where: { id: taskId },
     include: { workspace: { include: { aiSetting: true } } }
   });
-  const setting = task?.workspace?.aiSetting || null;
-  const analysisType = ((task?.analysisType as AnalysisType | null) || "product");
+  return resolveAiSetting(task?.workspace?.aiSetting || null, ((task?.analysisType as AnalysisType | null) || "product"));
+}
+
+async function loadAiSettingForWorkspace(workspaceId: string, analysisType: AnalysisType): Promise<ResolvedAiSetting> {
+  const setting = await prisma.workspaceAiSetting.findUnique({
+    where: { workspaceId }
+  });
+  return resolveAiSetting(setting, analysisType);
+}
+
+function resolveAiSetting(
+  setting: {
+    provider: string;
+    apiKey: string | null;
+    baseUrl: string | null;
+    modelName: string;
+    promptVersion: string;
+    systemPrompt: string;
+    userPromptTemplate: string;
+    summaryPrompt: string;
+    insightsPrompt: string;
+    videoUserPromptTemplate: string;
+    videoSummaryPrompt: string;
+    videoInsightsPrompt: string;
+    tweetUserPromptTemplate: string;
+    tweetSummaryPrompt: string;
+    tweetInsightsPrompt: string;
+    temperature: number;
+  } | null,
+  analysisType: AnalysisType
+): ResolvedAiSetting {
   const profile = getAnalysisPromptProfile(analysisType);
   const provider = setting?.provider || process.env.AI_PROVIDER || "openai";
   const promptProfile =
@@ -1018,13 +1049,344 @@ worker.on("failed", async (job, error) => {
   }
 });
 
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
+function parseOptionalDate(value: unknown) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function readString(row: Record<string, unknown>, key: string) {
+  return String(row[key] || "").trim();
+}
+
+function normalizeCrawlRow(row: Record<string, unknown>, fallback: { shopId: string; itemId: string }) {
+  const cmtId = readString(row, "cmtId") || readString(row, "cmtid");
+  const comment = readString(row, "comment");
+  const commentTr = readString(row, "commentTr") || readString(row, "comment_tr") || null;
+  const ratingStar = Number(row.ratingStar ?? row.rating_star ?? row.rating ?? 0);
+  if (!cmtId || (!comment && !commentTr)) {
+    return null;
+  }
+
+  return {
+    cmtId,
+    shopId: readString(row, "shopId") || readString(row, "shopid") || fallback.shopId,
+    itemId: readString(row, "itemId") || readString(row, "itemid") || fallback.itemId,
+    ratingStar: Number.isFinite(ratingStar) ? ratingStar : 0,
+    comment: comment || commentTr || "",
+    commentTr,
+    modelName: readString(row, "modelName") || readString(row, "model_name") || null,
+    hasMedia: Boolean(row.hasMedia ?? row.has_media),
+    commentTime: parseOptionalDate(row.commentTime ?? row.ctime_iso),
+    rawJson: row
+  };
+}
+
+async function autoImportAndAnalyzeFromMonitor(
+  crawlJob: NonNullable<Awaited<ReturnType<typeof prisma.crawlJob.findUnique>>> & {
+    monitor?: {
+      id: string;
+      workspaceId: string;
+      taskId: string | null;
+      name: string;
+      productName: string;
+      sourceChannel: string;
+      analysisType: string;
+      autoAnalyze: boolean;
+    } | null;
+  },
+  result: CrawlResult
+) {
+  const monitor = crawlJob.monitor;
+  if (!monitor?.autoAnalyze) {
+    return;
+  }
+
+  const fallback = {
+    shopId: result.shopId || crawlJob.platform,
+    itemId: result.itemId || crawlJob.normalizedUrl
+  };
+  const seen = new Set<string>();
+  const normalizedRows = result.rows
+    .map((row) => normalizeCrawlRow(row, fallback))
+    .filter((row): row is NonNullable<ReturnType<typeof normalizeCrawlRow>> => Boolean(row))
+    .filter((row) => {
+      if (seen.has(row.cmtId)) {
+        return false;
+      }
+      seen.add(row.cmtId);
+      return true;
+    });
+
+  if (!normalizedRows.length) {
+    await prisma.crawlMonitor.update({
+      where: { id: monitor.id },
+      data: { lastError: "本次采集没有可导入的新评论" }
+    });
+    return;
+  }
+
+  const existingTask = monitor.taskId
+    ? await prisma.task.findFirst({ where: { id: monitor.taskId, workspaceId: monitor.workspaceId } })
+    : null;
+  const existingIds = existingTask
+    ? new Set(
+        await prisma.review
+          .findMany({
+            where: {
+              taskId: existingTask.id,
+              cmtId: { in: normalizedRows.map((row) => row.cmtId) }
+            },
+            select: { cmtId: true }
+          })
+          .then((rows) => rows.map((row) => row.cmtId))
+      )
+    : new Set<string>();
+  const rowsToCreate = normalizedRows.filter((row) => !existingIds.has(row.cmtId));
+  const skippedDuplicate = normalizedRows.length - rowsToCreate.length;
+
+  if (!rowsToCreate.length && existingTask) {
+    await prisma.crawlJob.update({
+      where: { id: crawlJob.id },
+      data: { status: "imported", importedRows: 0, skippedDuplicate }
+    });
+    await prisma.crawlMonitor.update({
+      where: { id: monitor.id },
+      data: { taskId: existingTask.id, lastError: null }
+    });
+    return;
+  }
+
+  const subscription = await prisma.subscription.findUnique({ where: { workspaceId: monitor.workspaceId } });
+  if (subscription && subscription.currentPeriodReviewCount + rowsToCreate.length > subscription.monthlyReviewLimit) {
+    await prisma.crawlMonitor.update({
+      where: { id: monitor.id },
+      data: { lastError: "评论额度不足，监听任务已暂停自动导入" }
+    });
+    await prisma.crawlJob.update({
+      where: { id: crawlJob.id },
+      data: { lastError: "评论额度不足，无法自动导入" }
+    });
+    return;
+  }
+  if (subscription && subscription.currentPeriodRunCount + 1 > subscription.monthlyRunLimit) {
+    await prisma.crawlMonitor.update({
+      where: { id: monitor.id },
+      data: { lastError: "分析次数额度不足，监听任务已暂停自动分析" }
+    });
+    await prisma.crawlJob.update({
+      where: { id: crawlJob.id },
+      data: { lastError: "分析次数额度不足，无法自动分析" }
+    });
+    return;
+  }
+
+  const aiSetting = existingTask
+    ? await loadAiSetting(existingTask.id)
+    : await loadAiSettingForWorkspace(monitor.workspaceId, monitor.analysisType as AnalysisType);
+  if (process.env.ENABLE_MOCK_AI !== "true" && !aiSetting.apiKey) {
+    await prisma.crawlMonitor.update({
+      where: { id: monitor.id },
+      data: { lastError: "AI API Key 未配置，无法自动分析" }
+    });
+    return;
+  }
+
+  const transactionResult = await prisma.$transaction(async (tx) => {
+    let task = existingTask;
+    if (!task) {
+      task = await tx.task.create({
+        data: {
+          workspaceId: monitor.workspaceId,
+          name: monitor.name,
+          productName: monitor.productName || result.productName || monitor.name,
+          shopId: fallback.shopId,
+          itemId: fallback.itemId,
+          sourceChannel: monitor.sourceChannel,
+          analysisType: monitor.analysisType,
+          status: "imported"
+        }
+      });
+    }
+
+    const importRecord = await tx.importRecord.create({
+      data: {
+        taskId: task.id,
+        filename: crawlJob.normalizedUrl,
+        rawContent: Buffer.from(JSON.stringify(result)).toString("base64"),
+        rowCount: result.rows.length,
+        status: "completed"
+      }
+    });
+
+    const inserted = await tx.review.createMany({
+      data: rowsToCreate.map((row) => ({
+        taskId: task.id,
+        importId: importRecord.id,
+        cmtId: row.cmtId,
+        shopId: row.shopId || task!.shopId,
+        itemId: row.itemId || task!.itemId,
+        ratingStar: row.ratingStar,
+        comment: row.comment,
+        commentTr: row.commentTr,
+        modelName: row.modelName,
+        hasMedia: row.hasMedia,
+        commentTime: row.commentTime,
+        sourceChannel: monitor.sourceChannel,
+        rawJson: row.rawJson as Prisma.InputJsonValue
+      })),
+      skipDuplicates: true
+    });
+
+    await tx.subscription.update({
+      where: { workspaceId: monitor.workspaceId },
+      data: {
+        currentPeriodReviewCount: { increment: inserted.count },
+        currentPeriodRunCount: { increment: 1 }
+      }
+    });
+
+    const reviewCount = await tx.review.count({ where: { taskId: task.id } });
+    const run = await tx.analysisRun.create({
+      data: {
+        taskId: task.id,
+        provider: aiSetting.provider,
+        modelName: aiSetting.modelName,
+        promptVersion: aiSetting.promptVersion,
+        status: "queued",
+        reviewCount
+      }
+    });
+
+    await tx.analysisRunLog.create({
+      data: {
+        runId: run.id,
+        level: "info",
+        message: "Analysis run queued from crawl monitor",
+        meta: { crawlJobId: crawlJob.id, monitorId: monitor.id, insertedRows: inserted.count }
+      }
+    });
+
+    await tx.task.update({
+      where: { id: task.id },
+      data: { status: "analyzing" }
+    });
+
+    await tx.crawlJob.update({
+      where: { id: crawlJob.id },
+      data: {
+        taskId: task.id,
+        status: "imported",
+        importedRows: inserted.count,
+        skippedDuplicate
+      }
+    });
+
+    await tx.crawlMonitor.update({
+      where: { id: monitor.id },
+      data: {
+        taskId: task.id,
+        lastCrawlJobId: crawlJob.id,
+        lastError: null
+      }
+    });
+
+    return { run, taskId: task.id };
+  });
+
+  await analysisQueue.add("run-analysis", {
+    runId: transactionResult.run.id,
+    taskId: transactionResult.taskId,
+    workspaceId: monitor.workspaceId
+  });
+}
+
+async function scheduleDueCrawlMonitors() {
+  const now = new Date();
+  const dueMonitors = await prisma.crawlMonitor.findMany({
+    where: {
+      enabled: true,
+      nextRunAt: { lte: now }
+    },
+    orderBy: { nextRunAt: "asc" },
+    take: 20
+  });
+
+  for (const monitor of dueMonitors) {
+    try {
+      const nextRunAt = addMinutes(now, monitor.intervalMinutes);
+      const locked = await prisma.crawlMonitor.updateMany({
+        where: {
+          id: monitor.id,
+          enabled: true,
+          nextRunAt: { lte: now }
+        },
+        data: {
+          lastRunAt: now,
+          nextRunAt,
+          lastError: null
+        }
+      });
+      if (!locked.count) {
+        continue;
+      }
+
+      const crawlJob = await prisma.crawlJob.create({
+        data: {
+          workspaceId: monitor.workspaceId,
+          taskId: monitor.taskId,
+          monitorId: monitor.id,
+          name: monitor.name,
+          productName: monitor.productName,
+          sourceChannel: monitor.sourceChannel,
+          analysisType: monitor.analysisType,
+          productUrl: monitor.productUrl,
+          normalizedUrl: monitor.normalizedUrl,
+          platform: monitor.platform,
+          maxReviews: monitor.maxReviews,
+          crawlChannels: "browser_intercept",
+          status: "queued",
+          progress: 0,
+          rawResult: Prisma.JsonNull
+        }
+      });
+
+      await prisma.crawlMonitor.update({
+        where: { id: monitor.id },
+        data: { lastCrawlJobId: crawlJob.id }
+      });
+
+      await crawlQueue.add("run-crawl", {
+        crawlJobId: crawlJob.id,
+        workspaceId: monitor.workspaceId,
+        monitorId: monitor.id
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await prisma.crawlMonitor.update({
+        where: { id: monitor.id },
+        data: {
+          lastError: message,
+          nextRunAt: addMinutes(now, Math.max(monitor.intervalMinutes, 15))
+        }
+      });
+    }
+  }
+}
+
 const crawlWorker = new Worker(
   "crawl-jobs",
   async (job) => {
     const crawlJobId = String(job.data.crawlJobId || "");
     const crawlJob = await prisma.crawlJob.findUnique({
       where: { id: crawlJobId },
-      include: { workspace: { include: { crawlerSetting: true } } }
+      include: { workspace: { include: { crawlerSetting: true } }, monitor: true }
     });
     if (!crawlJob) {
       throw new Error(`Crawl job ${crawlJobId} not found`);
@@ -1081,6 +1443,19 @@ const crawlWorker = new Worker(
           lastError: null
         }
       });
+      if (crawlJob.monitorId) {
+        await autoImportAndAnalyzeFromMonitor(crawlJob, result).catch(async (error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          await prisma.crawlMonitor.update({
+            where: { id: crawlJob.monitorId! },
+            data: { lastError: message }
+          });
+          await prisma.crawlJob.update({
+            where: { id: crawlJob.id },
+            data: { lastError: message }
+          });
+        });
+      }
       return { fetchedRows: result.rows.length };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1106,5 +1481,13 @@ crawlWorker.on("completed", (job) => {
 crawlWorker.on("failed", (job, error) => {
   console.error(`Crawl job ${job?.id} failed`, error);
 });
+
+const crawlMonitorScanIntervalMs = Number(process.env.CRAWL_MONITOR_SCAN_INTERVAL_MS || 60000);
+setTimeout(() => {
+  scheduleDueCrawlMonitors().catch((error) => console.error("Crawl monitor scheduler failed", error));
+}, 5000);
+setInterval(() => {
+  scheduleDueCrawlMonitors().catch((error) => console.error("Crawl monitor scheduler failed", error));
+}, Number.isFinite(crawlMonitorScanIntervalMs) ? crawlMonitorScanIntervalMs : 60000);
 
 console.log("Analysis and crawl workers started");

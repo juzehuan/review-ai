@@ -69,6 +69,7 @@ model User {
   assignedActionItems ReviewActionItem[] @relation("ActionItemAssignee")
   createdInviteCodes InviteCode[] @relation("InviteCodeCreator")
   usedInviteCode      InviteCode?  @relation("InviteCodeUser")
+  createdReportShares ReportShare[] @relation("ReportShareCreator")
 
   @@map("user_account")
 }
@@ -117,6 +118,8 @@ model Workspace {
   aiSetting      WorkspaceAiSetting?
   crawlerSetting WorkspaceCrawlerSetting?
   crawlJobs      CrawlJob[]
+  crawlMonitors  CrawlMonitor[]
+  reportShares   ReportShare[]
 
   @@map("workspace")
 }
@@ -212,15 +215,41 @@ model Task {
   savedViews      SavedReviewView[]
   actionItems     ReviewActionItem[]
   crawlJobs       CrawlJob[]
+  crawlMonitors   CrawlMonitor[]
+  reportShares    ReportShare[]
 
   @@index([workspaceId])
   @@map("task")
+}
+
+model ReportShare {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  taskId          String    @map("task_id")
+  token           String    @unique
+  title           String    @default("")
+  enabled         Boolean   @default(true)
+  viewCount       Int       @default(0) @map("view_count")
+  lastViewedAt    DateTime? @map("last_viewed_at")
+  expiresAt       DateTime? @map("expires_at")
+  revokedAt       DateTime? @map("revoked_at")
+  createdByUserId String    @map("created_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdBy       User      @relation("ReportShareCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, taskId, enabled])
+  @@index([createdAt])
+  @@map("report_share")
 }
 
 model CrawlJob {
   id                String         @id @default(cuid())
   workspaceId       String         @map("workspace_id")
   taskId            String?        @map("task_id")
+  monitorId         String?        @map("monitor_id")
   name              String
   productName       String         @default("") @map("product_name")
   sourceChannel     String         @map("source_channel")
@@ -245,10 +274,42 @@ model CrawlJob {
   finishedAt        DateTime?      @map("finished_at")
   workspace         Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   task              Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  monitor           CrawlMonitor?  @relation(fields: [monitorId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, createdAt])
+  @@index([monitorId, createdAt])
   @@index([status])
   @@map("crawl_job")
+}
+
+model CrawlMonitor {
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
+  taskId         String?   @map("task_id")
+  name           String
+  productName    String    @default("") @map("product_name")
+  sourceChannel  String    @map("source_channel")
+  analysisType   String    @default("video") @map("analysis_type")
+  productUrl     String    @map("product_url")
+  normalizedUrl  String    @map("normalized_url")
+  platform       String
+  maxReviews     Int       @default(0) @map("max_reviews")
+  intervalMinutes Int      @default(360) @map("interval_minutes")
+  autoAnalyze    Boolean   @default(true) @map("auto_analyze")
+  enabled        Boolean   @default(true)
+  lastRunAt      DateTime? @map("last_run_at")
+  nextRunAt      DateTime  @default(now()) @map("next_run_at")
+  lastCrawlJobId String?   @map("last_crawl_job_id")
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task           Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  crawlJobs      CrawlJob[]
+
+  @@index([workspaceId, enabled, nextRunAt])
+  @@index([taskId])
+  @@map("crawl_monitor")
 }
 
 model SavedReviewView {
