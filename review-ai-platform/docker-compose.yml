@@ -30,6 +30,10 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
+        PLAYWRIGHT_DOWNLOAD_HOST: ${PLAYWRIGHT_DOWNLOAD_HOST:-https://npmmirror.com/mirrors/playwright}
     environment:
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/review_ai}
       DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin}
@@ -48,6 +52,10 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
+        PLAYWRIGHT_DOWNLOAD_HOST: ${PLAYWRIGHT_DOWNLOAD_HOST:-https://npmmirror.com/mirrors/playwright}
     environment:
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/review_ai}
       REDIS_URL: ${APP_REDIS_URL:-redis://redis:6379}

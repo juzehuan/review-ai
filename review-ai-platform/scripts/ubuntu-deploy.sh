@@ -16,6 +16,8 @@ set -Eeuo pipefail
 #   WEB_PORT=8080 API_PORT=3999 POSTGRES_PORT=15432 REDIS_PORT=16379
 #   POSTGRES_IMAGE=postgres:16 REDIS_IMAGE=redis:7
 #   DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
+#   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+#   PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
 #   USE_EXTERNAL_POSTGRES=true EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db
 #   USE_EXTERNAL_REDIS=true EXTERNAL_REDIS_URL=redis://host:6379
 
@@ -84,6 +86,11 @@ Images:
 Docker registry mirrors:
   DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
   DISABLE_DOCKER_MIRRORS=true
+
+Python mirrors:
+  PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+  PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+  PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
 EOF
 }
 
@@ -309,6 +316,9 @@ ensure_env() {
   env_set_if_empty POSTGRES_USER "postgres"
   env_set_if_empty POSTGRES_IMAGE "${POSTGRES_IMAGE:-postgres:16}"
   env_set_if_empty REDIS_IMAGE "${REDIS_IMAGE:-redis:7}"
+  env_set_if_empty PIP_INDEX_URL "${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+  env_set_if_empty PIP_TRUSTED_HOST "${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}"
+  env_set_if_empty PLAYWRIGHT_DOWNLOAD_HOST "${PLAYWRIGHT_DOWNLOAD_HOST:-https://npmmirror.com/mirrors/playwright}"
   env_set_if_empty POSTGRES_PORT "${POSTGRES_PORT:-15432}"
   env_set_if_empty REDIS_PORT "${REDIS_PORT:-16379}"
   env_set_if_empty_or_legacy API_PORT "${API_PORT:-3999}" "3001"

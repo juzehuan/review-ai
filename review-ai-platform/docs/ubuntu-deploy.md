@@ -52,6 +52,9 @@ API_PORT=3999
 POSTGRES_IMAGE=postgres:16
 REDIS_IMAGE=redis:7
 DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
+PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
 POSTGRES_PORT=15432
 REDIS_PORT=16379
 ```
@@ -94,6 +97,25 @@ sudo DISABLE_DOCKER_MIRRORS=true bash scripts/ubuntu-deploy.sh deploy
 ```
 
 仍然拉取失败时，也可以把 `POSTGRES_IMAGE`、`REDIS_IMAGE` 写入 `.env`，换成你服务器能访问的私有仓库镜像。
+
+## Python 和 Playwright 换源
+
+API 镜像构建时会安装 Python 爬虫依赖，并下载 Playwright Chromium。脚本默认使用国内源：
+
+```bash
+PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
+```
+
+也可以部署时覆盖：
+
+```bash
+sudo PIP_INDEX_URL='https://mirrors.aliyun.com/pypi/simple/' \
+  PIP_TRUSTED_HOST='mirrors.aliyun.com' \
+  PLAYWRIGHT_DOWNLOAD_HOST='https://npmmirror.com/mirrors/playwright' \
+  bash scripts/ubuntu-deploy.sh deploy
+```
 
 备份文件默认保存在：
 

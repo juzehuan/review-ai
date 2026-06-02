@@ -1,8 +1,15 @@
 FROM node:24-bookworm-slim AS runner
 WORKDIR /app
 
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+ARG PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
+
 ENV SCRAPLING_PYTHON_BIN=/opt/review-ai-crawler/bin/python
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+ENV PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
+ENV PLAYWRIGHT_DOWNLOAD_HOST=${PLAYWRIGHT_DOWNLOAD_HOST}
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -14,7 +21,8 @@ RUN apt-get update \
 
 RUN python3 -m venv /opt/review-ai-crawler
 COPY apps/crawler/requirements.txt /tmp/crawler-requirements.txt
-RUN /opt/review-ai-crawler/bin/pip install --no-cache-dir -r /tmp/crawler-requirements.txt \
+RUN /opt/review-ai-crawler/bin/pip install --no-cache-dir --upgrade pip setuptools wheel \
+  && /opt/review-ai-crawler/bin/pip install --no-cache-dir -r /tmp/crawler-requirements.txt \
   && /opt/review-ai-crawler/bin/python -m playwright install --with-deps chromium
 
 RUN corepack enable
