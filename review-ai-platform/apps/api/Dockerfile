@@ -3,17 +3,20 @@ WORKDIR /app
 
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 ARG PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
-ARG PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
 
 ENV SCRAPLING_PYTHON_BIN=/opt/review-ai-crawler/bin/python
+ENV SCRAPLING_CHROMIUM_EXECUTABLE=/usr/bin/chromium
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 ENV PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
-ENV PLAYWRIGHT_DOWNLOAD_HOST=${PLAYWRIGHT_DOWNLOAD_HOST}
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
+    chromium \
+    fonts-noto-cjk \
+    fonts-noto-color-emoji \
     python3 \
     python3-pip \
     python3-venv \
@@ -22,8 +25,7 @@ RUN apt-get update \
 RUN python3 -m venv /opt/review-ai-crawler
 COPY apps/crawler/requirements.txt /tmp/crawler-requirements.txt
 RUN /opt/review-ai-crawler/bin/pip install --no-cache-dir --upgrade pip setuptools wheel \
-  && /opt/review-ai-crawler/bin/pip install --no-cache-dir -r /tmp/crawler-requirements.txt \
-  && /opt/review-ai-crawler/bin/python -m playwright install --with-deps chromium
+  && /opt/review-ai-crawler/bin/pip install --no-cache-dir -r /tmp/crawler-requirements.txt
 
 RUN corepack enable
 COPY package.json pnpm-workspace.yaml tsconfig.base.json ./

@@ -33,7 +33,6 @@ services:
       args:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
         PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
-        PLAYWRIGHT_DOWNLOAD_HOST: ${PLAYWRIGHT_DOWNLOAD_HOST:-https://npmmirror.com/mirrors/playwright}
     environment:
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/review_ai}
       DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin}
@@ -55,7 +54,6 @@ services:
       args:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
         PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
-        PLAYWRIGHT_DOWNLOAD_HOST: ${PLAYWRIGHT_DOWNLOAD_HOST:-https://npmmirror.com/mirrors/playwright}
     environment:
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/review_ai}
       REDIS_URL: ${APP_REDIS_URL:-redis://redis:6379}
@@ -70,6 +68,7 @@ services:
       ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
       SCRAPLING_ENABLED: ${SCRAPLING_ENABLED:-true}
       SCRAPLING_PYTHON_BIN: /opt/review-ai-crawler/bin/python
+      SCRAPLING_CHROMIUM_EXECUTABLE: ${SCRAPLING_CHROMIUM_EXECUTABLE:-/usr/bin/chromium}
       SCRAPLING_PROXY: ${SCRAPLING_PROXY:-}
       SCRAPLING_CHANNELS: ${SCRAPLING_CHANNELS:-browser_intercept}
       SCRAPLING_DEFAULT_SOURCE: ${SCRAPLING_DEFAULT_SOURCE:-YouTube}

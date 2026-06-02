@@ -51,6 +51,13 @@ FACEBOOK_HOSTS = {"facebook.com", "www.facebook.com", "m.facebook.com", "web.fac
 NESTED_URL_PARAM_NAMES = ("url", "u", "q", "target", "redirect", "redirect_url")
 
 
+def apply_dynamic_fetcher_defaults(fetch_kwargs: dict[str, Any]) -> dict[str, Any]:
+    executable_path = os.getenv("SCRAPLING_CHROMIUM_EXECUTABLE") or os.getenv("PLAYWRIGHT_CHROMIUM_EXECUTABLE")
+    if executable_path:
+        fetch_kwargs.setdefault("executable_path", executable_path)
+    return fetch_kwargs
+
+
 def coerce_url(value: str) -> str:
     url = str(value or "").strip()
     if url.startswith("//"):
@@ -617,6 +624,7 @@ def fetch_browser_intercept_reviews(product_url: str, max_reviews: int, proxy: s
     if proxy:
         fetch_kwargs["proxy"] = proxy
 
+    apply_dynamic_fetcher_defaults(fetch_kwargs)
     DynamicFetcher.fetch(product_url, **fetch_kwargs)
     rows = list(rows_by_id.values())[:max_reviews]
     return {
@@ -971,6 +979,7 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
     if proxy:
         fetch_kwargs["proxy"] = proxy
 
+    apply_dynamic_fetcher_defaults(fetch_kwargs)
     DynamicFetcher.fetch(video_url, **fetch_kwargs)
     rows = list(comments_by_id.values())
     if max_reviews > 0:
@@ -1207,6 +1216,7 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
     if proxy:
         fetch_kwargs["proxy"] = proxy
 
+    apply_dynamic_fetcher_defaults(fetch_kwargs)
     DynamicFetcher.fetch(video_url, **fetch_kwargs)
     rows = list(comments_by_id.values())[:max_reviews]
     return {
@@ -1419,6 +1429,7 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
     if proxy:
         fetch_kwargs["proxy"] = proxy
 
+    apply_dynamic_fetcher_defaults(fetch_kwargs)
     DynamicFetcher.fetch(post_url, **fetch_kwargs)
     rows = list(comments_by_id.values())
     if max_reviews > 0:
