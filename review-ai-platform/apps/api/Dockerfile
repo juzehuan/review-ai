@@ -1,6 +1,8 @@
 FROM node:24-bookworm-slim AS runner
 WORKDIR /app
 
+ARG APT_MIRROR=http://mirrors.aliyun.com/debian
+ARG APT_SECURITY_MIRROR=http://mirrors.aliyun.com/debian-security
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 ARG PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 
@@ -11,12 +13,11 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 ENV PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
 
-RUN apt-get update \
+RUN sed -i "s|http://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g; s|http://deb.debian.org/debian|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
+  && apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     chromium \
-    fonts-noto-cjk \
-    fonts-noto-color-emoji \
     python3 \
     python3-pip \
     python3-venv \

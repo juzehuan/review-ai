@@ -52,6 +52,8 @@ API_PORT=3999
 POSTGRES_IMAGE=postgres:16
 REDIS_IMAGE=redis:7
 DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
+APT_MIRROR=http://mirrors.aliyun.com/debian
+APT_SECURITY_MIRROR=http://mirrors.aliyun.com/debian-security
 PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
@@ -100,15 +102,17 @@ sudo DISABLE_DOCKER_MIRRORS=true bash scripts/ubuntu-deploy.sh deploy
 
 ## Python 和 Playwright 换源
 
-API 镜像构建时会安装 Python 爬虫依赖。浏览器不再从 Playwright CDN 下载，镜像内会通过 Debian 包安装系统 Chromium，并默认使用：
+API 镜像构建时会安装系统 Chromium 和 Python 爬虫依赖。浏览器不再从 Playwright CDN 下载，镜像内会通过 Debian 包安装系统 Chromium，并默认使用：
 
 ```bash
 SCRAPLING_CHROMIUM_EXECUTABLE=/usr/bin/chromium
 ```
 
-Python 依赖默认使用国内源：
+apt 和 Python 依赖默认使用国内源：
 
 ```bash
+APT_MIRROR=http://mirrors.aliyun.com/debian
+APT_SECURITY_MIRROR=http://mirrors.aliyun.com/debian-security
 PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 ```
@@ -116,7 +120,9 @@ PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 也可以部署时覆盖：
 
 ```bash
-sudo PIP_INDEX_URL='https://mirrors.aliyun.com/pypi/simple/' \
+sudo APT_MIRROR='http://mirrors.aliyun.com/debian' \
+  APT_SECURITY_MIRROR='http://mirrors.aliyun.com/debian-security' \
+  PIP_INDEX_URL='https://mirrors.aliyun.com/pypi/simple/' \
   PIP_TRUSTED_HOST='mirrors.aliyun.com' \
   bash scripts/ubuntu-deploy.sh deploy
 ```
