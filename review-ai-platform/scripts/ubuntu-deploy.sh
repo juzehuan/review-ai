@@ -13,7 +13,7 @@ set -Eeuo pipefail
 #   APP_DIR=/opt/review-ai-platform
 #   REPO_URL=https://github.com/juzehuan/review-ai.git
 #   DEPLOY_BRANCH=codex/saas-analysis-core
-#   WEB_PORT=8080 API_PORT=3999 POSTGRES_PORT=15432 REDIS_PORT=16379
+#   WEB_PORT=6666 API_PORT=6667 POSTGRES_PORT=15432 REDIS_PORT=16379
 #   POSTGRES_IMAGE=postgres:16 REDIS_IMAGE=redis:7
 #   DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
 #   APT_MIRROR=http://mirrors.aliyun.com/debian
@@ -249,12 +249,20 @@ env_set_if_empty() {
 env_set_if_empty_or_legacy() {
   local key="$1"
   local value="$2"
-  local legacy="$3"
+  shift 2
   local current
   current="$(env_get "${key}")"
-  if [[ -z "${current}" || "${current}" == "${legacy}" ]]; then
+  if [[ -z "${current}" ]]; then
     env_set "${key}" "${value}"
+    return
   fi
+  local legacy
+  for legacy in "$@"; do
+    if [[ "${current}" == "${legacy}" ]]; then
+      env_set "${key}" "${value}"
+      return
+    fi
+  done
 }
 
 is_true() {
@@ -326,8 +334,8 @@ ensure_env() {
   env_set_if_empty PIP_TRUSTED_HOST "${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}"
   env_set_if_empty POSTGRES_PORT "${POSTGRES_PORT:-15432}"
   env_set_if_empty REDIS_PORT "${REDIS_PORT:-16379}"
-  env_set_if_empty_or_legacy API_PORT "${API_PORT:-3999}" "3001"
-  env_set_if_empty_or_legacy WEB_PORT "${WEB_PORT:-8080}" "5173"
+  env_set_if_empty_or_legacy API_PORT "${API_PORT:-6667}" "3001" "3999"
+  env_set_if_empty_or_legacy WEB_PORT "${WEB_PORT:-6666}" "5173" "8080"
   env_set_if_empty USE_EXTERNAL_POSTGRES "false"
   env_set_if_empty USE_EXTERNAL_REDIS "false"
 

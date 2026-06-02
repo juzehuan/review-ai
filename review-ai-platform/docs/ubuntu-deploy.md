@@ -47,8 +47,8 @@ bash scripts/ubuntu-deploy.sh restore /opt/review-ai-platform/backups/review-ai-
 APP_DIR=/opt/review-ai-platform
 REPO_URL=https://github.com/juzehuan/review-ai.git
 DEPLOY_BRANCH=codex/saas-analysis-core
-WEB_PORT=8080
-API_PORT=3999
+WEB_PORT=6666
+API_PORT=6667
 POSTGRES_IMAGE=postgres:16
 REDIS_IMAGE=redis:7
 DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
