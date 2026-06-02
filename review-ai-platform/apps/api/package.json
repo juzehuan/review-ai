@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -H 127.0.0.1 -p 6667",
+    "dev": "next dev -H 127.0.0.1 -p 8002",
     "build": "next build",
     "start": "next start -p 3001",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",

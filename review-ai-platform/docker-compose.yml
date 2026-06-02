@@ -83,7 +83,7 @@ services:
       SHOPEE_COOKIE: ${SHOPEE_COOKIE:-}
       PORT: 3001
     ports:
-      - "${API_PORT:-6667}:3001"
+      - "${API_PORT:-8002}:3001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -132,7 +132,7 @@ services:
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     ports:
-      - "${WEB_PORT:-6666}:80"
+      - "${WEB_PORT:-8001}:80"
     depends_on:
       api:
         condition: service_healthy
