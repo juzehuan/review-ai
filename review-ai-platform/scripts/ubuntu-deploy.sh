@@ -17,6 +17,7 @@ set -Eeuo pipefail
 #   POSTGRES_IMAGE=postgres:16 REDIS_IMAGE=redis:7
 #   DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
 #   APT_MIRROR=http://mirrors.aliyun.com/debian
+#   NPM_REGISTRY=https://registry.npmmirror.com
 #   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 #   USE_EXTERNAL_POSTGRES=true EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db
 #   USE_EXTERNAL_REDIS=true EXTERNAL_REDIS_URL=redis://host:6379
@@ -90,6 +91,7 @@ Docker registry mirrors:
 Python mirrors:
   APT_MIRROR=http://mirrors.aliyun.com/debian
   APT_SECURITY_MIRROR=http://mirrors.aliyun.com/debian-security
+  NPM_REGISTRY=https://registry.npmmirror.com
   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
   PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 EOF
@@ -319,6 +321,7 @@ ensure_env() {
   env_set_if_empty REDIS_IMAGE "${REDIS_IMAGE:-redis:7}"
   env_set_if_empty APT_MIRROR "${APT_MIRROR:-http://mirrors.aliyun.com/debian}"
   env_set_if_empty APT_SECURITY_MIRROR "${APT_SECURITY_MIRROR:-http://mirrors.aliyun.com/debian-security}"
+  env_set_if_empty NPM_REGISTRY "${NPM_REGISTRY:-https://registry.npmmirror.com}"
   env_set_if_empty PIP_INDEX_URL "${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
   env_set_if_empty PIP_TRUSTED_HOST "${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}"
   env_set_if_empty POSTGRES_PORT "${POSTGRES_PORT:-15432}"

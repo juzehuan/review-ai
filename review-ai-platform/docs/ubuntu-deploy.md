@@ -54,6 +54,7 @@ REDIS_IMAGE=redis:7
 DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
 APT_MIRROR=http://mirrors.aliyun.com/debian
 APT_SECURITY_MIRROR=http://mirrors.aliyun.com/debian-security
+NPM_REGISTRY=https://registry.npmmirror.com
 PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
@@ -109,10 +110,12 @@ SCRAPLING_CHROMIUM_EXECUTABLE=/usr/bin/chromium
 ```
 
 apt 和 Python 依赖默认使用国内源：
+apt、npm/pnpm 和 Python 依赖默认使用国内源：
 
 ```bash
 APT_MIRROR=http://mirrors.aliyun.com/debian
 APT_SECURITY_MIRROR=http://mirrors.aliyun.com/debian-security
+NPM_REGISTRY=https://registry.npmmirror.com
 PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 ```
@@ -122,6 +125,7 @@ PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 ```bash
 sudo APT_MIRROR='http://mirrors.aliyun.com/debian' \
   APT_SECURITY_MIRROR='http://mirrors.aliyun.com/debian-security' \
+  NPM_REGISTRY='https://registry.npmmirror.com' \
   PIP_INDEX_URL='https://mirrors.aliyun.com/pypi/simple/' \
   PIP_TRUSTED_HOST='mirrors.aliyun.com' \
   bash scripts/ubuntu-deploy.sh deploy
