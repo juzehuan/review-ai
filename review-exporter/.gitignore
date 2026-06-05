@@ -1,0 +1,24 @@
+# Build output
+dist/
+*.zip
+# Keep the packaged release zip for users who download without git.
+!review-exporter.zip
+
+# Dependencies
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Local
+*.log
+*.tmp

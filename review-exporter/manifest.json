@@ -1,0 +1,103 @@
+{
+  "manifest_version": 3,
+  "name": "Review Exporter (Shopee / Lazada / TikTok / YouTube / Facebook)",
+  "version": "0.6.0",
+  "description": "Collect product reviews, YouTube/TikTok video comments and Facebook post comments, then export them as JSON or CSV.",
+  "permissions": [
+    "downloads",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://shopee.co.th/*",
+    "https://www.lazada.co.th/*",
+    "https://lazada.co.th/*",
+    "https://acs-m.lazada.co.th/*",
+    "https://www.tiktok.com/*",
+    "https://www.youtube.com/*",
+    "https://youtube.com/*",
+    "https://m.youtube.com/*",
+    "https://www.facebook.com/*",
+    "https://facebook.com/*",
+    "https://m.facebook.com/*",
+    "https://web.facebook.com/*"
+  ],
+  "action": {
+    "default_title": "Review Exporter",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://shopee.co.th/*",
+        "https://www.lazada.co.th/*",
+        "https://lazada.co.th/*",
+        "https://www.tiktok.com/*",
+        "https://www.youtube.com/*",
+        "https://youtube.com/*",
+        "https://m.youtube.com/*",
+        "https://www.facebook.com/*",
+        "https://facebook.com/*",
+        "https://m.facebook.com/*",
+        "https://web.facebook.com/*"
+      ],
+      "js": [
+        "page-bridge.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://shopee.co.th/*",
+        "https://www.lazada.co.th/*",
+        "https://lazada.co.th/*",
+        "https://www.tiktok.com/*",
+        "https://www.youtube.com/*",
+        "https://youtube.com/*",
+        "https://m.youtube.com/*",
+        "https://www.facebook.com/*",
+        "https://facebook.com/*",
+        "https://m.facebook.com/*",
+        "https://web.facebook.com/*"
+      ],
+      "js": [
+        "adapters/platform.js",
+        "adapters/_utils.js",
+        "adapters/shopee-th.js",
+        "adapters/lazada-th.js",
+        "adapters/tiktok-th.js",
+        "adapters/tiktok-video.js",
+        "adapters/youtube-video.js",
+        "adapters/facebook-post.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "page-bridge.js"
+      ],
+      "matches": [
+        "https://shopee.co.th/*",
+        "https://www.lazada.co.th/*",
+        "https://lazada.co.th/*",
+        "https://www.tiktok.com/*",
+        "https://www.youtube.com/*",
+        "https://youtube.com/*",
+        "https://m.youtube.com/*",
+        "https://www.facebook.com/*",
+        "https://facebook.com/*",
+        "https://m.facebook.com/*",
+        "https://web.facebook.com/*"
+      ]
+    }
+  ]
+}

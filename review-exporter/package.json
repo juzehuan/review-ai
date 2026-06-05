@@ -1,0 +1,13 @@
+{
+  "name": "review-exporter",
+  "version": "0.6.0",
+  "description": "Browser extension to scrape e-commerce reviews, YouTube/TikTok video comments and Facebook post comments",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "build:zip": "node build.mjs --zip"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^4.1.1"
+  }
+}

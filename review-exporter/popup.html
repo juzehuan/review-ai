@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Review Exporter</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <section class="card">
+        <header class="header">
+          <h1>Review Exporter</h1>
+          <span id="platformBadge" class="badge badge-default">检测中</span>
+        </header>
+        <p id="pageHint" class="hint">打开支持的商品详情页或 YouTube 视频页。</p>
+
+        <div class="stats">
+          <div class="stat">
+            <span class="label">状态</span>
+            <span id="statusText" class="value">Idle</span>
+          </div>
+          <div class="stat">
+            <span id="itemCountLabel" class="label">评论</span>
+            <span id="reviewCount" class="value">0</span>
+            <span id="reviewTotalHint" class="sub-value"></span>
+          </div>
+          <div class="stat">
+            <span id="pageCountLabel" class="label">页数</span>
+            <span id="pageCount" class="value">0</span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="startBtn" class="primary">开始抓取</button>
+          <button id="stopBtn">停止</button>
+        </div>
+
+        <div class="actions">
+          <button id="jsonBtn">导出 JSON</button>
+          <button id="csvBtn">导出 CSV</button>
+        </div>
+
+        <div class="actions">
+          <button id="clearBtn" class="ghost">清空数据</button>
+        </div>
+
+        <details id="settingsBox" class="settings" open>
+          <summary>抓取设置</summary>
+          <div class="settings-body">
+            <div id="commerceSettings">
+              <div class="setting-label">翻页方式</div>
+              <label class="setting-radio">
+                <input type="radio" name="paginationMode" value="dom">
+                <span class="setting-radio-label">
+                  <strong>自动翻页</strong>
+                  <small>点击平台页面里的下一页按钮，兼容性最好。</small>
+                </span>
+              </label>
+              <label class="setting-radio">
+                <input type="radio" name="paginationMode" value="api">
+                <span class="setting-radio-label">
+                  <strong>直接接口</strong>
+                  <small id="apiModeHint">直接请求评论接口，需要当前浏览器会话有效。</small>
+                </span>
+              </label>
+              <p id="apiUnsupportedNote" class="setting-warn" hidden>
+                当前平台不支持直接接口，将自动使用页面翻页。
+              </p>
+            </div>
+
+            <div id="youtubeSettings" hidden>
+              <div class="setting-label">YouTube 排序</div>
+              <select id="youtubeSortMode" class="select-input">
+                <option value="both">热门 + 最新</option>
+                <option value="top">热门</option>
+                <option value="newest">最新</option>
+              </select>
+
+              <label class="setting-check">
+                <input id="includeReplies" type="checkbox">
+                <span>抓取回复</span>
+              </label>
+
+              <label class="setting-field">
+                <span>最大评论数</span>
+                <input id="maxItems" type="number" min="0" step="50" placeholder="0 表示不限">
+              </label>
+            </div>
+
+            <div class="setting-label">请求速度</div>
+            <div class="speed-group">
+              <label class="speed-pill"><input type="radio" name="requestSpeed" value="auto"><span><strong>自动</strong><small>推荐</small></span></label>
+              <label class="speed-pill"><input type="radio" name="requestSpeed" value="slow"><span><strong>慢速</strong><small>5.0s</small></span></label>
+              <label class="speed-pill"><input type="radio" name="requestSpeed" value="normal"><span><strong>正常</strong><small>2.8s</small></span></label>
+              <label class="speed-pill"><input type="radio" name="requestSpeed" value="fast"><span><strong>快速</strong><small>1.5s</small></span></label>
+            </div>
+            <p class="setting-hint">Lazada 直接接口建议使用慢速；YouTube 评论很多时建议先设置最大评论数。</p>
+          </div>
+        </details>
+
+        <pre id="logBox" class="log">等待页面数据...</pre>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
