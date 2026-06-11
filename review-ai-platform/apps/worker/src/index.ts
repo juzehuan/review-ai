@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { Queue, Worker } from "bullmq";
 import { OpenAI } from "openai";
@@ -69,9 +70,20 @@ function parseCrawlerProcessError(stderr: string, fallback: string) {
   }
 }
 
+function formatCrawlerSpawnError(error: unknown, pythonBin: string) {
+  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code || "") : "";
+  const message = error instanceof Error ? error.message : String(error);
+  if (code === "ENOENT") {
+    return new Error(
+      `Python command not found: ${pythonBin}. Please set SCRAPLING_PYTHON_BIN or update crawler settings to a valid Python executable.`
+    );
+  }
+  return error instanceof Error ? error : new Error(message);
+}
+
 function runScraplingCrawler(productUrl: string, maxReviews: number, setting: ResolvedCrawlerSetting) {
   return new Promise<CrawlResult>((resolve, reject) => {
-    const scriptPath = path.resolve(process.cwd(), "../../apps/crawler/scrapling_reviews.py");
+    const scriptPath = resolveCrawlerScriptPath();
     const args = [
       scriptPath,
       "--url",
@@ -112,7 +124,7 @@ function runScraplingCrawler(productUrl: string, maxReviews: number, setting: Re
     });
     child.on("error", (error) => {
       clearTimeout(timer);
-      reject(error);
+      reject(formatCrawlerSpawnError(error, setting.pythonBin));
     });
     child.on("close", (code) => {
       clearTimeout(timer);
@@ -127,6 +139,24 @@ function runScraplingCrawler(productUrl: string, maxReviews: number, setting: Re
       }
     });
   });
+}
+
+function resolveCrawlerScriptPath() {
+  const candidates = [
+    path.resolve(process.cwd(), "apps/crawler/scrapling_reviews.py"),
+    path.resolve(process.cwd(), "../../apps/crawler/scrapling_reviews.py"),
+    path.resolve(process.cwd(), "../crawler/scrapling_reviews.py")
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) || candidates[0];
+}
+
+function resolveCrawlerPythonBin(storedPythonBin: string | null | undefined) {
+  const configuredPythonBin = storedPythonBin?.trim();
+  const envPythonBin = process.env.SCRAPLING_PYTHON_BIN?.trim();
+  if (configuredPythonBin && configuredPythonBin !== "python") {
+    return configuredPythonBin;
+  }
+  return envPythonBin || configuredPythonBin || "python";
 }
 
 function buildEmptyCrawlError(result: CrawlResult) {
@@ -1397,7 +1427,7 @@ const crawlWorker = new Worker(
 
     const storedSetting = crawlJob.workspace.crawlerSetting;
     const setting: ResolvedCrawlerSetting = {
-      pythonBin: storedSetting?.pythonBin || process.env.SCRAPLING_PYTHON_BIN || "python",
+      pythonBin: resolveCrawlerPythonBin(storedSetting?.pythonBin),
       proxyUrl: storedSetting?.proxyUrl || process.env.SCRAPLING_PROXY || null,
       shopeeCookie: storedSetting?.shopeeCookie || process.env.SHOPEE_COOKIE || null,
       crawlChannels:

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { inferAnalysisType, type CrawlerChannel } from "@review-ai/shared";
 import { defaultCrawlerSetting } from "@/lib/crawler-settings";
@@ -129,6 +130,17 @@ export function parseCrawlerProcessError(stderr: string, fallback: string) {
   }
 }
 
+function formatCrawlerSpawnError(error: unknown, pythonBin: string) {
+  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code || "") : "";
+  const message = error instanceof Error ? error.message : String(error);
+  if (code === "ENOENT") {
+    return new Error(
+      `Python command not found: ${pythonBin}. Please set SCRAPLING_PYTHON_BIN or update crawler settings to a valid Python executable.`
+    );
+  }
+  return error instanceof Error ? error : new Error(message);
+}
+
 export function normalizeRequestedCrawlInput(body: Record<string, unknown>, defaults: ResolvedCrawlerSetting) {
   const productUrl = String(body.productUrl || "").trim();
   const normalizedProductUrl = normalizeCrawlUrl(productUrl);
@@ -160,7 +172,7 @@ export function normalizeRequestedCrawlInput(body: Record<string, unknown>, defa
 
 export function runScraplingCrawler(productUrl: string, maxReviews: number, setting: ResolvedCrawlerSetting) {
   return new Promise<CrawlResult>((resolve, reject) => {
-    const scriptPath = path.resolve(process.cwd(), "../../apps/crawler/scrapling_reviews.py");
+    const scriptPath = resolveCrawlerScriptPath();
     const args = [
       scriptPath,
       "--url",
@@ -201,7 +213,7 @@ export function runScraplingCrawler(productUrl: string, maxReviews: number, sett
     });
     child.on("error", (error) => {
       clearTimeout(timer);
-      reject(error);
+      reject(formatCrawlerSpawnError(error, setting.pythonBin));
     });
     child.on("close", (code) => {
       clearTimeout(timer);
@@ -216,6 +228,24 @@ export function runScraplingCrawler(productUrl: string, maxReviews: number, sett
       }
     });
   });
+}
+
+export function resolveCrawlerScriptPath() {
+  const candidates = [
+    path.resolve(process.cwd(), "apps/crawler/scrapling_reviews.py"),
+    path.resolve(process.cwd(), "../../apps/crawler/scrapling_reviews.py"),
+    path.resolve(process.cwd(), "../crawler/scrapling_reviews.py")
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) || candidates[0];
+}
+
+export function resolveCrawlerPythonBin(storedPythonBin: string | null | undefined, fallbackPythonBin = "python") {
+  const configuredPythonBin = storedPythonBin?.trim();
+  const envPythonBin = process.env.SCRAPLING_PYTHON_BIN?.trim();
+  if (configuredPythonBin && configuredPythonBin !== "python") {
+    return configuredPythonBin;
+  }
+  return envPythonBin || configuredPythonBin || fallbackPythonBin;
 }
 
 export function resolvedCrawlerSettingFromRecord(
@@ -235,7 +265,7 @@ export function resolvedCrawlerSettingFromRecord(
   const defaultSetting = defaultCrawlerSetting();
   return {
     enabled: storedCrawlerSetting?.enabled ?? defaultSetting.enabled,
-    pythonBin: storedCrawlerSetting?.pythonBin || defaultSetting.pythonBin,
+    pythonBin: resolveCrawlerPythonBin(storedCrawlerSetting?.pythonBin, defaultSetting.pythonBin),
     proxyUrl: storedCrawlerSetting?.proxyUrl || defaultSetting.proxyUrl,
     shopeeCookie: null,
     crawlChannels: ["browser_intercept"],

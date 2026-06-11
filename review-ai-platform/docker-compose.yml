@@ -103,7 +103,11 @@ services:
       context: .
       dockerfile: apps/worker/Dockerfile
       args:
+        APT_MIRROR: ${APT_MIRROR:-http://mirrors.aliyun.com/debian}
+        APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-http://mirrors.aliyun.com/debian-security}
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
     environment:
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/review_ai}
       REDIS_URL: ${APP_REDIS_URL:-redis://redis:6379}
@@ -116,6 +120,13 @@ services:
       MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
+      SCRAPLING_ENABLED: ${SCRAPLING_ENABLED:-true}
+      SCRAPLING_PYTHON_BIN: /opt/review-ai-crawler/bin/python
+      SCRAPLING_CHROMIUM_EXECUTABLE: ${SCRAPLING_CHROMIUM_EXECUTABLE:-/usr/bin/chromium}
+      SCRAPLING_PROXY: ${SCRAPLING_PROXY:-}
+      SCRAPLING_CHANNELS: ${SCRAPLING_CHANNELS:-browser_intercept}
+      SCRAPLING_TIMEOUT_SEC: ${SCRAPLING_TIMEOUT_SEC:-180}
+      SHOPEE_COOKIE: ${SHOPEE_COOKIE:-}
     depends_on:
       postgres:
         condition: service_healthy
