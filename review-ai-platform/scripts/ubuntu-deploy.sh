@@ -94,6 +94,8 @@ Python mirrors:
   NPM_REGISTRY=https://registry.npmmirror.com
   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
   PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+  DEFAULT_ADMIN_RESET_PASSWORD=false
+  DEFAULT_ADMIN_UNIQUE_SUPER_ADMIN=false
 EOF
 }
 
@@ -380,6 +382,8 @@ ensure_env() {
   env_set_if_empty DEFAULT_ADMIN_NAME "admin"
   env_set_if_empty DEFAULT_WORKSPACE_NAME "Admin Workspace"
   env_set_if_empty DEFAULT_WORKSPACE_SLUG "admin-workspace"
+  env_set_if_empty DEFAULT_ADMIN_RESET_PASSWORD "false"
+  env_set_if_empty DEFAULT_ADMIN_UNIQUE_SUPER_ADMIN "false"
 
   env_set_if_empty OPENAI_API_KEY ""
   env_set_if_empty OPENAI_MODEL "gpt-4.1-mini"
