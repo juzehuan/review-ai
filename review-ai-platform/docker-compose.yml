@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: ${POSTGRES_IMAGE:-postgres:16}
+    image: ${POSTGRES_IMAGE:-docker.m.daocloud.io/library/postgres:16}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-review_ai}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -16,7 +16,7 @@ services:
       retries: 20
 
   redis:
-    image: ${REDIS_IMAGE:-redis:7}
+    image: ${REDIS_IMAGE:-docker.m.daocloud.io/library/redis:7}
     ports:
       - "${REDIS_PORT:-16379}:6379"
     healthcheck:
@@ -31,6 +31,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
       args:
+        NODE_BOOKWORM_IMAGE: ${NODE_BOOKWORM_IMAGE:-docker.m.daocloud.io/library/node:24-bookworm-slim}
         APT_MIRROR: ${APT_MIRROR:-http://mirrors.aliyun.com/debian}
         APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-http://mirrors.aliyun.com/debian-security}
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
@@ -55,6 +56,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
       args:
+        NODE_BOOKWORM_IMAGE: ${NODE_BOOKWORM_IMAGE:-docker.m.daocloud.io/library/node:24-bookworm-slim}
         APT_MIRROR: ${APT_MIRROR:-http://mirrors.aliyun.com/debian}
         APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-http://mirrors.aliyun.com/debian-security}
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
@@ -103,6 +105,7 @@ services:
       context: .
       dockerfile: apps/worker/Dockerfile
       args:
+        NODE_BOOKWORM_IMAGE: ${NODE_BOOKWORM_IMAGE:-docker.m.daocloud.io/library/node:24-bookworm-slim}
         APT_MIRROR: ${APT_MIRROR:-http://mirrors.aliyun.com/debian}
         APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-http://mirrors.aliyun.com/debian-security}
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
@@ -141,6 +144,8 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
+        NODE_ALPINE_IMAGE: ${NODE_ALPINE_IMAGE:-docker.m.daocloud.io/library/node:24-alpine}
+        NGINX_ALPINE_IMAGE: ${NGINX_ALPINE_IMAGE:-docker.m.daocloud.io/library/nginx:1.27-alpine}
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     ports:
       - "${WEB_PORT:-8001}:80"

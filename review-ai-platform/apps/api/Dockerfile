@@ -1,4 +1,5 @@
-FROM node:24-bookworm-slim AS runner
+ARG NODE_BOOKWORM_IMAGE=docker.m.daocloud.io/library/node:24-bookworm-slim
+FROM ${NODE_BOOKWORM_IMAGE} AS runner
 WORKDIR /app
 
 ARG APT_MIRROR=http://mirrors.aliyun.com/debian

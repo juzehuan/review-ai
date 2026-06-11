@@ -14,8 +14,11 @@ set -Eeuo pipefail
 #   REPO_URL=https://github.com/juzehuan/review-ai.git
 #   DEPLOY_BRANCH=codex/saas-analysis-core
 #   WEB_PORT=8001 API_PORT=8002 POSTGRES_PORT=15432 REDIS_PORT=16379
-#   POSTGRES_IMAGE=postgres:16 REDIS_IMAGE=redis:7
-#   DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
+#   NODE_BOOKWORM_IMAGE=docker.m.daocloud.io/library/node:24-bookworm-slim
+#   NODE_ALPINE_IMAGE=docker.m.daocloud.io/library/node:24-alpine
+#   NGINX_ALPINE_IMAGE=docker.m.daocloud.io/library/nginx:1.27-alpine
+#   POSTGRES_IMAGE=docker.m.daocloud.io/library/postgres:16 REDIS_IMAGE=docker.m.daocloud.io/library/redis:7
+#   DOCKER_REGISTRY_MIRRORS=https://docker.m.daocloud.io,https://docker.1panel.live,https://docker.1ms.run
 #   APT_MIRROR=http://mirrors.aliyun.com/debian
 #   NPM_REGISTRY=https://registry.npmmirror.com
 #   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
@@ -81,11 +84,14 @@ External services:
   USE_EXTERNAL_REDIS=true EXTERNAL_REDIS_URL=redis://host:6379
 
 Images:
-  POSTGRES_IMAGE=postgres:16
-  REDIS_IMAGE=redis:7
+  NODE_BOOKWORM_IMAGE=docker.m.daocloud.io/library/node:24-bookworm-slim
+  NODE_ALPINE_IMAGE=docker.m.daocloud.io/library/node:24-alpine
+  NGINX_ALPINE_IMAGE=docker.m.daocloud.io/library/nginx:1.27-alpine
+  POSTGRES_IMAGE=docker.m.daocloud.io/library/postgres:16
+  REDIS_IMAGE=docker.m.daocloud.io/library/redis:7
 
 Docker registry mirrors:
-  DOCKER_REGISTRY_MIRRORS=https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io
+  DOCKER_REGISTRY_MIRRORS=https://docker.m.daocloud.io,https://docker.1panel.live,https://docker.1ms.run
   DISABLE_DOCKER_MIRRORS=true
 
 Python mirrors:
@@ -128,7 +134,7 @@ configure_docker_registry_mirrors() {
   fi
 
   local mirrors raw mirror json backup
-  mirrors="${DOCKER_REGISTRY_MIRRORS:-https://docker.1ms.run,https://docker.1panel.live,https://docker.m.daocloud.io}"
+  mirrors="${DOCKER_REGISTRY_MIRRORS:-https://docker.m.daocloud.io,https://docker.1panel.live,https://docker.1ms.run}"
   [[ -n "${mirrors}" ]] || return
 
   mkdir -p /etc/docker
@@ -303,13 +309,13 @@ external_redis_url() {
 postgres_image() {
   local image
   image="$(env_get POSTGRES_IMAGE)"
-  printf '%s' "${image:-postgres:16}"
+  printf '%s' "${image:-docker.m.daocloud.io/library/postgres:16}"
 }
 
 redis_image() {
   local image
   image="$(env_get REDIS_IMAGE)"
-  printf '%s' "${image:-redis:7}"
+  printf '%s' "${image:-docker.m.daocloud.io/library/redis:7}"
 }
 
 ensure_env() {
@@ -327,8 +333,11 @@ ensure_env() {
 
   env_set_if_empty POSTGRES_DB "review_ai"
   env_set_if_empty POSTGRES_USER "postgres"
-  env_set_if_empty POSTGRES_IMAGE "${POSTGRES_IMAGE:-postgres:16}"
-  env_set_if_empty REDIS_IMAGE "${REDIS_IMAGE:-redis:7}"
+  env_set_if_empty_or_legacy NODE_BOOKWORM_IMAGE "${NODE_BOOKWORM_IMAGE:-docker.m.daocloud.io/library/node:24-bookworm-slim}" "node:24-bookworm-slim"
+  env_set_if_empty_or_legacy NODE_ALPINE_IMAGE "${NODE_ALPINE_IMAGE:-docker.m.daocloud.io/library/node:24-alpine}" "node:24-alpine"
+  env_set_if_empty_or_legacy NGINX_ALPINE_IMAGE "${NGINX_ALPINE_IMAGE:-docker.m.daocloud.io/library/nginx:1.27-alpine}" "nginx:1.27-alpine"
+  env_set_if_empty_or_legacy POSTGRES_IMAGE "${POSTGRES_IMAGE:-docker.m.daocloud.io/library/postgres:16}" "postgres:16"
+  env_set_if_empty_or_legacy REDIS_IMAGE "${REDIS_IMAGE:-docker.m.daocloud.io/library/redis:7}" "redis:7"
   env_set_if_empty APT_MIRROR "${APT_MIRROR:-http://mirrors.aliyun.com/debian}"
   env_set_if_empty APT_SECURITY_MIRROR "${APT_SECURITY_MIRROR:-http://mirrors.aliyun.com/debian-security}"
   env_set_if_empty NPM_REGISTRY "${NPM_REGISTRY:-https://registry.npmmirror.com}"
