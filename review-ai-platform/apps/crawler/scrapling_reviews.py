@@ -781,6 +781,12 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
         def trigger_more_comments(round_index: int) -> None:
             page.evaluate(
                 """(roundIndex) => {
+                    const commentViews = document.querySelectorAll("ytd-comment-view-model").length;
+                    const commentsSection = document.querySelector("ytd-comments");
+                    if (!commentViews && !commentsSection) {
+                      window.scrollBy({ top: Math.max(window.innerHeight * 1.6, 1200), behavior: "smooth" });
+                      return;
+                    }
                     const scrollIntoView = (node) => {
                       if (node) node.scrollIntoView({ block: "center", inline: "nearest" });
                       return Boolean(node);
@@ -815,11 +821,13 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
                     if (comments) {
                         comments.scrollIntoView({ block: "start" });
                     } else {
-                        window.scrollBy(0, Math.max(900, Math.floor(window.innerHeight * 1.2)));
+                        window.scrollBy(0, Math.max(1400, Math.floor(window.innerHeight * 1.8)));
                     }
                 }"""
             )
             page.wait_for_timeout(2200)
+            page.keyboard.press("PageDown")
+            page.wait_for_timeout(1200)
         except Exception:
             page.wait_for_timeout(1200)
 
