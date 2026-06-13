@@ -13,6 +13,7 @@ set -Eeuo pipefail
 #   APP_DIR=/opt/review-ai-platform
 #   REPO_URL=https://github.com/juzehuan/review-ai.git
 #   DEPLOY_BRANCH=codex/saas-analysis-core
+#   GIT_HTTP_VERSION=HTTP/1.1 GIT_RETRY_ATTEMPTS=5 GIT_RETRY_DELAY_SEC=5
 #   WEB_PORT=8001 API_PORT=8002 POSTGRES_PORT=15432 REDIS_PORT=16379
 #   NODE_BOOKWORM_IMAGE=docker.m.daocloud.io/library/node:24-bookworm-slim
 #   NODE_ALPINE_IMAGE=docker.m.daocloud.io/library/node:24-alpine
@@ -35,8 +36,12 @@ else
 fi
 
 APP_DIR="${APP_DIR:-${DEFAULT_APP_DIR}}"
-REPO_URL="${REPO_URL:-https://github.com/juzehuan/review-ai.git}"
+CONFIGURED_REPO_URL="${REPO_URL:-}"
+REPO_URL="${CONFIGURED_REPO_URL:-https://github.com/juzehuan/review-ai.git}"
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-codex/saas-analysis-core}"
+GIT_HTTP_VERSION="${GIT_HTTP_VERSION:-HTTP/1.1}"
+GIT_RETRY_ATTEMPTS="${GIT_RETRY_ATTEMPTS:-5}"
+GIT_RETRY_DELAY_SEC="${GIT_RETRY_DELAY_SEC:-5}"
 BACKUP_DIR="${BACKUP_DIR:-${APP_DIR}/backups}"
 ENV_FILE="${APP_DIR}/.env"
 
@@ -77,6 +82,9 @@ Environment:
   APP_DIR=${APP_DIR}
   REPO_URL=${REPO_URL}
   DEPLOY_BRANCH=${DEPLOY_BRANCH}
+  GIT_HTTP_VERSION=${GIT_HTTP_VERSION}
+  GIT_RETRY_ATTEMPTS=${GIT_RETRY_ATTEMPTS}
+  GIT_RETRY_DELAY_SEC=${GIT_RETRY_DELAY_SEC}
   BACKUP_DIR=${BACKUP_DIR}
 
 External services:
@@ -125,6 +133,31 @@ run_in_app() {
   [[ -f "${APP_DIR}/docker-compose.yml" ]] || fail "docker-compose.yml not found in ${APP_DIR}"
   cd "${APP_DIR}"
   "$@"
+}
+
+git_network_args() {
+  printf '%s\n' \
+    "-c" "http.version=${GIT_HTTP_VERSION}" \
+    "-c" "http.lowSpeedLimit=0" \
+    "-c" "http.lowSpeedTime=999999"
+}
+
+git_retry() {
+  local attempt max delay
+  max="${GIT_RETRY_ATTEMPTS}"
+  delay="${GIT_RETRY_DELAY_SEC}"
+  attempt=1
+  while true; do
+    if git $(git_network_args) "$@"; then
+      return 0
+    fi
+    if (( attempt >= max )); then
+      return 1
+    fi
+    warn "Git command failed, retrying in ${delay}s (${attempt}/${max}): git $*"
+    sleep "${delay}"
+    attempt=$((attempt + 1))
+  done
 }
 
 configure_docker_registry_mirrors() {
@@ -208,7 +241,7 @@ ensure_repo() {
 
   log "Cloning ${REPO_URL} (${DEPLOY_BRANCH}) into ${APP_DIR}..."
   mkdir -p "$(dirname "${APP_DIR}")"
-  git clone --branch "${DEPLOY_BRANCH}" "${REPO_URL}" "${APP_DIR}"
+  git_retry clone --branch "${DEPLOY_BRANCH}" "${REPO_URL}" "${APP_DIR}"
 }
 
 pull_code() {
@@ -218,9 +251,12 @@ pull_code() {
     return
   fi
 
-  run_in_app git fetch origin
-  run_in_app git checkout "${DEPLOY_BRANCH}"
-  run_in_app git pull --ff-only origin "${DEPLOY_BRANCH}"
+  if [[ -n "${CONFIGURED_REPO_URL}" ]]; then
+    run_in_app git remote set-url origin "${REPO_URL}"
+  fi
+  run_in_app git_retry fetch origin
+  run_in_app git_retry checkout "${DEPLOY_BRANCH}"
+  run_in_app git_retry pull --ff-only origin "${DEPLOY_BRANCH}"
 }
 
 random_secret() {
