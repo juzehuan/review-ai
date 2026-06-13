@@ -50,6 +50,12 @@ type ResolvedCrawlerSetting = {
   requestTimeoutSec: number;
 };
 
+type CrawlerProgress = {
+  elapsedSec: number;
+  timeoutSec: number;
+  stderr: string;
+};
+
 function isCrawlResult(value: unknown): value is CrawlResult {
   return Boolean(value && typeof value === "object" && !Array.isArray(value) && Array.isArray((value as { rows?: unknown }).rows));
 }
@@ -82,6 +88,14 @@ function parseCrawlerProcessError(stderr: string, fallback: string) {
   }
 }
 
+function stderrTail(stderr: string) {
+  const text = stderr.trim();
+  if (!text) {
+    return "";
+  }
+  return text.split(/\r?\n/).slice(-8).join("\n");
+}
+
 function formatCrawlerSpawnError(error: unknown, pythonBin: string) {
   const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code || "") : "";
   const message = error instanceof Error ? error.message : String(error);
@@ -93,7 +107,12 @@ function formatCrawlerSpawnError(error: unknown, pythonBin: string) {
   return error instanceof Error ? error : new Error(message);
 }
 
-function runScraplingCrawler(productUrl: string, maxReviews: number, setting: ResolvedCrawlerSetting) {
+function runScraplingCrawler(
+  productUrl: string,
+  maxReviews: number,
+  setting: ResolvedCrawlerSetting,
+  onProgress?: (progress: CrawlerProgress) => void | Promise<void>
+) {
   return new Promise<CrawlResult>((resolve, reject) => {
     const scriptPath = resolveCrawlerScriptPath();
     const args = [
@@ -123,10 +142,23 @@ function runScraplingCrawler(productUrl: string, maxReviews: number, setting: Re
 
     let stdout = "";
     let stderr = "";
+    const startedAt = Date.now();
+    const cleanup = () => {
+      clearTimeout(timer);
+      clearInterval(progressTimer);
+    };
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error("Scrapling crawler timed out"));
-    }, setting.requestTimeoutSec * 1000);
+      const detail = stderrTail(stderr);
+      reject(new Error(detail ? `Scrapling crawler timed out. Recent crawler log:\n${detail}` : "Scrapling crawler timed out"));
+    }, (setting.requestTimeoutSec + 45) * 1000);
+    const progressTimer = setInterval(() => {
+      void onProgress?.({
+        elapsedSec: Math.floor((Date.now() - startedAt) / 1000),
+        timeoutSec: setting.requestTimeoutSec,
+        stderr
+      });
+    }, 10000);
 
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
@@ -135,11 +167,11 @@ function runScraplingCrawler(productUrl: string, maxReviews: number, setting: Re
       stderr += chunk.toString();
     });
     child.on("error", (error) => {
-      clearTimeout(timer);
+      cleanup();
       reject(formatCrawlerSpawnError(error, setting.pythonBin));
     });
     child.on("close", (code) => {
-      clearTimeout(timer);
+      cleanup();
       if (code !== 0) {
         reject(new Error(parseCrawlerProcessError(stderr, `Scrapling crawler exited with code ${code}`)));
         return;
@@ -1609,7 +1641,18 @@ const crawlWorker = new Worker(
     });
 
     try {
-      const result = await runScraplingCrawler(crawlJob.normalizedUrl, crawlJob.maxReviews, setting);
+      let lastReportedProgress = 10;
+      const result = await runScraplingCrawler(crawlJob.normalizedUrl, crawlJob.maxReviews, setting, async ({ elapsedSec, timeoutSec }) => {
+        const nextProgress = Math.min(85, 10 + Math.floor((elapsedSec / Math.max(timeoutSec, 1)) * 75));
+        if (nextProgress <= lastReportedProgress) {
+          return;
+        }
+        lastReportedProgress = nextProgress;
+        await prisma.crawlJob.update({
+          where: { id: crawlJob.id },
+          data: { progress: nextProgress }
+        });
+      });
       if (!result.rows.length) {
         const message = buildEmptyCrawlError(result);
         await prisma.crawlJob.update({

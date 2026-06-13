@@ -142,6 +142,14 @@ export function parseCrawlerProcessError(stderr: string, fallback: string) {
   }
 }
 
+function stderrTail(stderr: string) {
+  const text = stderr.trim();
+  if (!text) {
+    return "";
+  }
+  return text.split(/\r?\n/).slice(-8).join("\n");
+}
+
 function formatCrawlerSpawnError(error: unknown, pythonBin: string) {
   const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code || "") : "";
   const message = error instanceof Error ? error.message : String(error);
@@ -212,10 +220,14 @@ export function runScraplingCrawler(productUrl: string, maxReviews: number, sett
 
     let stdout = "";
     let stderr = "";
+    const cleanup = () => {
+      clearTimeout(timer);
+    };
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error("Scrapling crawler timed out"));
-    }, setting.requestTimeoutSec * 1000);
+      const detail = stderrTail(stderr);
+      reject(new Error(detail ? `Scrapling crawler timed out. Recent crawler log:\n${detail}` : "Scrapling crawler timed out"));
+    }, (setting.requestTimeoutSec + 45) * 1000);
 
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
@@ -224,11 +236,11 @@ export function runScraplingCrawler(productUrl: string, maxReviews: number, sett
       stderr += chunk.toString();
     });
     child.on("error", (error) => {
-      clearTimeout(timer);
+      cleanup();
       reject(formatCrawlerSpawnError(error, setting.pythonBin));
     });
     child.on("close", (code) => {
-      clearTimeout(timer);
+      cleanup();
       if (code !== 0) {
         reject(new Error(parseCrawlerProcessError(stderr, `Scrapling crawler exited with code ${code}`)));
         return;

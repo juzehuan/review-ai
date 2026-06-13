@@ -654,6 +654,7 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
         "payload_comments": 0,
         "dom_comment_count": 0,
         "dom_content_text_count": 0,
+        "crawl_deadline_reached": False,
     }
 
     def page_action(page: Any) -> None:
@@ -803,7 +804,9 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
         idle_rounds = 0
         last_count = 0
         last_next_requests = int(state.get("next_requests") or 0)
-        deadline = time.time() + timeout
+        # Leave time for Scrapling/Node to serialize partial rows instead of
+        # being killed by the outer process timeout.
+        deadline = time.time() + max(10, timeout - 20)
 
         try:
             page.evaluate(
@@ -889,6 +892,9 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
             if idle_rounds >= 10:
                 break
 
+        if time.time() >= deadline and (max_reviews <= 0 or len(comments_by_id) < max_reviews):
+            state["crawl_deadline_reached"] = True
+
     fetch_kwargs: dict[str, Any] = {
         "headless": True,
         "disable_resources": False,
@@ -924,6 +930,7 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
         "continuationCount": state.get("continuation_count"),
         "scrollY": state.get("scroll_y"),
         "scrollHeight": state.get("scroll_height"),
+        "partialDueToTimeout": state.get("crawl_deadline_reached"),
         "rows": rows,
     }
 
