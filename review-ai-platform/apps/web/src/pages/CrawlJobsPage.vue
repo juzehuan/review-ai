@@ -211,6 +211,10 @@
                 <template #icon><PlayCircleOutlined /></template>
                 开始分析
               </a-button>
+              <a-button v-if="canRetry(record)" size="small" :loading="retryingId === record.id" @click="retryJob(record)">
+                <template #icon><ReloadOutlined /></template>
+                重试
+              </a-button>
               <a-button v-if="record.taskId" size="small" @click="openTask(record)">
                 <template #icon><FileSearchOutlined /></template>
                 查看分析
@@ -334,6 +338,7 @@ import {
   fetchCrawlJobs,
   fetchCrawlMonitors,
   fetchWorkspaceCrawlerSettings,
+  retryCrawlJob,
   runCrawlMonitorNow,
   startCrawlJobAnalysis,
   updateCrawlMonitor
@@ -355,6 +360,7 @@ const monitors = ref<CrawlMonitorDTO[]>([]);
 const loading = ref(false);
 const autoRefresh = ref(true);
 const startingId = ref<string | null>(null);
+const retryingId = ref<string | null>(null);
 const monitorActionId = ref<string | null>(null);
 const showCreateModal = ref(false);
 const showMonitorModal = ref(false);
@@ -542,6 +548,10 @@ function canStart(job: CrawlJobDTO) {
   return job.status === "completed" && !job.taskId && job.fetchedRows > 0;
 }
 
+function canRetry(job: CrawlJobDTO) {
+  return job.status === "failed";
+}
+
 async function loadJobs() {
   jobs.value = await fetchCrawlJobs();
 }
@@ -583,6 +593,20 @@ async function startAnalysis(job: CrawlJobDTO) {
     router.push(`/tasks/${result.taskId}/runs`);
   } finally {
     startingId.value = null;
+  }
+}
+
+async function retryJob(job: CrawlJobDTO) {
+  if (!canRetry(job)) {
+    return;
+  }
+  retryingId.value = job.id;
+  try {
+    await retryCrawlJob(job.id);
+    message.success("已重新加入采集队列");
+    await loadJobs();
+  } finally {
+    retryingId.value = null;
   }
 }
 

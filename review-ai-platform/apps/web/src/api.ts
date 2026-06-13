@@ -349,6 +349,11 @@ export async function startCrawlJobAnalysis(jobId: string) {
   return data;
 }
 
+export async function retryCrawlJob(jobId: string) {
+  const { data } = await api.post<CrawlJobDTO>(`/crawl-jobs/${jobId}/retry`);
+  return data;
+}
+
 export async function fetchTask(taskId: string) {
   const { data } = await api.get(`/tasks/${taskId}`);
   return data;
