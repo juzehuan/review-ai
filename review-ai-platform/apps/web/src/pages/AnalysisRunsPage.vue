@@ -57,7 +57,7 @@
             {{ formatTime(record.createdAt) }}
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space wrap class="task-actions">
+            <a-space class="task-actions">
               <a-button size="small" type="primary" ghost @click.stop="openReviews(record)">
                 <template #icon><TableOutlined /></template>
                 评论列表
@@ -668,12 +668,13 @@ onUnmounted(stopPolling);
 
 .task-actions {
   gap: 8px 10px !important;
+  flex-wrap: nowrap !important;
 }
 
 .task-actions :deep(.ant-btn) {
   border-radius: 6px;
-  min-width: 92px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .runs-layout {

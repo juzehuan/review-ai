@@ -89,7 +89,7 @@
         :data-source="monitors"
         :pagination="{ pageSize: 8 }"
         :loading="loading"
-        :scroll="{ x: 1280 }"
+        :scroll="{ x: 1340 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'monitor'">
@@ -137,7 +137,7 @@
             <span v-else class="muted">-</span>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space wrap>
+            <a-space class="crawl-actions">
               <a-button size="small" :loading="monitorActionId === record.id" @click="runMonitorNow(record)">
                 <template #icon><PlayCircleOutlined /></template>
                 立即运行
@@ -172,7 +172,7 @@
         :data-source="jobs"
         :pagination="{ pageSize: 12 }"
         :loading="loading"
-        :scroll="{ x: 1320 }"
+        :scroll="{ x: 1480 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'job'">
@@ -200,7 +200,7 @@
             <div class="muted">{{ formatTime(record.finishedAt) }}</div>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space wrap>
+            <a-space class="crawl-actions">
               <a-button
                 size="small"
                 type="primary"
@@ -428,7 +428,7 @@ const columns = [
   { title: "来源", key: "meta", width: 160 },
   { title: "时间", key: "time", width: 170 },
   { title: "错误", key: "error" },
-  { title: "操作", key: "actions", width: 190 }
+  { title: "操作", key: "actions", width: 340 }
 ];
 
 const monitorColumns = [
@@ -438,7 +438,7 @@ const monitorColumns = [
   { title: "来源", key: "meta", width: 150 },
   { title: "最近运行", key: "last", width: 190 },
   { title: "错误", key: "error" },
-  { title: "操作", key: "actions", width: 250 }
+  { title: "操作", key: "actions", width: 300 }
 ];
 
 const hasActiveJobs = computed(() => jobs.value.some((job) => ["queued", "running"].includes(job.status)));
@@ -887,6 +887,14 @@ onUnmounted(() => {
 .monitor-status-cell {
   display: grid;
   gap: 8px;
+}
+
+.crawl-actions {
+  flex-wrap: nowrap !important;
+}
+
+.crawl-actions :deep(.ant-btn) {
+  white-space: nowrap;
 }
 
 .schedule-cell strong {
