@@ -1,7 +1,7 @@
 import { prisma } from "@review-ai/db";
-import { ok } from "@/lib/http";
+import { fail, ok } from "@/lib/http";
 import { serializeRun, serializeTask } from "@/lib/serializers";
-import { getWorkspaceContext, taskWorkspaceWhere } from "@/lib/workspace";
+import { getWorkspaceContext, requireWorkspaceRole, taskWorkspaceWhere } from "@/lib/workspace";
 
 export async function GET(request: Request, context: { params: Promise<{ taskId: string }> }) {
   const { taskId } = await context.params;
@@ -34,4 +34,39 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     latestImport: task.importRecords[0] || null,
     latestRun: task.analysisRuns[0] ? serializeRun(task.analysisRuns[0]) : null
   });
+}
+
+export async function DELETE(request: Request, context: { params: Promise<{ taskId: string }> }) {
+  const { taskId } = await context.params;
+  const workspaceContext = await getWorkspaceContext(request);
+  if (workspaceContext.response || !workspaceContext.workspace) {
+    return workspaceContext.response;
+  }
+  const roleResponse = requireWorkspaceRole(workspaceContext, ["owner", "admin", "analyst"]);
+  if (roleResponse) {
+    return roleResponse;
+  }
+
+  const task = await prisma.task.findFirst({
+    where: taskWorkspaceWhere(taskId, workspaceContext.workspace.id),
+    include: {
+      analysisRuns: {
+        where: { status: { in: ["queued", "running"] } },
+        select: { id: true },
+        take: 1
+      }
+    }
+  });
+  if (!task) {
+    return fail("分析任务不存在或不属于当前空间", 404);
+  }
+  if (task.analysisRuns.length) {
+    return fail("该分析任务仍有排队或运行中的分析批次，请先停止后再删除", 400);
+  }
+
+  await prisma.task.delete({
+    where: { id: task.id }
+  });
+
+  return ok({ deleted: true });
 }

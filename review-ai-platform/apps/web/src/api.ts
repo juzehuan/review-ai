@@ -125,6 +125,11 @@ export async function fetchTasks() {
   return data;
 }
 
+export async function deleteTask(taskId: string) {
+  const { data } = await api.delete<{ deleted: boolean }>(`/tasks/${taskId}`);
+  return data;
+}
+
 export async function fetchWorkspace() {
   const { data } = await api.get<WorkspaceDTO>("/workspace");
   return data;
@@ -351,6 +356,11 @@ export async function startCrawlJobAnalysis(jobId: string) {
 
 export async function retryCrawlJob(jobId: string) {
   const { data } = await api.post<CrawlJobDTO>(`/crawl-jobs/${jobId}/retry`);
+  return data;
+}
+
+export async function deleteCrawlJob(jobId: string) {
+  const { data } = await api.delete<{ deleted: boolean }>(`/crawl-jobs/${jobId}`);
   return data;
 }
 

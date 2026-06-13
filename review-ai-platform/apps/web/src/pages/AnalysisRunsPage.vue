@@ -78,6 +78,18 @@
                 <template #icon><FileAddOutlined /></template>
                 追加评论
               </a-button>
+              <a-popconfirm title="确定删除该分析任务？评论、分析结果、报告分享和行动项都会被删除。" @confirm="removeTask(record)">
+                <a-button
+                  size="small"
+                  danger
+                  :disabled="!canDeleteTask(record)"
+                  :loading="deletingTaskId === record.id"
+                  @click.stop
+                >
+                  <template #icon><DeleteOutlined /></template>
+                  删除
+                </a-button>
+              </a-popconfirm>
             </a-space>
           </template>
         </template>
@@ -212,6 +224,7 @@ import { message } from "ant-design-vue";
 import {
   CloudUploadOutlined,
   CheckSquareOutlined,
+  DeleteOutlined,
   FileAddOutlined,
   FileSearchOutlined,
   FileTextOutlined,
@@ -222,7 +235,7 @@ import {
 } from "@ant-design/icons-vue";
 import type { AnalysisRunDTO, AnalysisRunLogDTO, TaskListItem } from "@review-ai/shared";
 import TaskImportModal from "@/components/TaskImportModal.vue";
-import { cancelRun, createRun, fetchRunLogs, fetchRuns } from "@/api";
+import { cancelRun, createRun, deleteTask, fetchRunLogs, fetchRuns } from "@/api";
 import { useTaskStore } from "@/composables";
 
 const router = useRouter();
@@ -242,6 +255,7 @@ const logs = ref<AnalysisRunLogDTO[]>([]);
 const selectedRun = ref<AnalysisRunDTO | null>(null);
 const loading = ref(false);
 const starting = ref(false);
+const deletingTaskId = ref<string | null>(null);
 const autoRefresh = ref(true);
 const showImport = ref(false);
 const showAppendImport = ref(false);
@@ -285,6 +299,10 @@ const hasWorkerLog = computed(() => logs.value.some((log) => log.message.include
 
 function canCancel(run: AnalysisRunDTO) {
   return ["queued", "running"].includes(run.status);
+}
+
+function canDeleteTask(task: TaskListItem) {
+  return canWriteWorkspace.value && !["queued", "running"].includes(String(task.latestRunStatus || ""));
 }
 
 function runProgress(run: AnalysisRunDTO) {
@@ -442,6 +460,32 @@ function appendReviews(task: TaskListItem) {
 function closeAppendImport() {
   showAppendImport.value = false;
   appendTask.value = null;
+}
+
+async function removeTask(task: TaskListItem) {
+  if (!canDeleteTask(task)) {
+    return;
+  }
+  deletingTaskId.value = task.id;
+  try {
+    await deleteTask(task.id);
+    message.success("分析任务已删除");
+    if (selectedTask.value?.id === task.id) {
+      setSelectedTask("");
+      selectedRun.value = null;
+      logs.value = [];
+    }
+    await refreshTasks();
+    if (selectedTask.value) {
+      router.replace(`/tasks/${selectedTask.value.id}/runs`);
+    } else {
+      router.replace("/analysis-runs");
+    }
+    await loadRuns();
+    await loadLogs();
+  } finally {
+    deletingTaskId.value = null;
+  }
 }
 
 async function loadRuns() {

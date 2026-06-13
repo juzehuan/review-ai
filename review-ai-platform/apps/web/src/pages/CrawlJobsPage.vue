@@ -219,6 +219,11 @@
                 <template #icon><FileSearchOutlined /></template>
                 查看分析
               </a-button>
+              <a-popconfirm title="确定删除这条采集记录？已生成的分析任务不会被删除。" @confirm="removeJob(record)">
+                <a-button size="small" danger :disabled="!canDeleteJob(record)" :loading="deletingJobId === record.id">
+                  删除
+                </a-button>
+              </a-popconfirm>
             </a-space>
           </template>
           <template v-else-if="column.key === 'error'">
@@ -334,6 +339,7 @@ import {
 import {
   createCrawlJob,
   createCrawlMonitor,
+  deleteCrawlJob,
   deleteCrawlMonitor,
   fetchCrawlJobs,
   fetchCrawlMonitors,
@@ -361,6 +367,7 @@ const loading = ref(false);
 const autoRefresh = ref(true);
 const startingId = ref<string | null>(null);
 const retryingId = ref<string | null>(null);
+const deletingJobId = ref<string | null>(null);
 const monitorActionId = ref<string | null>(null);
 const showCreateModal = ref(false);
 const showMonitorModal = ref(false);
@@ -552,6 +559,10 @@ function canRetry(job: CrawlJobDTO) {
   return job.status === "failed";
 }
 
+function canDeleteJob(job: CrawlJobDTO) {
+  return !["queued", "running"].includes(job.status);
+}
+
 async function loadJobs() {
   jobs.value = await fetchCrawlJobs();
 }
@@ -607,6 +618,20 @@ async function retryJob(job: CrawlJobDTO) {
     await loadJobs();
   } finally {
     retryingId.value = null;
+  }
+}
+
+async function removeJob(job: CrawlJobDTO) {
+  if (!canDeleteJob(job)) {
+    return;
+  }
+  deletingJobId.value = job.id;
+  try {
+    await deleteCrawlJob(job.id);
+    message.success("采集记录已删除");
+    await loadJobs();
+  } finally {
+    deletingJobId.value = null;
   }
 }
 
