@@ -656,6 +656,277 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
         "dom_content_text_count": 0,
     }
 
+    def page_action(page: Any) -> None:
+        def on_response(response: Any) -> None:
+            try:
+                if "/youtubei/v1/next" in response.url:
+                    state["next_requests"] = int(state.get("next_requests") or 0) + 1
+                    try:
+                        payload = json.loads(response.text())
+                        payload_added = collect_youtube_payload_comments(
+                            payload,
+                            video_id,
+                            video_url,
+                            comments_by_id,
+                            max_reviews,
+                        )
+                        renderer_added = collect_youtube_renderer_comments(
+                            payload,
+                            video_id,
+                            video_url,
+                            comments_by_id,
+                            max_reviews,
+                        )
+                        state["payload_comments"] = int(state.get("payload_comments") or 0) + payload_added + renderer_added
+                    except Exception:
+                        return
+            except Exception:
+                return
+
+        page.on("response", on_response)
+        page.wait_for_timeout(2500)
+
+        try:
+            for selector in [
+                "button:has-text('Accept all')",
+                "button:has-text('I agree')",
+                "button:has-text('全部接受')",
+                "button:has-text('同意')",
+            ]:
+                button = page.query_selector(selector)
+                if button:
+                    button.click(timeout=2000)
+                    page.wait_for_timeout(800)
+                    break
+        except Exception:
+            pass
+
+        try:
+            title = page.title() or ""
+            state["title"] = title.replace("- YouTube", "").strip()
+        except Exception:
+            state["title"] = ""
+
+        def extract_comments() -> list[dict[str, Any]]:
+            return page.evaluate(
+                """() => {
+                    const clean = (value) => (value || "").replace(/\\s+/g, " ").trim();
+                    const comments = Array.from(document.querySelectorAll(
+                      "ytd-comment-view-model#comment, ytd-comment-view-model"
+                    )).filter((comment, index, all) =>
+                      !comment.closest("ytd-comment-replies-renderer") && all.indexOf(comment) === index
+                    );
+                    return comments.map((comment, index) => {
+                      const thread = comment.closest("ytd-comment-thread-renderer");
+                      const author =
+                        clean(comment.querySelector("#author-text span")?.textContent) ||
+                        clean(comment.querySelector("#author-thumbnail-button")?.getAttribute("aria-label"));
+                      const contentRoot = comment.querySelector("#content-text, yt-attributed-string[slot='content']");
+                      const content = clean(contentRoot?.innerText || contentRoot?.textContent);
+                      const timeLink = comment.querySelector("#published-time-text a");
+                      const publishedTime = clean(timeLink?.textContent);
+                      const href = timeLink?.getAttribute("href") || "";
+                      let commentId = "";
+                      try {
+                        const url = new URL(href, location.origin);
+                        commentId = url.searchParams.get("lc") || "";
+                      } catch {}
+                      const likeText = clean(comment.querySelector("#vote-count-middle")?.textContent);
+                      const replyText =
+                        clean(thread.querySelector("ytd-comment-replies-renderer #more-replies-sub-thread button")?.getAttribute("aria-label")) ||
+                        clean(thread.querySelector("ytd-comment-replies-renderer #more-replies-sub-thread span[role='text']")?.textContent);
+                      if (!content) return null;
+                      return { index, author, content, publishedTime, commentId, likeText, replyText };
+                    }).filter(Boolean);
+                }"""
+            )
+
+        def has_end_hint() -> bool:
+            try:
+                return bool(
+                    page.evaluate(
+                        """() => {
+                            const text = document.body?.innerText || "";
+                            return text.includes("目前你选择的是") ||
+                              text.includes("当前你选择的是") ||
+                              (text.includes("最热门") && text.includes("精选评论")) ||
+                              text.includes("You're currently sorted") ||
+                              text.includes("Top comments");
+                        }"""
+                    )
+                )
+            except Exception:
+                return False
+
+        def refresh_diagnostics() -> None:
+            try:
+                diagnostics = page.evaluate(
+                    """() => ({
+                        commentViews: document.querySelectorAll("ytd-comment-view-model").length,
+                        contentTexts: document.querySelectorAll("ytd-comment-view-model #content-text, ytd-comment-view-model yt-attributed-string[slot='content']").length,
+                        continuations: document.querySelectorAll("ytd-continuation-item, tp-yt-paper-spinner, #continuations").length,
+                        scrollY: Math.round(window.scrollY || 0),
+                        scrollHeight: Math.round(document.documentElement?.scrollHeight || document.body?.scrollHeight || 0)
+                    })"""
+                )
+                state["dom_comment_count"] = int(diagnostics.get("commentViews") or 0)
+                state["dom_content_text_count"] = int(diagnostics.get("contentTexts") or 0)
+                state["continuation_count"] = int(diagnostics.get("continuations") or 0)
+                state["scroll_y"] = int(diagnostics.get("scrollY") or 0)
+                state["scroll_height"] = int(diagnostics.get("scrollHeight") or 0)
+            except Exception:
+                return
+
+        def trigger_more_comments(round_index: int) -> None:
+            page.evaluate(
+                """(roundIndex) => {
+                    const scrollIntoView = (node) => {
+                      if (node) node.scrollIntoView({ block: "center", inline: "nearest" });
+                      return Boolean(node);
+                    };
+                    const continuation =
+                      document.querySelector("ytd-continuation-item") ||
+                      document.querySelector("#continuations") ||
+                      document.querySelector("tp-yt-paper-spinner");
+                    if (scrollIntoView(continuation)) return;
+
+                    const comments = Array.from(document.querySelectorAll("ytd-comment-view-model"));
+                    const lastComment = comments[comments.length - 1];
+                    if (scrollIntoView(lastComment)) return;
+
+                    const delta = Math.max(window.innerHeight * (roundIndex % 3 === 0 ? 2.2 : 1.1), 900);
+                    window.scrollBy({ top: delta, behavior: "smooth" });
+                }""",
+                round_index,
+            )
+
+        idle_rounds = 0
+        last_count = 0
+        last_next_requests = int(state.get("next_requests") or 0)
+        deadline = time.time() + timeout
+
+        try:
+            page.evaluate(
+                """() => {
+                    const comments = document.querySelector("ytd-comments");
+                    if (comments) {
+                        comments.scrollIntoView({ block: "start" });
+                    } else {
+                        window.scrollBy(0, Math.max(900, Math.floor(window.innerHeight * 1.2)));
+                    }
+                }"""
+            )
+            page.wait_for_timeout(2200)
+        except Exception:
+            page.wait_for_timeout(1200)
+
+        refresh_diagnostics()
+
+        while (max_reviews <= 0 or len(comments_by_id) < max_reviews) and time.time() < deadline:
+            try:
+                trigger_more_comments(idle_rounds)
+                page.wait_for_timeout(2400 if idle_rounds else 1800)
+                if idle_rounds >= 2:
+                    page.keyboard.press("End")
+                    page.wait_for_timeout(1800)
+                if idle_rounds >= 5:
+                    page.keyboard.press("PageDown")
+                    page.wait_for_timeout(1600)
+            except Exception:
+                page.wait_for_timeout(1600)
+
+            refresh_diagnostics()
+
+            for item in extract_comments():
+                content = str(item.get("content") or "").strip()
+                if not content:
+                    continue
+                author = str(item.get("author") or "").strip()
+                published_time = str(item.get("publishedTime") or "").strip()
+                comment_id = str(item.get("commentId") or "").strip() or stable_youtube_comment_id(
+                    video_id,
+                    author,
+                    published_time,
+                    content,
+                    int(item.get("index") or len(comments_by_id)),
+                )
+                comments_by_id[comment_id] = {
+                    "cmtId": comment_id,
+                    "shopId": "youtube",
+                    "itemId": video_id,
+                    "ratingStar": 0,
+                    "comment": content,
+                    "commentTr": None,
+                    "modelName": author or None,
+                    "hasMedia": False,
+                    "commentTime": None,
+                    "rawJson": {
+                        "platform": "YouTube",
+                        "videoId": video_id,
+                        "author": author,
+                        "publishedTime": published_time,
+                        "likeText": item.get("likeText") or "",
+                        "replyText": item.get("replyText") or "",
+                        "sourceUrl": video_url,
+                    },
+                }
+                if max_reviews > 0 and len(comments_by_id) >= max_reviews:
+                    break
+
+            current_count = len(comments_by_id)
+            current_next_requests = int(state.get("next_requests") or 0)
+            if current_count == last_count and current_next_requests == last_next_requests:
+                idle_rounds += 1
+            else:
+                idle_rounds = 0
+            last_count = current_count
+            last_next_requests = current_next_requests
+
+            if has_end_hint():
+                state["end_reached"] = True
+                if idle_rounds >= 1:
+                    break
+            if idle_rounds >= 10:
+                break
+
+    fetch_kwargs: dict[str, Any] = {
+        "headless": True,
+        "disable_resources": False,
+        "network_idle": False,
+        "timeout": timeout * 1000,
+        "wait": 1000,
+        "page_action": page_action,
+        "locale": "zh-CN",
+        "extra_headers": {"accept-language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7"},
+    }
+    if proxy:
+        fetch_kwargs["proxy"] = proxy
+
+    apply_dynamic_fetcher_defaults(fetch_kwargs)
+    DynamicFetcher.fetch(video_url, **fetch_kwargs)
+    rows = list(comments_by_id.values())
+    if max_reviews > 0:
+        rows = rows[:max_reviews]
+    return {
+        "source": "YouTube",
+        "crawlChannel": "youtube_dom",
+        "crawlChannelLabel": CHANNEL_LABELS["youtube_dom"],
+        "productUrl": video_url,
+        "productName": state.get("title") or f"YouTube {video_id}",
+        "shopId": "youtube",
+        "itemId": video_id,
+        "videoId": video_id,
+        "nextRequests": state.get("next_requests"),
+        "endReached": state.get("end_reached"),
+        "payloadComments": state.get("payload_comments"),
+        "domCommentCount": state.get("dom_comment_count"),
+        "domContentTextCount": state.get("dom_content_text_count"),
+        "continuationCount": state.get("continuation_count"),
+        "scrollY": state.get("scroll_y"),
+        "scrollHeight": state.get("scroll_height"),
+        "rows": rows,
+    }
+
 
 def collect_tiktok_api_comments(
     payload: dict[str, Any],

@@ -147,14 +147,18 @@ const navSections = computed<NavSection[]>(() => [
       { path: "/analysis-runs", label: "分析记录", disabled: false }
     ]
   },
-  {
-    label: "模型与抓取",
-    icon: SettingOutlined,
-    items: [
-      { path: "/settings/ai", label: "提示词与模型", disabled: false },
-      { path: "/settings/crawler", label: "抓取设置", disabled: false }
-    ]
-  },
+  ...(currentUser.value?.isSuperAdmin
+    ? [
+        {
+          label: "模型与抓取",
+          icon: SettingOutlined,
+          items: [
+            { path: "/settings/ai", label: "提示词与模型", disabled: false },
+            { path: "/settings/crawler", label: "抓取设置", disabled: false }
+          ]
+        }
+      ]
+    : []),
   {
     label: "平台管理",
     icon: TeamOutlined,

@@ -50,6 +50,18 @@ type ResolvedCrawlerSetting = {
   requestTimeoutSec: number;
 };
 
+function isCrawlResult(value: unknown): value is CrawlResult {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Array.isArray((value as { rows?: unknown }).rows));
+}
+
+function parseCrawlerOutput(stdout: string) {
+  const parsed = JSON.parse(stdout) as unknown;
+  if (!isCrawlResult(parsed)) {
+    throw new Error("Scrapling crawler returned an invalid result: missing rows array");
+  }
+  return parsed;
+}
+
 function parseCrawlerChannels(value: string | null | undefined): CrawlerChannel[] {
   return String(value || "")
     .split(",")
@@ -133,7 +145,7 @@ function runScraplingCrawler(productUrl: string, maxReviews: number, setting: Re
         return;
       }
       try {
-        resolve(JSON.parse(stdout) as CrawlResult);
+        resolve(parseCrawlerOutput(stdout));
       } catch (error) {
         reject(error);
       }
@@ -238,6 +250,12 @@ type TopicRule = {
   kind: "issue" | "highlight" | "mixed";
 };
 
+type RuntimeTopicRule = {
+  label: string;
+  keywords: string[];
+  kind: "issue" | "highlight" | "mixed";
+};
+
 const TOPIC_RULES: TopicRule[] = [
   { label: "物流速度", keywords: ["delivery", "shipping", "arrive", "ส่ง", "จัดส่ง", "เร็ว", "快递", "发货", "到货"], kind: "mixed" },
   { label: "包装保护", keywords: ["package", "packaging", "boxed", "แพค", "กล่อง", "包装", "外包装"], kind: "mixed" },
@@ -256,6 +274,84 @@ const TOPIC_RULES: TopicRule[] = [
 
 const POSITIVE_HINTS = ["good", "great", "excellent", "fast", "worth", "recommend", "clean", "easy", "ดี", "คุ้ม", "เร็ว", "好", "不错", "满意", "推荐", "喜欢", "完美"];
 const NEGATIVE_HINTS = ["bad", "broken", "problem", "issue", "slow", "difficult", "hard", "cannot", "failed", "เสีย", "ยาก", "ช้า", "差", "坏", "问题", "故障", "难用", "失望"];
+
+const AUDIENCE_POSITIVE_HINTS = [
+  "love",
+  "like",
+  "thanks",
+  "thank",
+  "agree",
+  "support",
+  "helpful",
+  "useful",
+  "insightful",
+  "interesting",
+  "amazing",
+  "great video",
+  "well said",
+  "赞",
+  "支持",
+  "喜欢",
+  "感谢",
+  "有道理",
+  "精彩",
+  "认同"
+];
+const AUDIENCE_NEGATIVE_HINTS = [
+  "fake",
+  "lie",
+  "wrong",
+  "bias",
+  "biased",
+  "disagree",
+  "trash",
+  "scam",
+  "misleading",
+  "clickbait",
+  "nonsense",
+  "反对",
+  "造假",
+  "错误",
+  "不认同",
+  "偏见",
+  "标题党",
+  "误导",
+  "离谱"
+];
+
+function topicLabel(setting: ResolvedAiSetting, index: number, fallback: string) {
+  return setting.taxonomy[index] || fallback;
+}
+
+function buildContextTopicRules(setting: ResolvedAiSetting): RuntimeTopicRule[] {
+  if (setting.analysisType === "video") {
+    return [
+      { label: topicLabel(setting, 0, "内容选题"), keywords: ["topic", "subject", "story", "内容", "选题", "主题", "题材"], kind: "mixed" },
+      { label: topicLabel(setting, 1, "叙事结构"), keywords: ["storytelling", "structure", "pace", "节奏", "叙事", "结构", "逻辑"], kind: "mixed" },
+      { label: topicLabel(setting, 2, "观点立场"), keywords: ["opinion", "view", "stance", "agree", "disagree", "观点", "立场", "认同", "反对"], kind: "mixed" },
+      { label: topicLabel(setting, 3, "事实证据"), keywords: ["source", "evidence", "fact", "data", "proof", "证据", "事实", "数据", "来源"], kind: "mixed" },
+      { label: topicLabel(setting, 4, "情绪共鸣"), keywords: ["love", "moved", "touching", "angry", "sad", "共鸣", "感动", "愤怒", "情绪"], kind: "mixed" },
+      { label: topicLabel(setting, 5, "表达节奏"), keywords: ["editing", "voice", "pace", "剪辑", "表达", "语速", "节奏"], kind: "mixed" },
+      { label: topicLabel(setting, 6, "标题封面"), keywords: ["title", "thumbnail", "clickbait", "标题", "封面", "标题党"], kind: "issue" },
+      { label: topicLabel(setting, 8, "争议澄清"), keywords: ["fake", "wrong", "misleading", "clarify", "造假", "错误", "误导", "澄清", "争议"], kind: "issue" },
+      { label: topicLabel(setting, 9, "互动引导"), keywords: ["subscribe", "comment", "reply", "互动", "回复", "订阅", "点赞"], kind: "highlight" },
+      { label: topicLabel(setting, 10, "受众期待"), keywords: ["next", "more", "episode", "希望", "期待", "下期", "继续"], kind: "highlight" },
+      { label: topicLabel(setting, 11, "账号信任"), keywords: ["trust", "credible", "channel", "可信", "信任", "账号", "频道"], kind: "mixed" }
+    ];
+  }
+  if (setting.analysisType === "tweet") {
+    return [
+      { label: topicLabel(setting, 0, "支持立场"), keywords: ["support", "agree", "yes", "支持", "赞同", "认同"], kind: "highlight" },
+      { label: topicLabel(setting, 1, "反对立场"), keywords: ["oppose", "disagree", "no", "反对", "不认同", "不同意"], kind: "issue" },
+      { label: topicLabel(setting, 2, "中立观望"), keywords: ["wait", "watch", "neutral", "观望", "中立", "等等看"], kind: "mixed" },
+      { label: topicLabel(setting, 3, "事实质疑"), keywords: ["fake", "source", "proof", "fact", "造假", "来源", "证据", "事实"], kind: "issue" },
+      { label: topicLabel(setting, 6, "传播扩散"), keywords: ["share", "viral", "spread", "转发", "传播", "扩散"], kind: "highlight" },
+      { label: topicLabel(setting, 7, "误解谣言"), keywords: ["rumor", "misleading", "误解", "谣言", "误导"], kind: "issue" },
+      { label: topicLabel(setting, 9, "回应诉求"), keywords: ["respond", "answer", "回应", "解释", "诉求"], kind: "mixed" }
+    ];
+  }
+  return TOPIC_RULES;
+}
 
 function resolveEnvKey(provider: string) {
   for (const name of PROVIDER_DEFAULTS[provider]?.envKeys || ["OPENAI_API_KEY"]) {
@@ -281,19 +377,47 @@ function resolveBaseUrl(provider: string, storedBaseUrl?: string | null) {
   return storedBaseUrl;
 }
 
+async function getPlatformAiSetting() {
+  return prisma.workspaceAiSetting.findFirst({
+    where: {
+      workspace: {
+        memberships: {
+          some: {
+            user: { isSuperAdmin: true }
+          }
+        }
+      }
+    },
+    orderBy: { updatedAt: "desc" }
+  });
+}
+
+async function getPlatformCrawlerSetting() {
+  return prisma.workspaceCrawlerSetting.findFirst({
+    where: {
+      workspace: {
+        memberships: {
+          some: {
+            user: { isSuperAdmin: true }
+          }
+        }
+      }
+    },
+    orderBy: { updatedAt: "desc" }
+  });
+}
+
 async function loadAiSetting(taskId: string): Promise<ResolvedAiSetting> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    include: { workspace: { include: { aiSetting: true } } }
+    select: { analysisType: true }
   });
-  return resolveAiSetting(task?.workspace?.aiSetting || null, ((task?.analysisType as AnalysisType | null) || "product"));
+  return resolveAiSetting(await getPlatformAiSetting(), ((task?.analysisType as AnalysisType | null) || "product"));
 }
 
 async function loadAiSettingForWorkspace(workspaceId: string, analysisType: AnalysisType): Promise<ResolvedAiSetting> {
-  const setting = await prisma.workspaceAiSetting.findUnique({
-    where: { workspaceId }
-  });
-  return resolveAiSetting(setting, analysisType);
+  void workspaceId;
+  return resolveAiSetting(await getPlatformAiSetting(), analysisType);
 }
 
 function resolveAiSetting(
@@ -501,6 +625,26 @@ function shouldUseResponsesApi(setting: ResolvedAiSetting) {
   return setting.provider === "openai";
 }
 
+function buildSystemPrompt(setting: ResolvedAiSetting) {
+  const domainGuard =
+    setting.analysisType === "video"
+      ? [
+          "This is a video-comment analysis task, not necessarily an e-commerce or product-review task.",
+          "YouTube/TikTok video comments may discuss news, education, entertainment, politics, finance, creators, arguments, evidence, emotions, or community interaction.",
+          "Do not assume logistics, packaging, after-sales service, price, product quality, or other shopping topics unless the comment explicitly mentions them.",
+          "Video comments usually have rating_star 0 or missing. Treat rating_star 0 as no rating, not as a negative rating.",
+          "Classify sentiment from the comment text itself: praise/support/thanks is positive; questions or factual additions can be neutral; only explicit criticism, anger, distrust, or disagreement is negative."
+        ].join("\n")
+      : setting.analysisType === "tweet"
+        ? [
+            "This is a social-media discussion analysis task, not necessarily an e-commerce or product-review task.",
+            "Do not assume shopping topics unless the text explicitly mentions them.",
+            "Classify sentiment from stance, support, opposition, skepticism, risk, and discussion context."
+          ].join("\n")
+        : "";
+  return [setting.systemPrompt, domainGuard].filter(Boolean).join("\n\n");
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -525,55 +669,75 @@ function scoreHits(text: string, words: string[]) {
   return words.filter((word) => text.includes(word.toLowerCase())).length;
 }
 
-function inferTopics(text: string) {
-  return TOPIC_RULES.filter((rule) => rule.keywords.some((keyword) => text.includes(keyword.toLowerCase())));
+function inferTopics(text: string, setting: ResolvedAiSetting) {
+  return buildContextTopicRules(setting).filter((rule) => rule.keywords.some((keyword) => text.includes(keyword.toLowerCase())));
 }
 
-function inferKeywords(text: string, matchedTopics: TopicRule[]) {
+function inferKeywords(text: string, matchedTopics: RuntimeTopicRule[], setting: ResolvedAiSetting) {
   const englishWords = text
     .replace(/[^\p{L}\p{N}\s-]/gu, " ")
     .split(/\s+/)
     .map((word) => word.trim())
     .filter((word) => /^[a-z][a-z0-9-]{2,}$/i.test(word))
     .slice(0, 6);
-  return unique([...matchedTopics.map((item) => item.label), ...englishWords]).slice(0, 10);
+  const baseKeywords = unique([...matchedTopics.map((item) => item.label), ...englishWords]).slice(0, 10);
+  if (baseKeywords.length) {
+    return baseKeywords;
+  }
+  return setting.analysisType === "video" ? ["观众反馈", "视频评论"] : setting.analysisType === "tweet" ? ["舆情反馈", "社媒评论"] : [];
 }
 
 function inferSentiment(text: string, ratingStar: number) {
-  const positiveHits = scoreHits(text, POSITIVE_HINTS);
-  const negativeHits = scoreHits(text, NEGATIVE_HINTS);
-  if (ratingStar <= 3 || negativeHits >= positiveHits + 1) {
+  const positiveHits = scoreHits(text, [...POSITIVE_HINTS, ...AUDIENCE_POSITIVE_HINTS]);
+  const negativeHits = scoreHits(text, [...NEGATIVE_HINTS, ...AUDIENCE_NEGATIVE_HINTS]);
+  if (ratingStar > 0 && ratingStar <= 3) {
     return { sentiment: "negative" as const, sentimentScore: ratingStar <= 2 ? 0.14 : 0.22 };
   }
-  if (ratingStar === 4 || negativeHits > 0) {
+  if (negativeHits >= positiveHits + 1) {
+    return { sentiment: "negative" as const, sentimentScore: ratingStar <= 2 ? 0.14 : 0.22 };
+  }
+  if (ratingStar === 4 || negativeHits > 0 || (ratingStar <= 0 && positiveHits === 0)) {
     return { sentiment: "neutral" as const, sentimentScore: 0.56 };
   }
   return { sentiment: "positive" as const, sentimentScore: positiveHits >= 2 ? 0.92 : 0.84 };
 }
 
-function mockAnalyze(comment: string, commentTr: string | null, ratingStar: number): AnalysisResult {
+function mockAnalyze(comment: string, commentTr: string | null, ratingStar: number, setting: ResolvedAiSetting): AnalysisResult {
   const original = comment.trim();
   const translated = (commentTr || "").trim();
   const combined = `${translated}\n${original}`.toLowerCase();
-  const matchedTopics = inferTopics(combined);
+  const matchedTopics = inferTopics(combined, setting);
   const topicLabels = unique(matchedTopics.map((item) => item.label)).slice(0, 5);
-  const keywords = inferKeywords(combined, matchedTopics);
+  const keywords = inferKeywords(combined, matchedTopics, setting);
   const { sentiment, sentimentScore } = inferSentiment(combined, ratingStar);
   const issueTopics = matchedTopics.filter((item) => item.kind !== "highlight").map((item) => item.label);
   const highlightTopics = matchedTopics.filter((item) => item.kind !== "issue").map((item) => item.label);
   const painPoints = sentiment === "negative" ? unique(issueTopics).slice(0, 3) : sentiment === "neutral" ? unique(issueTopics).slice(0, 2) : [];
   const highlights = sentiment === "positive" ? unique(highlightTopics.length ? highlightTopics : topicLabels).slice(0, 3) : sentiment === "neutral" ? unique(highlightTopics).slice(0, 2) : [];
   const tone = sentiment === "positive" ? "整体评价偏正面" : sentiment === "negative" ? "整体评价偏负面" : "整体评价偏中性";
+  const fallbackTopic = topicLabel(setting, 0, setting.analysisType === "video" ? "内容选题" : setting.analysisType === "tweet" ? "中立观望" : "综合体验");
+  const suggestion =
+    setting.analysisType === "video"
+      ? sentiment === "negative"
+        ? "建议核查争议评论中的事实质疑，并在后续内容或置顶回复中澄清。"
+        : "建议延展观众认可的选题和表达方式，增强互动与系列化内容。"
+      : setting.analysisType === "tweet"
+        ? sentiment === "negative"
+          ? "建议优先回应高频质疑点，降低误解扩散风险。"
+          : "建议放大支持理由，并跟进可继续传播的话题。"
+        : sentiment === "negative"
+          ? "建议优先排查差评中的核心问题，并完善售后响应。"
+          : "建议持续放大高频好评点，用于详情页和营销素材。";
   return {
     sentiment,
     sentimentScore,
-    topicLabels: topicLabels.length ? topicLabels : ["综合体验"],
-    keywords: keywords.length ? keywords : ["电商评论"],
+    topicLabels: topicLabels.length ? topicLabels : [fallbackTopic],
+    keywords,
     summary: `${tone}${topicLabels.length ? `，重点涉及${topicLabels.join("、")}` : ""}。${(translated || original).slice(0, 56)}`,
     painPoints,
     highlights,
-    suggestion: sentiment === "negative" ? "建议优先排查差评中的核心问题，并完善售后响应。" : "建议持续放大高频好评点，用于详情页和营销素材。",
-    needsAttention: sentiment === "negative" || ratingStar <= 2
+    suggestion,
+    needsAttention: sentiment === "negative" || (ratingStar > 0 && ratingStar <= 2)
   };
 }
 
@@ -610,7 +774,7 @@ function buildBatchPrompt(setting: ResolvedAiSetting, items: BatchInput[]) {
 
 async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, item: BatchInput): Promise<AnalysisResult> {
   if (process.env.ENABLE_MOCK_AI === "true") {
-    return mockAnalyze(item.comment, item.commentTr, item.ratingStar);
+    return mockAnalyze(item.comment, item.commentTr, item.ratingStar, setting);
   }
   if (!client) {
     throw new Error(`API key for provider "${setting.provider}" is not configured`);
@@ -624,7 +788,7 @@ async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, ite
       messages: [
         {
           role: "system",
-          content: `${setting.systemPrompt}\nReturn only valid JSON. Do not wrap it in markdown.`
+          content: `${buildSystemPrompt(setting)}\nReturn only valid JSON. Do not wrap it in markdown.`
         },
         {
           role: "user",
@@ -643,7 +807,7 @@ async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, ite
     model: setting.modelName,
     temperature: setting.temperature,
     input: [
-      { role: "system", content: setting.systemPrompt },
+      { role: "system", content: buildSystemPrompt(setting) },
       { role: "user", content: buildSinglePrompt(setting, item) }
     ],
     text: { format: zodTextFormat(analysisSchema, "review_analysis") }
@@ -664,7 +828,7 @@ async function analyzeBatch(client: OpenAI, setting: ResolvedAiSetting, items: B
       messages: [
         {
           role: "system",
-          content: `${setting.systemPrompt}\nReturn only valid JSON. Do not wrap it in markdown. The analyses array must contain exactly one entry per input review, in the same order.`
+          content: `${buildSystemPrompt(setting)}\nReturn only valid JSON. Do not wrap it in markdown. The analyses array must contain exactly one entry per input review, in the same order.`
         },
         {
           role: "user",
@@ -690,7 +854,7 @@ async function analyzeBatch(client: OpenAI, setting: ResolvedAiSetting, items: B
     input: [
       {
         role: "system",
-        content: `${setting.systemPrompt}\nThe analyses array must contain exactly one entry per input review, in the same order.`
+        content: `${buildSystemPrompt(setting)}\nThe analyses array must contain exactly one entry per input review, in the same order.`
       },
       { role: "user", content: buildBatchPrompt(setting, items) }
     ],
@@ -1416,7 +1580,7 @@ const crawlWorker = new Worker(
     const crawlJobId = String(job.data.crawlJobId || "");
     const crawlJob = await prisma.crawlJob.findUnique({
       where: { id: crawlJobId },
-      include: { workspace: { include: { crawlerSetting: true } }, monitor: true }
+      include: { monitor: true }
     });
     if (!crawlJob) {
       throw new Error(`Crawl job ${crawlJobId} not found`);
@@ -1425,7 +1589,7 @@ const crawlWorker = new Worker(
       return { skipped: true };
     }
 
-    const storedSetting = crawlJob.workspace.crawlerSetting;
+    const storedSetting = await getPlatformCrawlerSetting();
     const setting: ResolvedCrawlerSetting = {
       pythonBin: resolveCrawlerPythonBin(storedSetting?.pythonBin),
       proxyUrl: storedSetting?.proxyUrl || process.env.SCRAPLING_PROXY || null,

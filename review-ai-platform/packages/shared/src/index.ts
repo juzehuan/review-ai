@@ -846,11 +846,15 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
   const total = analyses.length;
   const ratedAnalyses = analyses.filter((item) => item.review.ratingStar > 0);
   const ratingTotal = ratedAnalyses.length;
+  const positiveCount = analyses.filter((item) => item.sentiment === "positive").length;
+  const neutralCount = analyses.filter((item) => item.sentiment === "neutral").length;
   const negativeCount = analyses.filter((item) => item.sentiment === "negative").length;
-  const promoters = ratedAnalyses.filter((item) => item.review.ratingStar === 5).length;
-  const passives = ratedAnalyses.filter((item) => item.review.ratingStar === 4).length;
-  const detractors = ratedAnalyses.filter((item) => item.review.ratingStar <= 3).length;
-  const nps = ratingTotal ? round(((promoters - detractors) / ratingTotal) * 100) : 0;
+  const hasRatingNps = ratingTotal > 0;
+  const promoters = hasRatingNps ? ratedAnalyses.filter((item) => item.review.ratingStar === 5).length : positiveCount;
+  const passives = hasRatingNps ? ratedAnalyses.filter((item) => item.review.ratingStar === 4).length : neutralCount;
+  const detractors = hasRatingNps ? ratedAnalyses.filter((item) => item.review.ratingStar <= 3).length : negativeCount;
+  const npsTotal = hasRatingNps ? ratingTotal : total;
+  const nps = npsTotal ? round(((promoters - detractors) / npsTotal) * 100) : 0;
   const avgRating = ratingTotal ? round(ratedAnalyses.reduce((sum, item) => sum + item.review.ratingStar, 0) / ratingTotal) : 0;
 
   const npsBreakdown = [
@@ -858,6 +862,13 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
     { label: "中立者 4 星", count: passives, percent: ratingTotal ? round((passives / ratingTotal) * 100) : 0 },
     { label: "推荐者 5 星", count: promoters, percent: ratingTotal ? round((promoters / ratingTotal) * 100) : 0 }
   ];
+  const effectiveNpsBreakdown = hasRatingNps
+    ? npsBreakdown
+    : [
+        { label: "负向观众", count: detractors, percent: npsTotal ? round((detractors / npsTotal) * 100) : 0 },
+        { label: "中性观众", count: passives, percent: npsTotal ? round((passives / npsTotal) * 100) : 0 },
+        { label: "正向观众", count: promoters, percent: npsTotal ? round((promoters / npsTotal) * 100) : 0 }
+      ];
 
   const ratingSentiment = [1, 2, 3, 4, 5].map((ratingStar) => {
     const byStar = ratedAnalyses.filter((item) => item.review.ratingStar === ratingStar);
@@ -991,7 +1002,7 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
     negativeCount,
     avgRating,
     nps,
-    npsBreakdown,
+    npsBreakdown: effectiveNpsBreakdown,
     ratingSentiment,
     ratingDistribution,
     sentimentDistribution,

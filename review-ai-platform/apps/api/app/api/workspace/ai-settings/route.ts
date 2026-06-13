@@ -1,7 +1,8 @@
 import { prisma } from "@review-ai/db";
 import { fail, ok } from "@/lib/http";
 import { defaultAiSetting, normalizeProviderBaseUrl, serializeAiSetting } from "@/lib/ai-settings";
-import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+import { getPlatformAiSetting } from "@/lib/platform-settings";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 export async function GET(request: Request) {
   const context = await getWorkspaceContext(request);
@@ -9,11 +10,11 @@ export async function GET(request: Request) {
     return context.response;
   }
 
-  const setting = await prisma.workspaceAiSetting.findUnique({
-    where: { workspaceId: context.workspace.id }
-  });
+  if (!context.user?.isSuperAdmin) {
+    return fail("模型配置由平台超管统一管理。", 403);
+  }
 
-  return ok(serializeAiSetting(setting));
+  return ok(serializeAiSetting(await getPlatformAiSetting()));
 }
 
 export async function PATCH(request: Request) {
@@ -22,9 +23,8 @@ export async function PATCH(request: Request) {
     return context.response;
   }
 
-  const roleResponse = requireWorkspaceRole(context, ["owner", "admin"]);
-  if (roleResponse) {
-    return roleResponse;
+  if (!context.user?.isSuperAdmin) {
+    return fail("模型配置由平台超管统一管理。", 403);
   }
 
   const body = await request.json().catch(() => ({}));

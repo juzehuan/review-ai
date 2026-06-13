@@ -302,7 +302,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { message } from "ant-design-vue";
 import { DownloadOutlined } from "@ant-design/icons-vue";
 import {
@@ -331,6 +331,7 @@ import { useTaskStore } from "@/composables";
 
 const { workspace, workspaces, currentUser, refreshTasks, switchWorkspace } = useTaskStore();
 const route = useRoute();
+const router = useRouter();
 const modalOpen = ref(false);
 const memberModalOpen = ref(false);
 const saving = ref(false);
@@ -415,9 +416,11 @@ const pageSubtitle = computed(() => {
   return "管理当前空间、成员角色、我的空间列表和额度使用情况。";
 });
 const canEditAi = computed(() => {
+  return Boolean(currentUser.value?.isSuperAdmin);
+});
+const canManageMembers = computed(() => {
   return Boolean(currentUser.value?.isSuperAdmin || currentRole.value === "owner" || currentRole.value === "admin");
 });
-const canManageMembers = computed(() => canEditAi.value);
 const currentProvider = computed(() => AI_PROVIDER_PRESETS.find((item) => item.id === aiForm.provider) || null);
 const providerModels = computed(() => {
   const models = currentProvider.value?.models || [];
@@ -653,6 +656,10 @@ async function loadMembers() {
 }
 
 async function reloadCurrentSection() {
+  if ((activeSection.value === "ai" || activeSection.value === "crawler") && currentUser.value && !currentUser.value.isSuperAdmin) {
+    router.replace("/dashboard");
+    return;
+  }
   loading.value = true;
   try {
     if (activeSection.value === "workspace") {

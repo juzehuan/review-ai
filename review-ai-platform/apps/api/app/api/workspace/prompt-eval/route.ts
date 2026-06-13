@@ -1,7 +1,8 @@
 import { prisma } from "@review-ai/db";
 import type { PromptEvalDTO } from "@review-ai/shared";
-import { ok } from "@/lib/http";
-import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+import { fail, ok } from "@/lib/http";
+import { getPlatformAiSetting } from "@/lib/platform-settings";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 function includesAny(value: string, tokens: string[]) {
   const lower = value.toLowerCase();
@@ -13,13 +14,12 @@ export async function POST(request: Request) {
   if (workspaceContext.response || !workspaceContext.workspace) {
     return workspaceContext.response;
   }
-  const roleResponse = requireWorkspaceRole(workspaceContext, ["owner", "admin", "analyst"]);
-  if (roleResponse) {
-    return roleResponse;
+  if (!workspaceContext.user?.isSuperAdmin) {
+    return fail("提示词评估由平台超管统一管理。", 403);
   }
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const setting = await prisma.workspaceAiSetting.findUnique({ where: { workspaceId: workspaceContext.workspace.id } });
+  const setting = await getPlatformAiSetting();
   const userPromptTemplate = String(body.userPromptTemplate || setting?.userPromptTemplate || "");
   const systemPrompt = String(body.systemPrompt || setting?.systemPrompt || "");
   const summaryPrompt = String(body.summaryPrompt || setting?.summaryPrompt || "");

@@ -2,6 +2,7 @@ import { prisma } from "@review-ai/db";
 import type { CreateCrawlMonitorResponse } from "@review-ai/shared";
 import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord } from "@/lib/crawl-utils";
 import { fail, ok } from "@/lib/http";
+import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlMonitor } from "@/lib/serializers";
 import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -41,10 +42,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const name = String(body.name || "").trim();
   const productName = String(body.productName || "").trim();
-  const storedCrawlerSetting = await prisma.workspaceCrawlerSetting.findUnique({
-    where: { workspaceId: context.workspace.id }
-  });
-  const crawlerSetting = resolvedCrawlerSettingFromRecord(storedCrawlerSetting);
+  const crawlerSetting = resolvedCrawlerSettingFromRecord(await getPlatformCrawlerSetting());
   const input = normalizeRequestedCrawlInput(body, crawlerSetting);
 
   if (!name) {

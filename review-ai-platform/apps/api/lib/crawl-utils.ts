@@ -39,6 +39,18 @@ export type ResolvedCrawlerSetting = {
   requestTimeoutSec: number;
 };
 
+function isCrawlResult(value: unknown): value is CrawlResult {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Array.isArray((value as { rows?: unknown }).rows));
+}
+
+function parseCrawlerOutput(stdout: string) {
+  const parsed = JSON.parse(stdout) as unknown;
+  if (!isCrawlResult(parsed)) {
+    throw new Error("Scrapling crawler returned an invalid result: missing rows array");
+  }
+  return parsed;
+}
+
 const nestedUrlParamNames = ["url", "u", "q", "target", "redirect", "redirect_url"] as const;
 
 export function coerceCrawlUrl(value: string) {
@@ -222,7 +234,7 @@ export function runScraplingCrawler(productUrl: string, maxReviews: number, sett
         return;
       }
       try {
-        resolve(JSON.parse(stdout) as CrawlResult);
+        resolve(parseCrawlerOutput(stdout));
       } catch (error) {
         reject(error);
       }

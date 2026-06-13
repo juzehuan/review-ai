@@ -1,6 +1,7 @@
 import { prisma } from "@review-ai/db";
 import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord } from "@/lib/crawl-utils";
 import { fail, ok } from "@/lib/http";
+import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlMonitor } from "@/lib/serializers";
 import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -61,10 +62,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ monit
   }
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const storedCrawlerSetting = await prisma.workspaceCrawlerSetting.findUnique({
-    where: { workspaceId: workspaceContext.workspace.id }
-  });
-  const crawlerSetting = resolvedCrawlerSettingFromRecord(storedCrawlerSetting);
+  const crawlerSetting = resolvedCrawlerSettingFromRecord(await getPlatformCrawlerSetting());
   const input = body.productUrl ? normalizeRequestedCrawlInput(body, crawlerSetting) : null;
 
   if (input && !input.crawlerPlatform) {

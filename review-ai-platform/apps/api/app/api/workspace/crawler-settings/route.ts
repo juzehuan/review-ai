@@ -1,7 +1,8 @@
 import { prisma } from "@review-ai/db";
 import { defaultCrawlerSetting, serializeCrawlerSetting } from "@/lib/crawler-settings";
 import { fail, ok } from "@/lib/http";
-import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 export async function GET(request: Request) {
   const context = await getWorkspaceContext(request);
@@ -9,11 +10,18 @@ export async function GET(request: Request) {
     return context.response;
   }
 
-  const setting = await prisma.workspaceCrawlerSetting.findUnique({
-    where: { workspaceId: context.workspace.id }
-  });
+  const serialized = serializeCrawlerSetting(await getPlatformCrawlerSetting());
+  if (!context.user?.isSuperAdmin) {
+    return ok({
+      ...serialized,
+      pythonBin: "",
+      proxyUrl: null,
+      shopeeCookie: null,
+      shopeeCookieSet: false
+    });
+  }
 
-  return ok(serializeCrawlerSetting(setting));
+  return ok(serialized);
 }
 
 export async function PATCH(request: Request) {
@@ -22,9 +30,8 @@ export async function PATCH(request: Request) {
     return context.response;
   }
 
-  const roleResponse = requireWorkspaceRole(context, ["owner", "admin"]);
-  if (roleResponse) {
-    return roleResponse;
+  if (!context.user?.isSuperAdmin) {
+    return fail("抓取配置由平台超管统一管理。", 403);
   }
 
   const body = await request.json().catch(() => ({}));

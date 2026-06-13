@@ -3,6 +3,7 @@ import { getAnalysisQueue } from "@/lib/queue";
 import { fail, ok } from "@/lib/http";
 import { serializeRun } from "@/lib/serializers";
 import { defaultAiSetting, resolveApiKey } from "@/lib/ai-settings";
+import { getPlatformAiSetting } from "@/lib/platform-settings";
 import { assertRunQuota, getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function GET(request: Request, context: { params: Promise<{ taskId: string }> }) {
@@ -46,13 +47,9 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     return quotaResponse;
   }
 
-  const body = await request.json().catch(() => ({}));
-  const aiSetting =
-    (await prisma.workspaceAiSetting.findUnique({
-      where: { workspaceId: workspace.id }
-    })) || defaultAiSetting();
-  const modelName = String(body.modelName || aiSetting.modelName);
-  const promptVersion = String(body.promptVersion || aiSetting.promptVersion);
+  const aiSetting = (await getPlatformAiSetting()) || defaultAiSetting();
+  const modelName = aiSetting.modelName;
+  const promptVersion = aiSetting.promptVersion;
   const reviewCount = await prisma.review.count({ where: { taskId } });
 
   if (!reviewCount) {

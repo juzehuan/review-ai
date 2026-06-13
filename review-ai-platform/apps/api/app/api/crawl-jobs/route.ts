@@ -2,6 +2,7 @@ import { Prisma, prisma } from "@review-ai/db";
 import { getCrawlQueue } from "@/lib/queue";
 import { resolvedCrawlerSettingFromRecord, normalizeRequestedCrawlInput } from "@/lib/crawl-utils";
 import { fail, ok } from "@/lib/http";
+import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlJob } from "@/lib/serializers";
 import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -34,10 +35,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const name = String(body.name || "").trim();
   const productName = String(body.productName || "").trim();
-  const storedCrawlerSetting = await prisma.workspaceCrawlerSetting.findUnique({
-    where: { workspaceId: context.workspace.id }
-  });
-  const crawlerSetting = resolvedCrawlerSettingFromRecord(storedCrawlerSetting);
+  const crawlerSetting = resolvedCrawlerSettingFromRecord(await getPlatformCrawlerSetting());
   const input = normalizeRequestedCrawlInput(body, crawlerSetting);
 
   if (!input.productUrl) {

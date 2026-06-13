@@ -3,6 +3,7 @@ import type { CrawlResult } from "@/lib/crawl-utils";
 import { parseOptionalDate } from "@/lib/crawl-utils";
 import { defaultAiSetting, resolveApiKey } from "@/lib/ai-settings";
 import { fail, ok } from "@/lib/http";
+import { getPlatformAiSetting } from "@/lib/platform-settings";
 import { getAnalysisQueue } from "@/lib/queue";
 import { serializeRun } from "@/lib/serializers";
 import { assertReviewQuota, assertRunQuota, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
@@ -41,7 +42,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
   }
 
   const crawlResult = parseCrawlResult(job.rawResult);
-  if (!crawlResult?.rows.length) {
+  if (!crawlResult || !crawlResult.rows.length) {
     return fail("爬取结果为空，不能开始分析", 400);
   }
 
@@ -54,13 +55,9 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     return runQuotaResponse;
   }
 
-  const aiSetting =
-    (await prisma.workspaceAiSetting.findUnique({
-      where: { workspaceId: workspace.id }
-    })) || defaultAiSetting();
-  const body = await request.json().catch(() => ({}));
-  const modelName = String(body.modelName || aiSetting.modelName);
-  const promptVersion = String(body.promptVersion || aiSetting.promptVersion);
+  const aiSetting = (await getPlatformAiSetting()) || defaultAiSetting();
+  const modelName = aiSetting.modelName;
+  const promptVersion = aiSetting.promptVersion;
 
   if (
     process.env.ENABLE_MOCK_AI !== "true" &&
