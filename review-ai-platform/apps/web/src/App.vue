@@ -2,7 +2,7 @@
   <router-view v-if="isPublicRoute" />
 
   <a-layout v-else class="app-shell">
-    <a-layout-sider theme="light" width="288" class="app-sidebar">
+    <a-layout-sider theme="light" width="288" class="app-sidebar" :class="{ 'app-sidebar-collapsed': sidebarCollapsed }">
       <div class="brand-block">
         <div class="brand-mark">RI</div>
         <div class="brand-copy">
@@ -38,6 +38,7 @@
               class="side-nav-subitem"
               :class="{ active: itemActive(item), disabled: item.disabled }"
               :disabled="item.disabled"
+              :title="item.label"
               @click="router.push(item.path)"
             >
               <span>{{ item.label }}</span>
@@ -49,6 +50,12 @@
 
     <a-layout class="app-main">
       <header class="topbar">
+        <a-button class="sidebar-toggle" type="text" @click="sidebarCollapsed = !sidebarCollapsed">
+          <template #icon>
+            <MenuUnfoldOutlined v-if="sidebarCollapsed" />
+            <MenuFoldOutlined v-else />
+          </template>
+        </a-button>
         <div class="topbar-left">
           <div class="topbar-eyebrow">{{ currentUser?.isSuperAdmin ? "Super Admin" : "User Backend" }}</div>
           <div class="topbar-title">{{ pageTitle }}</div>
@@ -108,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { message } from "ant-design-vue";
 import {
@@ -116,6 +123,8 @@ import {
   FolderOpenOutlined,
   LockOutlined,
   LogoutOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   SettingOutlined,
   TeamOutlined
 } from "@ant-design/icons-vue";
@@ -125,7 +134,9 @@ import { useTaskStore } from "@/composables";
 const router = useRouter();
 const route = useRoute();
 const { workspace, currentUser, bootstrapAuth, clearAuthState } = useTaskStore();
+const SIDEBAR_COLLAPSED_KEY = "reviewiq:sidebar-collapsed";
 const passwordModalOpen = ref(false);
+const sidebarCollapsed = ref(window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
 const changingPassword = ref(false);
 const passwordForm = reactive({
   oldPassword: "",
@@ -292,5 +303,9 @@ onMounted(() => {
   if (getAuthToken()) {
     bootstrapAuth();
   }
+});
+
+watch(sidebarCollapsed, (collapsed) => {
+  window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
 });
 </script>

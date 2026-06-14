@@ -151,7 +151,8 @@
         </a-dropdown>
 
         <a-button type="primary" ghost @click="loadReviews" :loading="loading">筛选</a-button>
-        <a-button @click="resetFilters">重置</a-button>
+        <a-button :disabled="!activeFilterCount" @click="resetFilters">重置</a-button>
+        <a-tag v-if="activeFilterCount" color="blue">已启用 {{ activeFilterCount }} 个筛选</a-tag>
         <a-button @click="saveCurrentView">
           <template #icon><SaveOutlined /></template>
           保存视图
@@ -400,6 +401,9 @@ const totalCount = computed(() => pagination.total || 0);
 const mediaCount = computed(() => rows.value.filter((item) => item.hasMedia).length);
 const negativeCount = computed(() => rows.value.filter((item) => item.sentiment === "negative").length);
 const visibleColumns = computed(() => allColumns.filter((column) => visibleColumnKeys.value.includes(column.key)));
+const activeFilterCount = computed(() =>
+  [filters.ratingStar, filters.sentiment, filters.hasMedia, filters.keyword.trim()].filter((value) => value !== undefined && value !== "").length
+);
 const canCancelRun = computed(() => Boolean(latestRun.value && ["queued", "running"].includes(latestRun.value.status)));
 const resultRuns = computed(() => allRuns.value.filter((run) => ["completed", "partial_failed"].includes(run.status)));
 const progressPercent = computed(() => {

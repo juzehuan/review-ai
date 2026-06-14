@@ -439,6 +439,8 @@ onMounted(async () => {
 
 <style scoped>
 .growth-page {
+  width: min(1480px, 100%);
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -457,8 +459,8 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 24px;
-  border-radius: 8px;
+  padding: 24px 26px;
+  border-radius: 12px;
 }
 
 .growth-kicker {
@@ -495,7 +497,7 @@ onMounted(async () => {
 .brief-card,
 .growth-panel {
   padding: 20px;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .brief-card-main {
@@ -508,6 +510,11 @@ onMounted(async () => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.panel-title-row .ant-btn,
+.growth-hero .ant-btn {
+  white-space: nowrap;
 }
 
 .section-head span {
@@ -567,6 +574,18 @@ onMounted(async () => {
 
 .growth-tabs {
   background: transparent;
+}
+
+.growth-tabs :deep(.ant-tabs-nav) {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  margin-bottom: 14px;
+  padding: 0 12px;
+  border: 1px solid rgba(116, 139, 174, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
 }
 
 .compare-picker {

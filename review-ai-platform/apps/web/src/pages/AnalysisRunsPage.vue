@@ -34,6 +34,7 @@
         :data-source="tasks"
         :pagination="{ pageSize: 10 }"
         :loading="loadingTasks"
+        :scroll="{ x: 1440 }"
         :row-class-name="taskRowClassName"
         @row="taskRowProps"
       >

@@ -442,8 +442,11 @@ onMounted(load);
 
 .action-board {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(330px, 1fr));
   gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
 }
 
 .action-column {
@@ -477,6 +480,11 @@ onMounted(load);
   border-radius: 10px;
   background: #ffffff;
   box-shadow: 0 10px 26px rgba(12, 20, 36, 0.08);
+}
+
+.action-card:hover {
+  border-color: rgba(47, 107, 255, 0.3);
+  box-shadow: 0 14px 30px rgba(12, 20, 36, 0.1);
 }
 
 .action-card-top,
@@ -531,13 +539,17 @@ onMounted(load);
 }
 
 @media (max-width: 1280px) {
-  .action-board,
   .action-summary-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 960px) {
+  .action-board {
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+  }
+
   .action-card-controls,
   .action-form-grid {
     grid-template-columns: 1fr;
