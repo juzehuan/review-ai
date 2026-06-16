@@ -1563,6 +1563,25 @@ async function scheduleDueCrawlMonitors() {
         continue;
       }
 
+      const activeJob = await prisma.crawlJob.findFirst({
+        where: {
+          monitorId: monitor.id,
+          status: { in: ["queued", "running"] }
+        },
+        select: { id: true }
+      });
+      if (activeJob) {
+        await prisma.crawlMonitor.update({
+          where: { id: monitor.id },
+          data: {
+            lastCrawlJobId: activeJob.id,
+            nextRunAt,
+            lastError: null
+          }
+        });
+        continue;
+      }
+
       const crawlJob = await prisma.crawlJob.create({
         data: {
           workspaceId: monitor.workspaceId,

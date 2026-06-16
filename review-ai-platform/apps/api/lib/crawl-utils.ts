@@ -176,7 +176,7 @@ export function normalizeRequestedCrawlInput(body: Record<string, unknown>, defa
     ? rawAnalysisType
     : inferAnalysisType(sourceChannel);
   const requestedMaxReviews = Number(body.maxReviews ?? defaults.defaultMaxReviews);
-  const maxReviews = requestedMaxReviews <= 0 ? 0 : Math.min(Math.max(requestedMaxReviews, 1), 1000);
+  const maxReviews = requestedMaxReviews <= 0 ? 0 : Math.min(Math.max(requestedMaxReviews, 1), 5000);
   const crawlChannels = ["browser_intercept"] as CrawlerChannel[];
 
   return {

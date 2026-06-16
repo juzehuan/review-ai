@@ -686,4 +686,51 @@ onMounted(async () => {
     width: 100%;
   }
 }
+
+@media (max-width: 760px) {
+  .growth-page {
+    gap: 14px;
+  }
+
+  .growth-hero,
+  .brief-card,
+  .growth-panel {
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  .growth-hero h1,
+  .growth-panel h2 {
+    font-size: 20px;
+  }
+
+  .metric-row {
+    grid-template-columns: 1fr;
+  }
+
+  .brief-card-main {
+    min-height: auto;
+  }
+
+  .brief-summary {
+    margin: 14px 0;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .growth-tabs :deep(.ant-tabs-nav) {
+    position: static;
+    padding: 0 8px;
+    overflow-x: auto;
+  }
+
+  .growth-tabs :deep(.ant-tabs-tab) {
+    padding: 10px 0;
+    white-space: nowrap;
+  }
+
+  .compare-picker {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

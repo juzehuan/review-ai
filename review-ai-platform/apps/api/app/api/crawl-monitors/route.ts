@@ -1,18 +1,11 @@
 import { prisma } from "@review-ai/db";
 import type { CreateCrawlMonitorResponse } from "@review-ai/shared";
+import { normalizeCrawlMonitorIntervalMinutes, queueCrawlMonitorRun } from "@/lib/crawl-monitor-runs";
 import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord } from "@/lib/crawl-utils";
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlMonitor } from "@/lib/serializers";
 import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
-
-function normalizeIntervalMinutes(value: unknown) {
-  const numberValue = Number(value || 360);
-  if (!Number.isFinite(numberValue)) {
-    return 360;
-  }
-  return Math.min(Math.max(Math.floor(numberValue), 15), 10080);
-}
 
 export async function GET(request: Request) {
   const context = await getWorkspaceContext(request);
@@ -58,6 +51,8 @@ export async function POST(request: Request) {
     return fail("当前账号没有启用链接抓取，请先在抓取设置中开启评论采集。");
   }
 
+  const enabled = body.enabled !== false;
+  const intervalMinutes = normalizeCrawlMonitorIntervalMinutes(body.intervalMinutes);
   const monitor = await prisma.crawlMonitor.create({
     data: {
       workspaceId: context.workspace.id,
@@ -69,12 +64,14 @@ export async function POST(request: Request) {
       normalizedUrl: input.normalizedProductUrl,
       platform: input.crawlerPlatform,
       maxReviews: input.maxReviews,
-      intervalMinutes: normalizeIntervalMinutes(body.intervalMinutes),
+      intervalMinutes,
       autoAnalyze: body.autoAnalyze !== false,
-      enabled: body.enabled !== false,
+      enabled: false,
       nextRunAt: new Date()
     }
   });
 
-  return ok({ monitor: serializeCrawlMonitor(monitor) } satisfies CreateCrawlMonitorResponse, 201);
+  const result = enabled ? await queueCrawlMonitorRun(monitor.id, { forceEnable: true }) : { monitor };
+
+  return ok({ monitor: serializeCrawlMonitor(result.monitor) } satisfies CreateCrawlMonitorResponse, 201);
 }

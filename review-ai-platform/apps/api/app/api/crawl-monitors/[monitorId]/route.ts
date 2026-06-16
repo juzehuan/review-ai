@@ -1,17 +1,10 @@
 import { prisma } from "@review-ai/db";
+import { normalizeCrawlMonitorIntervalMinutes, queueCrawlMonitorRun } from "@/lib/crawl-monitor-runs";
 import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord } from "@/lib/crawl-utils";
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlMonitor } from "@/lib/serializers";
 import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
-
-function normalizeIntervalMinutes(value: unknown) {
-  const numberValue = Number(value || 360);
-  if (!Number.isFinite(numberValue)) {
-    return 360;
-  }
-  return Math.min(Math.max(Math.floor(numberValue), 15), 10080);
-}
 
 export async function POST(request: Request, context: { params: Promise<{ monitorId: string }> }) {
   const { monitorId } = await context.params;
@@ -31,16 +24,9 @@ export async function POST(request: Request, context: { params: Promise<{ monito
     return fail("监听任务不存在或不属于当前账号。", 404);
   }
 
-  const updated = await prisma.crawlMonitor.update({
-    where: { id: monitor.id },
-    data: {
-      enabled: true,
-      nextRunAt: new Date(),
-      lastError: null
-    }
-  });
+  const result = await queueCrawlMonitorRun(monitor.id, { forceEnable: true });
 
-  return ok(serializeCrawlMonitor(updated));
+  return ok(serializeCrawlMonitor(result.monitor));
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ monitorId: string }> }) {
@@ -84,7 +70,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ monit
             maxReviews: input.maxReviews
           }
         : {}),
-      ...(body.intervalMinutes !== undefined ? { intervalMinutes: normalizeIntervalMinutes(body.intervalMinutes) } : {}),
+      ...(body.intervalMinutes !== undefined
+        ? { intervalMinutes: normalizeCrawlMonitorIntervalMinutes(body.intervalMinutes) }
+        : {}),
       ...(typeof body.autoAnalyze === "boolean" ? { autoAnalyze: body.autoAnalyze } : {}),
       ...(typeof body.enabled === "boolean"
         ? {
@@ -94,6 +82,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ monit
         : {})
     }
   });
+
+  if (body.enabled === true) {
+    const result = await queueCrawlMonitorRun(updated.id, { forceEnable: true });
+    return ok(serializeCrawlMonitor(result.monitor));
+  }
 
   return ok(serializeCrawlMonitor(updated));
 }

@@ -555,4 +555,33 @@ onMounted(load);
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 760px) {
+  .action-page {
+    gap: 14px;
+  }
+
+  .action-column {
+    min-height: auto;
+    padding: 12px;
+  }
+
+  .action-column-head {
+    margin-bottom: 10px;
+  }
+
+  .action-card {
+    gap: 10px;
+    padding: 12px;
+    box-shadow: 0 8px 18px rgba(12, 20, 36, 0.07);
+  }
+
+  .action-card-actions :deep(.ant-btn) {
+    flex: 1 1 auto;
+  }
+
+  .action-empty {
+    margin-top: 24px;
+  }
+}
 </style>

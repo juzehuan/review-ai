@@ -793,4 +793,43 @@ onUnmounted(stopPolling);
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 760px) {
+  .task-actions {
+    gap: 6px !important;
+  }
+
+  .task-actions :deep(.ant-btn) {
+    padding-inline: 8px;
+  }
+
+  .run-log-panel {
+    min-height: auto;
+  }
+
+  .run-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .logs-box {
+    height: 360px;
+    padding: 10px;
+  }
+
+  .log-line {
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+  }
+
+  .log-message {
+    grid-column: 1 / -1;
+  }
+
+  .log-meta {
+    grid-column: 1 / -1;
+    max-width: 100%;
+    overflow: auto;
+  }
+}
 </style>

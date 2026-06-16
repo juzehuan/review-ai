@@ -138,7 +138,12 @@
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space class="crawl-actions">
-              <a-button size="small" :loading="monitorActionId === record.id" @click="runMonitorNow(record)">
+              <a-button
+                size="small"
+                :disabled="hasActiveMonitorJob(record)"
+                :loading="monitorActionId === record.id"
+                @click="runMonitorNow(record)"
+              >
                 <template #icon><PlayCircleOutlined /></template>
                 立即运行
               </a-button>
@@ -563,6 +568,10 @@ function canDeleteJob(job: CrawlJobDTO) {
   return !["queued", "running"].includes(job.status);
 }
 
+function hasActiveMonitorJob(monitor: CrawlMonitorDTO) {
+  return jobs.value.some((job) => job.id === monitor.lastCrawlJobId && ["queued", "running"].includes(job.status));
+}
+
 async function loadJobs() {
   jobs.value = await fetchCrawlJobs();
 }
@@ -934,6 +943,29 @@ onUnmounted(() => {
 @media (max-width: 960px) {
   .monitor-form-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .crawler-page {
+    gap: 14px;
+  }
+
+  .crawl-actions {
+    gap: 6px !important;
+  }
+
+  .crawl-actions :deep(.ant-btn) {
+    padding-inline: 8px;
+  }
+
+  .schedule-cell,
+  .monitor-status-cell {
+    gap: 6px;
+  }
+
+  .error-pill {
+    max-width: 180px;
   }
 }
 </style>
