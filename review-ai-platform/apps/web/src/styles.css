@@ -2467,3 +2467,304 @@ body {
     display: none;
   }
 }
+
+/* Device-aware shell: actual touch/mobile devices use the compact navigation even when landscape is wide. */
+body.app-device-mobile .app-shell {
+  display: block;
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+}
+
+body.app-device-mobile .app-sidebar,
+body.app-device-mobile .app-sidebar-collapsed {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  height: auto;
+  padding: 10px 12px 12px;
+  border-right: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+body.app-device-mobile .app-sidebar .ant-layout-sider-children {
+  height: auto;
+  overflow: visible;
+  padding-right: 0;
+}
+
+body.app-device-mobile .brand-block,
+body.app-device-mobile .app-sidebar-collapsed .brand-block {
+  min-height: 34px;
+  justify-content: flex-start;
+  padding-bottom: 10px;
+}
+
+body.app-device-mobile .brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+body.app-device-mobile .brand-title {
+  font-size: 15px;
+}
+
+body.app-device-mobile .brand-subtitle,
+body.app-device-mobile .workspace-card {
+  display: none;
+}
+
+body.app-device-mobile .brand-copy,
+body.app-device-mobile .app-sidebar-collapsed .brand-copy {
+  display: block;
+}
+
+body.app-device-mobile .side-nav {
+  margin-top: 10px;
+  flex-direction: row;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+body.app-device-mobile .side-nav::-webkit-scrollbar {
+  display: none;
+}
+
+body.app-device-mobile .side-nav-section,
+body.app-device-mobile .side-nav-children {
+  flex: 0 0 auto;
+  flex-direction: row;
+  gap: 8px;
+}
+
+body.app-device-mobile .side-nav-group {
+  display: none;
+}
+
+body.app-device-mobile .side-nav-subitem,
+body.app-device-mobile .app-sidebar-collapsed .side-nav-subitem {
+  min-height: 36px;
+  justify-content: center;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+body.app-device-mobile .side-nav-subitem::before {
+  display: none;
+}
+
+body.app-device-mobile .app-main {
+  display: block;
+  flex: 0 0 auto !important;
+  flex-basis: auto !important;
+  width: 100vw !important;
+  min-width: 0;
+  max-width: 100vw;
+  height: auto;
+  min-height: auto;
+}
+
+body.app-device-mobile .topbar {
+  min-height: 58px;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px 12px;
+  gap: 10px;
+}
+
+body.app-device-mobile .sidebar-toggle {
+  display: none;
+}
+
+body.app-device-mobile .topbar-left {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+body.app-device-mobile .topbar-eyebrow {
+  display: none;
+}
+
+body.app-device-mobile .topbar-title {
+  margin-top: 0;
+  font-size: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.app-device-mobile .topbar-actions {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+body.app-device-mobile .account-chip {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  justify-content: center;
+}
+
+body.app-device-mobile .account-name {
+  display: none;
+}
+
+body.app-device-mobile .app-content {
+  display: block;
+  width: 100% !important;
+  min-width: 0;
+  max-width: 100vw;
+  box-sizing: border-box;
+  padding: 12px;
+  overflow: visible;
+}
+
+body.app-device-mobile .workspace-overview-page,
+body.app-device-mobile .dashboard-grid,
+body.app-device-mobile .review-page,
+body.app-device-mobile .runs-page,
+body.app-device-mobile .growth-page,
+body.app-device-mobile .crawler-page {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+body.app-device-mobile .page-toolbar {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* A desktop-class device keeps the desktop shell even if the browser window is narrow. */
+@media (max-width: 760px) {
+  body.app-device-desktop .app-shell {
+    display: flex;
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body.app-device-desktop .app-sidebar {
+    position: relative;
+    flex: 0 0 288px !important;
+    width: 288px !important;
+    min-width: 288px !important;
+    max-width: 288px !important;
+    height: 100vh;
+    padding: 20px;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 0;
+  }
+
+  body.app-device-desktop .app-sidebar-collapsed {
+    flex: 0 0 88px !important;
+    width: 88px !important;
+    min-width: 88px !important;
+    max-width: 88px !important;
+    padding: 20px 14px;
+  }
+
+  body.app-device-desktop .app-sidebar .ant-layout-sider-children {
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  body.app-device-desktop .brand-block {
+    min-height: 48px;
+    padding-bottom: 18px;
+  }
+
+  body.app-device-desktop .brand-mark {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    font-size: 15px;
+  }
+
+  body.app-device-desktop .brand-title {
+    font-size: 18px;
+  }
+
+  body.app-device-desktop .brand-subtitle,
+  body.app-device-desktop .workspace-card {
+    display: block;
+  }
+
+  body.app-device-desktop .app-sidebar-collapsed .brand-copy,
+  body.app-device-desktop .app-sidebar-collapsed .workspace-card,
+  body.app-device-desktop .app-sidebar-collapsed .side-nav-group span,
+  body.app-device-desktop .app-sidebar-collapsed .side-nav-subitem span {
+    display: none;
+  }
+
+  body.app-device-desktop .side-nav {
+    margin-top: 22px;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  body.app-device-desktop .side-nav-section,
+  body.app-device-desktop .side-nav-children {
+    flex-direction: column;
+  }
+
+  body.app-device-desktop .side-nav-group {
+    display: flex;
+  }
+
+  body.app-device-desktop .side-nav-subitem {
+    justify-content: flex-start;
+    padding: 0 12px 0 18px;
+  }
+
+  body.app-device-desktop .side-nav-subitem::before {
+    display: block;
+  }
+
+  body.app-device-desktop .app-main {
+    height: 100vh;
+    min-height: 0;
+  }
+
+  body.app-device-desktop .topbar {
+    height: 78px;
+    min-height: 78px;
+    flex-direction: row;
+    align-items: center;
+    padding: 0 28px;
+  }
+
+  body.app-device-desktop .sidebar-toggle {
+    display: inline-flex;
+  }
+
+  body.app-device-desktop .topbar-eyebrow,
+  body.app-device-desktop .account-name {
+    display: inline;
+  }
+
+  body.app-device-desktop .topbar-title {
+    font-size: 21px;
+  }
+
+  body.app-device-desktop .account-chip {
+    width: auto;
+    height: 40px;
+    padding: 0 14px 0 4px;
+  }
+
+  body.app-device-desktop .app-content {
+    padding: 30px 32px 38px;
+    overflow: auto;
+  }
+}

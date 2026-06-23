@@ -14,7 +14,7 @@
           下载浏览器插件
         </a-button>
         <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
-        <a-button @click="refreshPageData" :loading="loading">
+        <a-button @click="() => refreshPageData()" :loading="loading">
           <template #icon><ReloadOutlined /></template>
           刷新
         </a-button>
@@ -349,6 +349,7 @@ import {
   fetchCrawlJobs,
   fetchCrawlMonitors,
   fetchWorkspaceCrawlerSettings,
+  getWorkspaceSlug,
   retryCrawlJob,
   runCrawlMonitorNow,
   startCrawlJobAnalysis,
@@ -366,8 +367,8 @@ import {
 } from "@review-ai/shared";
 
 const router = useRouter();
-const jobs = ref<CrawlJobDTO[]>([]);
-const monitors = ref<CrawlMonitorDTO[]>([]);
+const jobs = ref<CrawlJobDTO[]>(readWorkspaceCache<CrawlJobDTO>("crawl-jobs"));
+const monitors = ref<CrawlMonitorDTO[]>(readWorkspaceCache<CrawlMonitorDTO>("crawl-monitors"));
 const loading = ref(false);
 const autoRefresh = ref(true);
 const startingId = ref<string | null>(null);
@@ -381,6 +382,31 @@ const monitorCreating = ref(false);
 const crawlerEnabled = ref(true);
 const browserExtensionDownloadUrl = "/downloads/review-exporter.zip";
 let timer: ReturnType<typeof setInterval> | null = null;
+
+function workspaceCacheKey(kind: string) {
+  return `reviewiq:${kind}:${getWorkspaceSlug() || "default"}`;
+}
+
+function readWorkspaceCache<T>(kind: string): T[] {
+  try {
+    const raw = window.sessionStorage.getItem(workspaceCacheKey(kind));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeWorkspaceCache<T>(kind: string, rows: T[]) {
+  try {
+    window.sessionStorage.setItem(workspaceCacheKey(kind), JSON.stringify(rows));
+  } catch {
+    // 缓存只是切页时的体验兜底，失败不影响主流程。
+  }
+}
 
 const form = reactive({
   name: "",
@@ -573,11 +599,15 @@ function hasActiveMonitorJob(monitor: CrawlMonitorDTO) {
 }
 
 async function loadJobs() {
-  jobs.value = await fetchCrawlJobs();
+  const rows = await fetchCrawlJobs();
+  jobs.value = rows;
+  writeWorkspaceCache("crawl-jobs", rows);
 }
 
 async function loadMonitors() {
-  monitors.value = await fetchCrawlMonitors();
+  const rows = await fetchCrawlMonitors();
+  monitors.value = rows;
+  writeWorkspaceCache("crawl-monitors", rows);
 }
 
 async function loadCrawlerSettings() {
@@ -586,16 +616,16 @@ async function loadCrawlerSettings() {
   return setting;
 }
 
-async function refreshPageData() {
+async function refreshPageData(options: { silent?: boolean } = {}) {
   loading.value = true;
   try {
-    await Promise.all([
-      loadCrawlerSettings().catch(() => {
-        crawlerEnabled.value = true;
-      }),
-      loadJobs(),
-      loadMonitors()
-    ]);
+    const results = await Promise.allSettled([loadCrawlerSettings(), loadJobs(), loadMonitors()]);
+    if (results[0].status === "rejected") {
+      crawlerEnabled.value = true;
+    }
+    if (!options.silent && results.some((result) => result.status === "rejected")) {
+      message.warning("部分采集数据刷新失败，已保留上一次成功加载的记录。");
+    }
   } finally {
     loading.value = false;
   }
@@ -637,6 +667,8 @@ async function removeJob(job: CrawlJobDTO) {
   deletingJobId.value = job.id;
   try {
     await deleteCrawlJob(job.id);
+    jobs.value = jobs.value.filter((item) => item.id !== job.id);
+    writeWorkspaceCache("crawl-jobs", jobs.value);
     message.success("采集记录已删除");
     await loadJobs();
   } finally {
@@ -767,7 +799,7 @@ async function submitCrawlJob() {
   }
   creating.value = true;
   try {
-    await createCrawlJob({
+    const job = await createCrawlJob({
       name: form.name,
       productName: form.productName,
       sourceChannel: form.sourceChannel,
@@ -776,6 +808,8 @@ async function submitCrawlJob() {
       maxReviews: form.maxReviews,
       crawlChannels: ["browser_intercept"]
     });
+    jobs.value = [job, ...jobs.value.filter((item) => item.id !== job.id)];
+    writeWorkspaceCache("crawl-jobs", jobs.value);
     message.success("评论采集任务已加入队列。");
     showCreateModal.value = false;
     await loadJobs();
@@ -800,7 +834,7 @@ async function submitCrawlMonitor() {
   }
   monitorCreating.value = true;
   try {
-    await createCrawlMonitor({
+    const monitor = await createCrawlMonitor({
       name: monitorForm.name,
       productName: monitorForm.productName,
       sourceChannel: monitorForm.sourceChannel,
@@ -810,6 +844,8 @@ async function submitCrawlMonitor() {
       intervalMinutes: monitorForm.intervalMinutes,
       autoAnalyze: monitorForm.autoAnalyze
     });
+    monitors.value = [monitor, ...monitors.value.filter((item) => item.id !== monitor.id)];
+    writeWorkspaceCache("crawl-monitors", monitors.value);
     message.success("监听任务已创建，系统会自动发起首次采集。");
     showMonitorModal.value = false;
     await refreshPageData();
@@ -848,6 +884,8 @@ async function removeMonitor(monitor: CrawlMonitorDTO) {
   monitorActionId.value = monitor.id;
   try {
     await deleteCrawlMonitor(monitor.id);
+    monitors.value = monitors.value.filter((item) => item.id !== monitor.id);
+    writeWorkspaceCache("crawl-monitors", monitors.value);
     message.success("监听任务已删除");
     await loadMonitors();
   } finally {
@@ -859,7 +897,7 @@ onMounted(() => {
   refreshPageData();
   timer = setInterval(() => {
     if (autoRefresh.value && (hasActiveJobs.value || hasEnabledMonitor.value)) {
-      refreshPageData();
+      refreshPageData({ silent: true });
     }
   }, 5000);
 });

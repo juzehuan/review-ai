@@ -1,7 +1,9 @@
 <template>
-  <router-view v-if="isPublicRoute" />
+  <div v-if="isPublicRoute" :class="appDeviceClass">
+    <router-view />
+  </div>
 
-  <a-layout v-else class="app-shell">
+  <a-layout v-else class="app-shell" :class="appDeviceClass">
     <a-layout-sider theme="light" width="288" class="app-sidebar" :class="{ 'app-sidebar-collapsed': sidebarCollapsed }">
       <div class="brand-block">
         <div class="brand-mark">RI</div>
@@ -115,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { message } from "ant-design-vue";
 import {
@@ -135,8 +137,12 @@ const router = useRouter();
 const route = useRoute();
 const { workspace, currentUser, bootstrapAuth, clearAuthState } = useTaskStore();
 const SIDEBAR_COLLAPSED_KEY = "reviewiq:sidebar-collapsed";
+const DEVICE_CLASS_NAMES = ["app-device-mobile", "app-device-desktop"] as const;
+const coarsePointerQuery = window.matchMedia("(pointer: coarse)");
+const narrowViewportQuery = window.matchMedia("(max-width: 760px)");
 const passwordModalOpen = ref(false);
 const sidebarCollapsed = ref(window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
+const deviceKind = ref<"mobile" | "desktop">("desktop");
 const changingPassword = ref(false);
 const passwordForm = reactive({
   oldPassword: "",
@@ -183,6 +189,7 @@ const navSections = computed<NavSection[]>(() => [
 ].filter((section) => section.items.length));
 
 const isPublicRoute = computed(() => Boolean(route.meta.public));
+const appDeviceClass = computed(() => `app-device-${deviceKind.value}`);
 const usageText = computed(() => {
   if (!workspace.value) {
     return "0/0";
@@ -230,6 +237,25 @@ const pageTitle = computed(() => {
 });
 
 const accountInitial = computed(() => (currentUser.value?.name || currentUser.value?.email || "U").slice(0, 1).toUpperCase());
+
+function detectDeviceKind() {
+  const nav = navigator as Navigator & { userAgentData?: { mobile?: boolean } };
+  const userAgent = navigator.userAgent || "";
+  const userAgentMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(userAgent);
+  const iPadLike = /iPad/i.test(userAgent) || (/Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1);
+  const coarsePointer = coarsePointerQuery.matches;
+  const touchDevice = navigator.maxTouchPoints > 1;
+  const narrowViewport = narrowViewportQuery.matches;
+  return nav.userAgentData?.mobile || userAgentMobile || iPadLike || (coarsePointer && touchDevice) || narrowViewport ? "mobile" : "desktop";
+}
+
+function applyDeviceClass() {
+  deviceKind.value = detectDeviceKind();
+  document.documentElement.classList.remove(...DEVICE_CLASS_NAMES);
+  document.body.classList.remove(...DEVICE_CLASS_NAMES);
+  document.documentElement.classList.add(`app-device-${deviceKind.value}`);
+  document.body.classList.add(`app-device-${deviceKind.value}`);
+}
 
 function sectionActive(section: NavSection) {
   if (section.label === "用户后台" && route.path.startsWith("/tasks/")) {
@@ -300,9 +326,21 @@ async function submitPasswordChange() {
 }
 
 onMounted(() => {
+  applyDeviceClass();
+  window.addEventListener("resize", applyDeviceClass);
+  coarsePointerQuery.addEventListener("change", applyDeviceClass);
+  narrowViewportQuery.addEventListener("change", applyDeviceClass);
   if (getAuthToken()) {
     bootstrapAuth();
   }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", applyDeviceClass);
+  coarsePointerQuery.removeEventListener("change", applyDeviceClass);
+  narrowViewportQuery.removeEventListener("change", applyDeviceClass);
+  document.documentElement.classList.remove(...DEVICE_CLASS_NAMES);
+  document.body.classList.remove(...DEVICE_CLASS_NAMES);
 });
 
 watch(sidebarCollapsed, (collapsed) => {
