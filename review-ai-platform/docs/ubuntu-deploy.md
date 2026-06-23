@@ -82,6 +82,49 @@ sudo USE_EXTERNAL_POSTGRES=true \
 
 启用后脚本会跳过对应的内置容器，迁移、启动、备份和恢复都会使用外部连接串。
 
+## AI 分析提速
+
+Worker 默认会用批量分析和并发批次处理评论，适合几千到几万条评论的任务。可以在 `.env` 中按模型限流、服务器 CPU/内存和账号额度调整：
+
+```bash
+ANALYSIS_BATCH_SIZE=50
+ANALYSIS_BATCH_CONCURRENCY=2
+ANALYSIS_SINGLE_CONCURRENCY=6
+ANALYSIS_WORKER_CONCURRENCY=2
+ANALYSIS_REQUEST_TIMEOUT_MS=180000
+ANALYSIS_BATCH_PAUSE_MS=0
+ANALYSIS_SPLIT_BATCH_SIZE=10
+```
+
+参数说明：
+
+- `ANALYSIS_BATCH_SIZE`：单次 AI 批量请求包含的评论数，默认 50；可按模型上下文和输出稳定性调到 80-100，太大可能导致模型输出 JSON 过长而失败。
+- `ANALYSIS_BATCH_CONCURRENCY`：同一个分析任务内同时跑几个批次，模型限流宽松时可以调到 3 或 4。
+- `ANALYSIS_SINGLE_CONCURRENCY`：批量请求失败后，单条兜底分析的并发数。
+- `ANALYSIS_WORKER_CONCURRENCY`：同一个 worker 进程同时消费几个分析任务。多人同时分析时可提高，但会更容易撞模型限流。
+- `ANALYSIS_REQUEST_TIMEOUT_MS`：单个 AI 请求超时时间。评论批次更大时可适当调高。
+- `ANALYSIS_BATCH_PAUSE_MS`：批次组之间的暂停时间。遇到 429 或限流时可设为 `500`、`1000`。
+- `ANALYSIS_SPLIT_BATCH_SIZE`：大批量 JSON 输出失败后，先拆成多大的小批次重试，默认 10；小批仍失败才进入单条兜底。
+
+推荐调优：
+
+```bash
+# 保守，适合额度有限或经常 429
+ANALYSIS_BATCH_SIZE=15
+ANALYSIS_BATCH_CONCURRENCY=1
+ANALYSIS_SINGLE_CONCURRENCY=4
+
+# 较快，适合模型限流较宽松
+ANALYSIS_BATCH_SIZE=50
+ANALYSIS_BATCH_CONCURRENCY=3
+ANALYSIS_SINGLE_CONCURRENCY=8
+
+# 激进，适合长上下文模型和限流较宽松的账号
+ANALYSIS_BATCH_SIZE=80
+ANALYSIS_BATCH_CONCURRENCY=3
+ANALYSIS_SINGLE_CONCURRENCY=10
+```
+
 ## 镜像拉取失败
 
 如果服务器无法从 Docker Hub 拉取官方镜像，可以指定可访问的镜像仓库：

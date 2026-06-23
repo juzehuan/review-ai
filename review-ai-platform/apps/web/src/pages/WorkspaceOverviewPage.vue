@@ -6,6 +6,10 @@
         <div class="toolbar-subtitle">查看你的分析任务、评论额度和最近的处理进度。</div>
       </div>
       <a-space wrap>
+        <a-button href="/downloads/ReviewIQ-ordinary-user-manual.docx" download="ReviewIQ-普通用户操作手册.docx">
+          <template #icon><DownloadOutlined /></template>
+          下载操作手册
+        </a-button>
         <a-button @click="refreshTasks" :loading="loadingTasks">
           <template #icon><ReloadOutlined /></template>
           刷新
@@ -103,7 +107,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { ReloadOutlined, UnorderedListOutlined } from "@ant-design/icons-vue";
+import { DownloadOutlined, ReloadOutlined, UnorderedListOutlined } from "@ant-design/icons-vue";
 import type { TaskListItem } from "@review-ai/shared";
 import { useTaskStore } from "@/composables";
 

@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReviewIQ 评论分析系统培训演示</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #101828;
+        --muted: #5b667a;
+        --soft: #f4f7fb;
+        --line: #d9e1ee;
+        --panel: #ffffff;
+        --navy: #0d1b2f;
+        --blue: #2367f5;
+        --teal: #02b9c8;
+        --green: #0f9f6e;
+        --amber: #b7791f;
+        --red: #c24135;
+        --shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          "Microsoft YaHei",
+          "PingFang SC",
+          "Segoe UI",
+          Arial,
+          sans-serif;
+        color: var(--ink);
+        background:
+          linear-gradient(120deg, rgba(35, 103, 245, 0.09), transparent 28%),
+          linear-gradient(160deg, rgba(2, 185, 200, 0.1), transparent 34%),
+          #eef3f9;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .deck {
+        min-height: 100vh;
+      }
+
+      .hero {
+        min-height: 92vh;
+        display: grid;
+        grid-template-columns: minmax(0, 0.82fr) minmax(360px, 1fr);
+        align-items: center;
+        gap: 42px;
+        padding: 48px clamp(24px, 5vw, 72px) 42px;
+        background:
+          linear-gradient(90deg, rgba(13, 27, 47, 0.92), rgba(13, 27, 47, 0.72)),
+          url("assets/user-manual/03-crawl-jobs.png") center / cover;
+        color: #ffffff;
+      }
+
+      .hero-kicker,
+      .eyebrow {
+        margin: 0 0 12px;
+        color: #8ee8f1;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(36px, 5.4vw, 68px);
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      .hero-copy {
+        max-width: 720px;
+      }
+
+      .hero-copy p {
+        margin: 22px 0 0;
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 19px;
+        line-height: 1.75;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 34px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border: 1px solid rgba(255, 255, 255, 0.26);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        font-weight: 900;
+        backdrop-filter: blur(12px);
+      }
+
+      .button.primary {
+        border-color: transparent;
+        background: linear-gradient(90deg, var(--blue), var(--teal));
+      }
+
+      .hero-board {
+        display: grid;
+        gap: 16px;
+      }
+
+      .hero-screen {
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: var(--shadow);
+      }
+
+      .hero-screen img {
+        display: block;
+        width: 100%;
+      }
+
+      .hero-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .metric {
+        min-height: 104px;
+        padding: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 26px;
+      }
+
+      .metric span {
+        color: rgba(255, 255, 255, 0.74);
+        font-size: 13px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        gap: 28px;
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .toc {
+        position: sticky;
+        top: 18px;
+        align-self: start;
+        max-height: calc(100vh - 36px);
+        overflow: auto;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.88);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+        backdrop-filter: blur(14px);
+      }
+
+      .toc-title {
+        margin: 0 0 10px;
+        color: var(--navy);
+        font-size: 15px;
+        font-weight: 900;
+      }
+
+      .toc a {
+        display: block;
+        padding: 9px 10px;
+        border-radius: 6px;
+        color: #475467;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .toc a:hover,
+      .toc a:focus {
+        background: #eaf1ff;
+        color: var(--blue);
+        outline: none;
+      }
+
+      main {
+        display: grid;
+        gap: 22px;
+      }
+
+      .section {
+        padding: clamp(22px, 3vw, 34px);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 15px 36px rgba(15, 23, 42, 0.08);
+      }
+
+      .section-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 22px;
+      }
+
+      .section h2 {
+        margin: 0;
+        color: var(--navy);
+        font-size: clamp(26px, 3vw, 38px);
+        line-height: 1.15;
+      }
+
+      .section h3 {
+        margin: 0 0 10px;
+        color: #1c3558;
+        font-size: 19px;
+      }
+
+      .section p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.75;
+      }
+
+      .tag {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 0 11px;
+        border-radius: 999px;
+        background: #e8f6f9;
+        color: #047481;
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: minmax(0, 0.88fr) minmax(360px, 1.12fr);
+        gap: 22px;
+        align-items: start;
+      }
+
+      .card,
+      .step,
+      .note {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .card {
+        padding: 18px;
+      }
+
+      .card strong,
+      .step strong {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--navy);
+        font-size: 17px;
+      }
+
+      .card p,
+      .step p,
+      .note p {
+        font-size: 14px;
+      }
+
+      .steps {
+        display: grid;
+        gap: 12px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr);
+        gap: 12px;
+        padding: 14px;
+      }
+
+      .num {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: #eaf1ff;
+        color: var(--blue);
+        font-weight: 900;
+      }
+
+      .screen {
+        overflow: hidden;
+        border: 1px solid #ccd7e7;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 30px rgba(15, 23, 42, 0.1);
+      }
+
+      .screen img {
+        display: block;
+        width: 100%;
+      }
+
+      .screen.phone {
+        width: min(280px, 100%);
+        margin: 0 auto;
+      }
+
+      .note {
+        padding: 16px;
+        border-color: #f0d69c;
+        background: #fff8e8;
+      }
+
+      .note strong {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--amber);
+      }
+
+      .checklist {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .checklist li {
+        position: relative;
+        padding: 11px 12px 11px 34px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        color: #344054;
+        font-weight: 800;
+      }
+
+      .checklist li::before {
+        content: "";
+        position: absolute;
+        left: 13px;
+        top: 16px;
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--green);
+      }
+
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .timeline .step {
+        grid-template-columns: 1fr;
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .table th,
+      .table td {
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .table th {
+        background: #eaf1ff;
+        color: #183b73;
+        font-size: 13px;
+      }
+
+      .table td {
+        color: #475467;
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .table tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .callout-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .callout {
+        padding: 18px;
+        border-radius: 8px;
+        color: #ffffff;
+        background: linear-gradient(135deg, #183b73, #0d1b2f);
+      }
+
+      .callout:nth-child(2) {
+        background: linear-gradient(135deg, #087f8c, #0d1b2f);
+      }
+
+      .callout strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 18px;
+      }
+
+      .callout p {
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      .footer {
+        padding: 40px 28px 56px;
+        text-align: center;
+        color: #667085;
+      }
+
+      .print-tip {
+        margin-top: 18px;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 13px;
+      }
+
+      @media (max-width: 1080px) {
+        .hero,
+        .layout,
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+
+        .toc {
+          position: relative;
+          top: auto;
+          max-height: none;
+        }
+
+        .grid,
+        .timeline,
+        .callout-row {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 720px) {
+        .hero {
+          min-height: auto;
+          padding: 34px 18px;
+        }
+
+        .hero-metrics,
+        .grid,
+        .timeline,
+        .callout-row {
+          grid-template-columns: 1fr;
+        }
+
+        .layout {
+          padding: 16px;
+        }
+
+        .section-head {
+          display: grid;
+        }
+      }
+
+      @media print {
+        body {
+          background: #ffffff;
+        }
+
+        .hero {
+          min-height: auto;
+          color: #101828;
+          background: #ffffff;
+        }
+
+        .button,
+        .toc,
+        .print-tip {
+          display: none;
+        }
+
+        .layout {
+          display: block;
+          padding: 0;
+        }
+
+        .section {
+          box-shadow: none;
+          page-break-inside: avoid;
+          margin-bottom: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="deck">
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <p class="hero-kicker">ReviewIQ Training Deck</p>
+          <h1>评论分析系统演示培训</h1>
+          <p>
+            面向运营、分析和管理员的完整演示材料。讲师可以按“登录、采集、监听、分析、复核、行动、管理”的顺序演示，
+            学员可以跟着页面截图快速理解每个功能入口和关键注意事项。
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#flow">开始培训流程</a>
+            <a class="button" href="#checklist">查看演示清单</a>
+          </div>
+          <div class="print-tip">提示：浏览器打开后可直接投屏，也可以使用打印功能导出 PDF。</div>
+        </div>
+        <div class="hero-board">
+          <div class="hero-screen">
+            <img src="assets/user-manual/03-crawl-jobs.png" alt="评论采集控制台截图" />
+          </div>
+          <div class="hero-metrics">
+            <div class="metric"><span>培训时长</span><strong>45-60 分钟</strong></div>
+            <div class="metric"><span>核心流程</span><strong>7 个环节</strong></div>
+            <div class="metric"><span>演示截图</span><strong>11 张</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="layout">
+        <aside class="toc" aria-label="培训目录">
+          <p class="toc-title">培训目录</p>
+          <a href="#goal">1. 培训目标</a>
+          <a href="#roles">2. 角色与权限</a>
+          <a href="#flow">3. 演示主流程</a>
+          <a href="#login">4. 登录与看板</a>
+          <a href="#crawl">5. 一次性采集</a>
+          <a href="#monitor">6. 持续监听</a>
+          <a href="#analysis">7. 分析记录</a>
+          <a href="#reviews">8. 评论明细</a>
+          <a href="#growth">9. 增长运营</a>
+          <a href="#admin">10. 超管配置</a>
+          <a href="#mobile">11. 移动端演示</a>
+          <a href="#faq">12. 常见问题</a>
+          <a href="#checklist">13. 讲师清单</a>
+        </aside>
+
+        <main>
+          <section class="section" id="goal">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 01</p>
+                <h2>培训目标</h2>
+              </div>
+              <span class="tag">建议 5 分钟</span>
+            </div>
+            <div class="grid">
+              <div class="card">
+                <strong>理解系统定位</strong>
+                <p>ReviewIQ 用来把 YouTube、TikTok、商品评论和社媒评论变成可分析的数据资产。</p>
+              </div>
+              <div class="card">
+                <strong>掌握标准流程</strong>
+                <p>从链接采集到 AI 分析，再到评论复核和行动项沉淀，形成闭环。</p>
+              </div>
+              <div class="card">
+                <strong>知道排错方向</strong>
+                <p>遇到未采集到评论、采集超时、分析偏差时，能先判断是链接、抓取还是提示词问题。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="roles">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 02</p>
+                <h2>角色与权限</h2>
+              </div>
+              <span class="tag">讲清边界</span>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>角色</th>
+                  <th>主要使用功能</th>
+                  <th>培训重点</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>普通用户</td>
+                  <td>任务看板、评论采集、分析记录、评论明细、增长运营。</td>
+                  <td>不要配置模型和抓取参数，统一使用超管配置。</td>
+                </tr>
+                <tr>
+                  <td>运营/分析人员</td>
+                  <td>创建采集任务、查看分析报告、筛选评论、导出证据、跟进行动项。</td>
+                  <td>重点讲“视频类评论”和“商品类评论”的分析类型选择。</td>
+                </tr>
+                <tr>
+                  <td>超管</td>
+                  <td>用户、工作区、邀请码、额度、AI 提示词与模型、抓取设置。</td>
+                  <td>强调生产环境配置统一维护，避免普通用户误改。</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section class="section" id="flow">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 03</p>
+                <h2>标准演示主流程</h2>
+              </div>
+              <span class="tag">建议 8 分钟</span>
+            </div>
+            <div class="timeline">
+              <div class="step"><span class="num">1</span><strong>登录</strong><p>进入系统并说明账号权限。</p></div>
+              <div class="step"><span class="num">2</span><strong>采集</strong><p>用视频链接创建一次性采集。</p></div>
+              <div class="step"><span class="num">3</span><strong>监听</strong><p>创建持续监听并说明自动分析。</p></div>
+              <div class="step"><span class="num">4</span><strong>分析</strong><p>从采集记录进入分析记录。</p></div>
+              <div class="step"><span class="num">5</span><strong>复盘</strong><p>查看报告、评论明细和增长运营。</p></div>
+            </div>
+          </section>
+
+          <section class="section" id="login">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 04</p>
+                <h2>登录与任务看板</h2>
+              </div>
+              <span class="tag">演示入口</span>
+            </div>
+            <div class="two-col">
+              <div class="steps">
+                <div class="step"><span class="num">1</span><div><strong>登录系统</strong><p>输入账号密码，登录后进入任务看板。</p></div></div>
+                <div class="step"><span class="num">2</span><div><strong>讲解额度</strong><p>说明评论额度、分析次数和当前账号套餐。</p></div></div>
+                <div class="step"><span class="num">3</span><div><strong>打开最近任务</strong><p>点击最近任务中的“打开”，进入任务详情或分析记录。</p></div></div>
+                <div class="note"><strong>讲师提示</strong><p>如果是生产环境，不要在培训中展示真实敏感评论；优先使用演示账号或测试工作区。</p></div>
+              </div>
+              <div class="screen">
+                <img src="assets/user-manual/02-dashboard.png" alt="任务看板截图" />
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="crawl">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 05</p>
+                <h2>一次性评论采集</h2>
+              </div>
+              <span class="tag">核心操作</span>
+            </div>
+            <div class="two-col">
+              <div class="steps">
+                <div class="step"><span class="num">1</span><div><strong>进入评论采集</strong><p>确认顶部统计、持续监听任务和采集记录区域。</p></div></div>
+                <div class="step"><span class="num">2</span><div><strong>点击一次采集</strong><p>填写任务名称、内容名称、视频链接、来源渠道和分析类型。</p></div></div>
+                <div class="step"><span class="num">3</span><div><strong>设置采集条数</strong><p>演示 200 条或 0 不限制，并解释实际数量受平台加载和网络影响。</p></div></div>
+                <div class="step"><span class="num">4</span><div><strong>查看采集记录</strong><p>讲解排队中、抓取中、已完成、失败、重试和删除。</p></div></div>
+              </div>
+              <div class="screen">
+                <img src="assets/user-manual/04-create-crawl-job.png" alt="新建一次性采集弹窗" />
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="monitor">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 06</p>
+                <h2>持续监听模式</h2>
+              </div>
+              <span class="tag">重点演示</span>
+            </div>
+            <div class="two-col">
+              <div class="steps">
+                <div class="step"><span class="num">1</span><div><strong>点击新建监听</strong><p>填写监听名称、链接、来源渠道和分析类型。</p></div></div>
+                <div class="step"><span class="num">2</span><div><strong>设置运行频率</strong><p>例如每 6 小时运行一次，适合持续追踪新评论。</p></div></div>
+                <div class="step"><span class="num">3</span><div><strong>选择自动分析</strong><p>开启后每次采集完成会自动进入 AI 分析流程。</p></div></div>
+                <div class="step"><span class="num">4</span><div><strong>切页返回验证</strong><p>创建后切到任务看板，再回评论采集，监听任务应仍保留在列表中。</p></div></div>
+                <div class="note"><strong>讲师提示</strong><p>监听任务用于长期追踪同一链接；一次性采集用于临时分析，不要混淆两个入口。</p></div>
+              </div>
+              <div class="screen">
+                <img src="assets/user-manual/05-create-monitor.png" alt="新建监听任务弹窗" />
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="analysis">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 07</p>
+                <h2>分析记录与报告阅读</h2>
+              </div>
+              <span class="tag">结果说明</span>
+            </div>
+            <div class="two-col">
+              <div class="steps">
+                <div class="step"><span class="num">1</span><div><strong>进入分析记录</strong><p>查看任务名称、来源、类型、导入状态和分析状态。</p></div></div>
+                <div class="step"><span class="num">2</span><div><strong>讲解状态</strong><p>未分析、排队中、分析中、已完成、失败分别意味着什么。</p></div></div>
+                <div class="step"><span class="num">3</span><div><strong>进入报告</strong><p>按总体结论、NPS、情绪分布、用户声音、痛点和机会点阅读。</p></div></div>
+                <div class="note"><strong>关键提醒</strong><p>YouTube 视频类评论必须选择“视频类评论”，避免被按商品评论的电商维度分析。</p></div>
+              </div>
+              <div class="screen">
+                <img src="assets/user-manual/06-analysis-runs.png" alt="分析记录页面截图" />
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="reviews">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 08</p>
+                <h2>评论明细复核</h2>
+              </div>
+              <span class="tag">证据链</span>
+            </div>
+            <div class="two-col">
+              <div class="steps">
+                <div class="step"><span class="num">1</span><div><strong>搜索和筛选</strong><p>按关键词、情绪、标签、时间和来源过滤评论。</p></div></div>
+                <div class="step"><span class="num">2</span><div><strong>抽查原文</strong><p>报告结论有疑问时回到原始评论核对。</p></div></div>
+                <div class="step"><span class="num">3</span><div><strong>保存视图</strong><p>把常用筛选条件保存为团队复盘视图。</p></div></div>
+                <div class="step"><span class="num">4</span><div><strong>导出证据</strong><p>交付外部报告前导出关键评论作为支撑。</p></div></div>
+              </div>
+              <div class="screen">
+                <img src="assets/user-manual/07-reviews.png" alt="评论明细页面截图" />
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="growth">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 09</p>
+                <h2>增长运营闭环</h2>
+              </div>
+              <span class="tag">从洞察到行动</span>
+            </div>
+            <div class="two-col">
+              <div class="steps">
+                <div class="step"><span class="num">1</span><div><strong>提炼机会点</strong><p>从高频用户声音中找到内容选题、产品改进或舆情跟进方向。</p></div></div>
+                <div class="step"><span class="num">2</span><div><strong>生成行动项</strong><p>把问题拆成可执行事项，分配负责人和优先级。</p></div></div>
+                <div class="step"><span class="num">3</span><div><strong>周期复盘</strong><p>后续通过持续监听观察评论变化，验证动作是否有效。</p></div></div>
+              </div>
+              <div class="screen">
+                <img src="assets/user-manual/08-growth.png" alt="增长运营页面截图" />
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="admin">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 10</p>
+                <h2>超管后台与抓取设置</h2>
+              </div>
+              <span class="tag">管理员专场</span>
+            </div>
+            <div class="callout-row">
+              <div class="callout">
+                <strong>超管后台</strong>
+                <p>管理用户、邀请码、工作区和额度。培训时强调普通用户不维护模型和抓取参数。</p>
+              </div>
+              <div class="callout">
+                <strong>抓取设置</strong>
+                <p>启用评论采集、调整抓取数量、超时时间和重试策略。遇到超时或未采集到评论时优先检查这里。</p>
+              </div>
+            </div>
+            <div class="grid" style="margin-top: 18px">
+              <div class="screen"><img src="assets/user-manual/09-admin.png" alt="超管后台截图" /></div>
+              <div class="screen"><img src="assets/user-manual/10-settings-crawler.png" alt="抓取设置截图" /></div>
+              <div class="note"><strong>讲师提示</strong><p>视频类评论、商品类评论、社媒评论的提示词维度不同。分析偏差时，先检查任务类型和超管提示词配置。</p></div>
+            </div>
+          </section>
+
+          <section class="section" id="mobile">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 11</p>
+                <h2>移动端演示</h2>
+              </div>
+              <span class="tag">轻量查看</span>
+            </div>
+            <div class="two-col">
+              <div class="steps">
+                <div class="step"><span class="num">1</span><div><strong>设备自适应</strong><p>系统会根据 PC 或移动设备显示对应 UI。</p></div></div>
+                <div class="step"><span class="num">2</span><div><strong>适合场景</strong><p>移动端适合查看状态、刷新任务、轻量跟进，不建议做复杂表格筛选。</p></div></div>
+                <div class="step"><span class="num">3</span><div><strong>链接录入</strong><p>手机端新建任务时建议复制完整链接，减少输入错误。</p></div></div>
+              </div>
+              <div class="screen phone">
+                <img src="assets/user-manual/11-mobile-dashboard.png" alt="移动端任务看板截图" />
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="faq">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 12</p>
+                <h2>常见问题讲解</h2>
+              </div>
+              <span class="tag">排错口径</span>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>问题</th>
+                  <th>培训时说明</th>
+                  <th>优先排查</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>未采集到评论</td>
+                  <td>不是所有视频都能抓到评论，可能评论关闭、链接不公开或平台限制。</td>
+                  <td>打开链接确认评论可见；检查抓取设置和 worker 日志。</td>
+                </tr>
+                <tr>
+                  <td>Scrapling 超时</td>
+                  <td>平台加载慢、网络代理不稳定或采集数量过大都可能导致超时。</td>
+                  <td>降低单次采集数，检查服务器网络，必要时调高超时。</td>
+                </tr>
+                <tr>
+                  <td>分析结果全负向</td>
+                  <td>视频评论不应按商品评论维度处理，NPS 也要适配内容推荐倾向。</td>
+                  <td>检查分析类型、提示词和样本质量。</td>
+                </tr>
+                <tr>
+                  <td>监听任务切页后不见</td>
+                  <td>监听列表应持久保留；如果接口短暂失败，页面会保留上一次成功记录。</td>
+                  <td>刷新页面，检查 `/api/crawl-monitors` 和登录工作区。</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section class="section" id="checklist">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Module 13</p>
+                <h2>讲师演示清单</h2>
+              </div>
+              <span class="tag">开课前检查</span>
+            </div>
+            <ul class="checklist">
+              <li>准备一个可公开演示的 YouTube 或 TikTok 视频链接。</li>
+              <li>确认演示账号可以登录，并且当前工作区有评论额度和分析次数额度。</li>
+              <li>确认评论采集已在抓取设置中启用。</li>
+              <li>确认 API、Web、Worker 都在运行，采集任务能进入队列。</li>
+              <li>先用少量评论跑一次采集和分析，避免现场等待过久。</li>
+              <li>演示时强调“视频类评论”和“商品类评论”的分析类型不能混用。</li>
+              <li>结束前展示删除、重试、刷新和持续监听的日常维护动作。</li>
+            </ul>
+          </section>
+        </main>
+      </div>
+
+      <footer class="footer">
+        <strong>ReviewIQ 评论分析系统培训演示</strong>
+        <p>本页面基于 docs/user-manual.md 和真实系统截图制作。</p>
+        <p><a href="#top">返回顶部</a></p>
+      </footer>
+    </div>
+  </body>
+</html>

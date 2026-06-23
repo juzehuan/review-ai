@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReviewIQ 普通用户培训演示</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172033;
+        --muted: #5d687a;
+        --line: #dce4ef;
+        --paper: #ffffff;
+        --soft: #f5f8fc;
+        --navy: #112033;
+        --blue: #2367f5;
+        --teal: #08a9b8;
+        --green: #0d9468;
+        --amber: #a76518;
+        --red: #c4382d;
+        --shadow: 0 18px 44px rgba(15, 23, 42, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          "Microsoft YaHei",
+          "PingFang SC",
+          "Segoe UI",
+          Arial,
+          sans-serif;
+        color: var(--ink);
+        background: #eef3f8;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .hero {
+        min-height: 88vh;
+        display: grid;
+        grid-template-columns: minmax(0, 0.86fr) minmax(360px, 1fr);
+        align-items: center;
+        gap: 44px;
+        padding: 48px clamp(22px, 5vw, 78px) 42px;
+        color: #ffffff;
+        background:
+          linear-gradient(90deg, rgba(17, 32, 51, 0.94), rgba(17, 32, 51, 0.7)),
+          url("assets/user-manual/02-dashboard.png") center / cover;
+      }
+
+      .kicker,
+      .eyebrow {
+        margin: 0 0 12px;
+        color: #82e5ef;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 20px;
+        font-size: clamp(36px, 5.6vw, 68px);
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-bottom: 14px;
+        font-size: clamp(26px, 3vw, 42px);
+        line-height: 1.16;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        margin-bottom: 10px;
+        font-size: 19px;
+        line-height: 1.35;
+        letter-spacing: 0;
+      }
+
+      .hero p {
+        max-width: 720px;
+        color: rgba(255, 255, 255, 0.84);
+        font-size: 19px;
+        line-height: 1.75;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 30px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border: 1px solid rgba(255, 255, 255, 0.26);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        font-weight: 900;
+        backdrop-filter: blur(10px);
+      }
+
+      .button.primary {
+        border-color: transparent;
+        background: linear-gradient(90deg, var(--blue), var(--teal));
+      }
+
+      .hero-panel {
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        padding: 22px;
+        background: rgba(255, 255, 255, 0.1);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(12px);
+      }
+
+      .hero-panel ol {
+        margin: 0;
+        padding-left: 21px;
+        color: rgba(255, 255, 255, 0.84);
+        line-height: 1.85;
+      }
+
+      .topnav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        gap: 8px;
+        padding: 10px clamp(14px, 4vw, 42px);
+        overflow-x: auto;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(12px);
+      }
+
+      .topnav a {
+        flex: 0 0 auto;
+        padding: 9px 12px;
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .topnav a:hover {
+        color: var(--blue);
+        background: #edf4ff;
+      }
+
+      section {
+        padding: 72px clamp(18px, 5vw, 78px);
+      }
+
+      .band {
+        background: var(--paper);
+      }
+
+      .section-head {
+        max-width: 860px;
+        margin-bottom: 28px;
+      }
+
+      .section-head p {
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.75;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: minmax(0, 0.94fr) minmax(360px, 1.06fr);
+        gap: 28px;
+        align-items: start;
+      }
+
+      .card,
+      .note,
+      .shot {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+      }
+
+      .card {
+        padding: 20px;
+      }
+
+      .card p,
+      .note p {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .card ul,
+      .note ul,
+      .step-list {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+
+      .note {
+        padding: 18px;
+        border-left: 5px solid var(--blue);
+      }
+
+      .note.warning {
+        border-left-color: var(--amber);
+      }
+
+      .note.success {
+        border-left-color: var(--green);
+      }
+
+      .shot {
+        overflow: hidden;
+      }
+
+      .shot img {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: #e8eef7;
+      }
+
+      .caption {
+        margin: 0;
+        padding: 12px 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+        background: #fbfcff;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .flow-step {
+        min-height: 128px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+      }
+
+      .num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        margin-bottom: 12px;
+        border-radius: 999px;
+        background: #e8f1ff;
+        color: var(--blue);
+        font-weight: 900;
+      }
+
+      .flow-step strong {
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .flow-step span {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+      }
+
+      table {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--ink);
+        background: #f5f8fc;
+        font-size: 14px;
+      }
+
+      td {
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .checklist {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .check {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+      }
+
+      .box {
+        flex: 0 0 auto;
+        width: 18px;
+        height: 18px;
+        margin-top: 4px;
+        border: 2px solid var(--blue);
+        border-radius: 5px;
+      }
+
+      .check strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .check span {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .footer {
+        padding: 34px clamp(18px, 5vw, 78px);
+        color: #d7e6ff;
+        background: var(--navy);
+      }
+
+      .footer p {
+        margin: 0;
+        line-height: 1.7;
+      }
+
+      @media (max-width: 980px) {
+        .hero,
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+
+        .hero {
+          min-height: auto;
+        }
+
+        .grid,
+        .flow,
+        .checklist {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .hero {
+          padding: 38px 18px;
+        }
+
+        h1 {
+          font-size: 36px;
+        }
+
+        section {
+          padding: 50px 16px;
+        }
+
+        .grid,
+        .flow,
+        .checklist {
+          grid-template-columns: 1fr;
+        }
+
+        .button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero" id="top">
+        <div>
+          <p class="kicker">ReviewIQ Training</p>
+          <h1>普通用户培训演示</h1>
+          <p>
+            这份演示面向日常业务用户，围绕评论采集、持续监听、AI 分析、报告阅读和评论复核展开。普通用户只需要完成业务操作，模型、提示词和抓取底层配置统一由管理员维护。
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#flow">开始培训</a>
+            <a class="button" href="#checklist">讲师检查清单</a>
+          </div>
+        </div>
+        <aside class="hero-panel">
+          <p class="eyebrow">60 分钟建议节奏</p>
+          <ol>
+            <li>10 分钟：登录、看板和用户边界</li>
+            <li>20 分钟：一次性采集和持续监听</li>
+            <li>15 分钟：AI 分析和报告阅读</li>
+            <li>10 分钟：评论明细、导出和增长运营</li>
+            <li>5 分钟：移动端和常见问题</li>
+          </ol>
+        </aside>
+      </header>
+
+      <nav class="topnav" aria-label="培训目录">
+        <a href="#scope">用户边界</a>
+        <a href="#flow">日常流程</a>
+        <a href="#login">登录看板</a>
+        <a href="#crawl">评论采集</a>
+        <a href="#monitor">持续监听</a>
+        <a href="#analysis">AI 分析</a>
+        <a href="#reviews">评论复核</a>
+        <a href="#growth">增长运营</a>
+        <a href="#mobile">移动端</a>
+        <a href="#faq">常见问题</a>
+      </nav>
+
+      <section class="band" id="scope">
+        <div class="section-head">
+          <p class="eyebrow">Module 01</p>
+          <h2>普通用户只负责业务流程</h2>
+          <p>
+            培训开场先明确权限边界，减少误操作和沟通成本。普通用户的重点是把评论数据采集进来、发起分析、复核结果并形成行动项。
+          </p>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <h3>可以操作</h3>
+            <ul>
+              <li>查看任务看板和额度</li>
+              <li>创建一次性采集任务</li>
+              <li>创建、暂停、立即运行监听任务</li>
+              <li>发起 AI 分析并查看报告</li>
+              <li>检索、筛选、导出和修正评论</li>
+              <li>删除不再需要的采集或分析记录</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>不需要操作</h3>
+            <ul>
+              <li>AI 模型和 API Key</li>
+              <li>提示词模板和分析规则</li>
+              <li>抓取引擎、代理和超时配置</li>
+              <li>用户、邀请码和工作区后台</li>
+              <li>服务器部署和 worker 队列配置</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>遇到问题时</h3>
+            <p>
+              普通用户先确认链接、来源渠道、分析类型和任务状态。涉及模型、抓取底层、登录接口或服务器日志的问题，交由管理员处理。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="flow">
+        <div class="section-head">
+          <p class="eyebrow">Module 02</p>
+          <h2>一条主线：采集、分析、复核、行动</h2>
+          <p>日常使用时不需要从系统菜单开始记忆，只要记住这条业务链路。</p>
+        </div>
+        <div class="flow">
+          <div class="flow-step">
+            <span class="num">1</span>
+            <strong>准备链接</strong>
+            <span>复制需要分析的 YouTube、TikTok 或其他内容链接。</span>
+          </div>
+          <div class="flow-step">
+            <span class="num">2</span>
+            <strong>采集评论</strong>
+            <span>创建一次性采集，或创建持续监听任务。</span>
+          </div>
+          <div class="flow-step">
+            <span class="num">3</span>
+            <strong>发起分析</strong>
+            <span>采集完成后开始 AI 分析，等待报告生成。</span>
+          </div>
+          <div class="flow-step">
+            <span class="num">4</span>
+            <strong>复核证据</strong>
+            <span>进入评论明细，抽查原始评论和 AI 标注。</span>
+          </div>
+          <div class="flow-step">
+            <span class="num">5</span>
+            <strong>沉淀行动</strong>
+            <span>把主题、痛点和机会点转成运营跟进事项。</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="band" id="login">
+        <div class="two-col">
+          <div>
+            <p class="eyebrow">Module 03</p>
+            <h2>登录和任务看板</h2>
+            <p>
+              登录后优先查看任务看板，确认额度、任务数量、完成情况和最近任务。看板适合每天开始工作时做一次快速巡检。
+            </p>
+            <div class="note success">
+              <h3>演示口径</h3>
+              <ul>
+                <li>先登录系统，再看当前账号和工作区。</li>
+                <li>确认评论额度和分析次数是否足够。</li>
+                <li>检查是否有失败、排队过久或待分析任务。</li>
+              </ul>
+            </div>
+          </div>
+          <figure class="shot">
+            <img src="assets/user-manual/01-login.png" alt="ReviewIQ 登录页面" />
+            <p class="caption">登录页：输入账号和密码后进入任务看板。</p>
+          </figure>
+        </div>
+        <div style="height: 24px"></div>
+        <figure class="shot">
+          <img src="assets/user-manual/02-dashboard.png" alt="ReviewIQ 任务看板" />
+          <p class="caption">任务看板：查看额度、任务总数、完成情况和最近分析任务。</p>
+        </figure>
+      </section>
+
+      <section id="crawl">
+        <div class="section-head">
+          <p class="eyebrow">Module 04</p>
+          <h2>创建一次性评论采集</h2>
+          <p>
+            一次性采集适合临时分析某条视频、某次活动或某个内容链接。培训时建议现场准备一条公开可访问、评论区开启的链接。
+          </p>
+        </div>
+        <div class="two-col">
+          <div>
+            <ol class="step-list">
+              <li>进入“评论采集”。</li>
+              <li>点击“一次采集”。</li>
+              <li>填写任务名称和视频链接。</li>
+              <li>选择来源渠道，例如 YouTube 或 TikTok。</li>
+              <li>选择正确的分析类型，视频评论请选择“视频类评论”。</li>
+              <li>设置最多采集条数后提交。</li>
+              <li>回到采集记录查看进度。</li>
+            </ol>
+            <div class="note warning" style="margin-top: 18px">
+              <h3>重点提醒</h3>
+              <p>
+                来源渠道和分析类型会影响后续报告质量。YouTube 视频类评论不要按商品评论处理，否则可能出现用户声音偏电商、情绪判断异常或 NPS 不合理。
+              </p>
+            </div>
+          </div>
+          <figure class="shot">
+            <img src="assets/user-manual/04-create-crawl-job.png" alt="新建一次性采集任务" />
+            <p class="caption">新建一次性采集：填写链接、来源渠道、分析类型和采集数量。</p>
+          </figure>
+        </div>
+        <div style="height: 24px"></div>
+        <figure class="shot">
+          <img src="assets/user-manual/03-crawl-jobs.png" alt="评论采集控制台" />
+          <p class="caption">评论采集控制台：查看持续监听任务和每次采集记录。</p>
+        </figure>
+      </section>
+
+      <section class="band" id="monitor">
+        <div class="two-col">
+          <div>
+            <p class="eyebrow">Module 05</p>
+            <h2>创建持续监听任务</h2>
+            <p>
+              持续监听用于长期跟踪同一条视频或内容链接的新评论。适合新品发布、热门视频、投放内容、舆情内容和需要长期复盘的链接。
+            </p>
+            <ol class="step-list">
+              <li>点击“新建监听”。</li>
+              <li>填写监听名称、内容名称和视频链接。</li>
+              <li>选择来源渠道和分析类型。</li>
+              <li>设置运行频率和单次最大采集数量。</li>
+              <li>按需开启自动分析。</li>
+              <li>保存后回到监听列表查看任务。</li>
+            </ol>
+          </div>
+          <figure class="shot">
+            <img src="assets/user-manual/05-create-monitor.png" alt="新建持续监听任务" />
+            <p class="caption">新建监听任务：设置频率后，系统会定期采集新评论。</p>
+          </figure>
+        </div>
+        <div style="height: 24px"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>操作</th>
+                <th>适用场景</th>
+                <th>讲解重点</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>启用或暂停</td>
+                <td>控制任务是否继续按频率运行。</td>
+                <td>暂停不会删除历史数据，只是停止后续自动运行。</td>
+              </tr>
+              <tr>
+                <td>立即运行</td>
+                <td>需要马上补采一次评论。</td>
+                <td>不用等下一次计划时间，适合临时复盘前刷新数据。</td>
+              </tr>
+              <tr>
+                <td>自动分析</td>
+                <td>希望每次采集完成后自动产出报告。</td>
+                <td>适合稳定监听；如果想人工确认评论数量，可先关闭。</td>
+              </tr>
+              <tr>
+                <td>删除</td>
+                <td>监听对象已经结束或任务创建错误。</td>
+                <td>删除前确认任务名称和链接，避免误删。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="analysis">
+        <div class="section-head">
+          <p class="eyebrow">Module 06</p>
+          <h2>发起 AI 分析并阅读报告</h2>
+          <p>
+            采集完成后，普通用户可以从采集记录中发起 AI 分析，也可以在分析记录中查看进度。大批量评论分析需要等待，速度会受模型服务、网络、额度和服务器性能影响。
+          </p>
+        </div>
+        <div class="two-col">
+          <div>
+            <h3>分析前检查</h3>
+            <ul class="step-list">
+              <li>评论数量是否符合预期。</li>
+              <li>分析类型是否正确。</li>
+              <li>任务名称是否方便后续识别。</li>
+              <li>是否有重复任务。</li>
+            </ul>
+            <div class="note" style="margin-top: 18px">
+              <h3>报告阅读顺序</h3>
+              <ul>
+                <li>先看总体结论。</li>
+                <li>再看 NPS 和情绪分布。</li>
+                <li>查看用户声音、高频词和核心主题。</li>
+                <li>阅读痛点、机会点和行动建议。</li>
+                <li>回到评论明细抽查原文。</li>
+              </ul>
+            </div>
+          </div>
+          <figure class="shot">
+            <img src="assets/user-manual/06-analysis-runs.png" alt="分析记录页面" />
+            <p class="caption">分析记录：查看任务状态、分析进度和操作入口。</p>
+          </figure>
+        </div>
+      </section>
+
+      <section class="band" id="reviews">
+        <div class="two-col">
+          <div>
+            <p class="eyebrow">Module 07</p>
+            <h2>评论明细复核</h2>
+            <p>
+              评论明细是验证 AI 报告是否可靠的证据层。培训时建议演示一次关键词搜索、情绪筛选和导出流程。
+            </p>
+            <ul class="step-list">
+              <li>按关键词查找评论。</li>
+              <li>按情绪、标签、评分、时间或来源筛选。</li>
+              <li>根据工作需要调整表格列。</li>
+              <li>保存常用筛选视图。</li>
+              <li>导出当前筛选结果。</li>
+              <li>发现 AI 标注错误时进行人工修正。</li>
+            </ul>
+          </div>
+          <figure class="shot">
+            <img src="assets/user-manual/07-reviews.png" alt="评论明细页面" />
+            <p class="caption">评论明细：查看原始评论和 AI 标注，支持筛选、导出和修正。</p>
+          </figure>
+        </div>
+      </section>
+
+      <section id="growth">
+        <div class="two-col">
+          <div>
+            <p class="eyebrow">Module 08</p>
+            <h2>把评论洞察转成行动</h2>
+            <p>
+              增长运营页面用于把主题、痛点、机会点和建议沉淀成可跟进事项。它适合周会复盘、内容选题、用户反馈闭环和投放效果复盘。
+            </p>
+            <ol class="step-list">
+              <li>从分析报告定位主要问题。</li>
+              <li>进入增长运营查看机会点和行动建议。</li>
+              <li>拆分负责人、优先级和处理状态。</li>
+              <li>定期复盘后续评论变化。</li>
+            </ol>
+          </div>
+          <figure class="shot">
+            <img src="assets/user-manual/08-growth.png" alt="增长运营页面" />
+            <p class="caption">增长运营：将评论洞察转化为后续运营动作。</p>
+          </figure>
+        </div>
+      </section>
+
+      <section class="band" id="mobile">
+        <div class="two-col">
+          <div>
+            <p class="eyebrow">Module 09</p>
+            <h2>移动端使用方式</h2>
+            <p>
+              系统会根据当前设备识别 PC 或移动端并显示对应布局。手机更适合查看状态、刷新任务、查看报告和处理轻量操作。
+            </p>
+            <div class="note">
+              <h3>移动端建议</h3>
+              <ul>
+                <li>复杂筛选和大量表格复核优先使用 PC。</li>
+                <li>创建任务时复制完整链接，减少手动输入。</li>
+                <li>删除、重试等操作前仔细确认任务名称。</li>
+                <li>表格内容较多时可以横向滚动查看。</li>
+              </ul>
+            </div>
+          </div>
+          <figure class="shot">
+            <img src="assets/user-manual/11-mobile-dashboard.png" alt="移动端任务看板" />
+            <p class="caption">移动端看板：适合随时查看状态和轻量处理任务。</p>
+          </figure>
+        </div>
+      </section>
+
+      <section id="faq">
+        <div class="section-head">
+          <p class="eyebrow">Module 10</p>
+          <h2>普通用户常见问题</h2>
+          <p>这些问题适合培训最后统一讲，也适合做内部答疑口径。</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>问题</th>
+                <th>普通用户先做什么</th>
+                <th>何时找管理员</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>登录失败</td>
+                <td>确认账号密码，刷新页面后重试。</td>
+                <td>多次失败、账号被禁用、接口返回异常。</td>
+              </tr>
+              <tr>
+                <td>未采集到评论</td>
+                <td>打开链接确认评论区可见，检查来源渠道是否正确。</td>
+                <td>公开评论仍无法采集，或多个链接都失败。</td>
+              </tr>
+              <tr>
+                <td>只采集到少量评论</td>
+                <td>提高最多采集条数，或改用持续监听分批采集。</td>
+                <td>明显少于页面可见数量，且多次重试无改善。</td>
+              </tr>
+              <tr>
+                <td>分析速度慢</td>
+                <td>等待任务完成，避免重复创建大量分析任务。</td>
+                <td>长时间无进度、队列卡住或所有任务都变慢。</td>
+              </tr>
+              <tr>
+                <td>视频报告像商品报告</td>
+                <td>确认任务是否选择“视频类评论”。</td>
+                <td>类型正确但仍持续出现电商词汇或 NPS 异常。</td>
+              </tr>
+              <tr>
+                <td>误删任务</td>
+                <td>立即停止重复操作，记录任务名称和时间。</td>
+                <td>需要管理员检查备份或数据库记录。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="band" id="checklist">
+        <div class="section-head">
+          <p class="eyebrow">Trainer Checklist</p>
+          <h2>讲师演示检查清单</h2>
+          <p>培训前按这份清单准备，可以让现场演示更顺。</p>
+        </div>
+        <div class="checklist">
+          <div class="check">
+            <span class="box"></span>
+            <div>
+              <strong>准备账号</strong>
+              <span>确认普通用户账号能登录，且不显示后台配置入口。</span>
+            </div>
+          </div>
+          <div class="check">
+            <span class="box"></span>
+            <div>
+              <strong>准备链接</strong>
+              <span>准备 1 条公开、评论区开启、能稳定访问的视频链接。</span>
+            </div>
+          </div>
+          <div class="check">
+            <span class="box"></span>
+            <div>
+              <strong>准备历史任务</strong>
+              <span>准备 1 个已完成采集和 1 个已完成分析的任务，避免现场等待。</span>
+            </div>
+          </div>
+          <div class="check">
+            <span class="box"></span>
+            <div>
+              <strong>准备讲解口径</strong>
+              <span>明确普通用户不维护模型、提示词和抓取底层配置。</span>
+            </div>
+          </div>
+          <div class="check">
+            <span class="box"></span>
+            <div>
+              <strong>演示复核</strong>
+              <span>至少演示一次评论搜索、筛选、导出和原文抽查。</span>
+            </div>
+          </div>
+          <div class="check">
+            <span class="box"></span>
+            <div>
+              <strong>说明风险</strong>
+              <span>删除、重试、分析类型选择和大批量任务都要重点提醒。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        ReviewIQ 普通用户培训演示。建议配合《ReviewIQ 普通用户操作手册》使用，现场演示以实际部署环境的数据和权限为准。
+      </p>
+    </footer>
+  </body>
+</html>

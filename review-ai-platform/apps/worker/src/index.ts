@@ -26,6 +26,24 @@ const analysisQueue = new Queue("analysis-runs", { connection });
 const crawlQueue = new Queue("crawl-jobs", { connection });
 const CRAWLER_CHANNELS = new Set<CrawlerChannel>(["api_exporter", "api_basic", "browser_intercept"]);
 
+function readPositiveIntEnv(name: string, fallback: number, options: { min?: number; max?: number } = {}) {
+  const parsed = Number(process.env[name]);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  const min = options.min ?? 1;
+  const max = options.max ?? Number.MAX_SAFE_INTEGER;
+  return Math.min(Math.max(Math.floor(parsed), min), max);
+}
+
+const ANALYSIS_BATCH_SIZE = readPositiveIntEnv("ANALYSIS_BATCH_SIZE", 50, { min: 1, max: 100 });
+const ANALYSIS_BATCH_CONCURRENCY = readPositiveIntEnv("ANALYSIS_BATCH_CONCURRENCY", 2, { min: 1, max: 6 });
+const ANALYSIS_SINGLE_CONCURRENCY = readPositiveIntEnv("ANALYSIS_SINGLE_CONCURRENCY", 6, { min: 1, max: 20 });
+const ANALYSIS_REQUEST_TIMEOUT_MS = readPositiveIntEnv("ANALYSIS_REQUEST_TIMEOUT_MS", 180000, { min: 30000, max: 600000 });
+const ANALYSIS_BATCH_PAUSE_MS = readPositiveIntEnv("ANALYSIS_BATCH_PAUSE_MS", 0, { min: 0, max: 30000 });
+const ANALYSIS_WORKER_CONCURRENCY = readPositiveIntEnv("ANALYSIS_WORKER_CONCURRENCY", 2, { min: 1, max: 10 });
+const ANALYSIS_SPLIT_BATCH_SIZE = readPositiveIntEnv("ANALYSIS_SPLIT_BATCH_SIZE", 10, { min: 2, max: 50 });
+
 type CrawlResult = {
   source: string;
   crawlChannel?: string;
@@ -237,17 +255,92 @@ const ALL_TOPIC_TAXONOMY = [
   "支持立场", "反对立场", "中立观望", "事实质疑", "情绪宣泄", "讽刺调侃", "传播扩散", "误解谣言", "品牌风险", "回应诉求", "行动号召"
 ] as const;
 
-const analysisSchema = z.object({
-  sentiment: z.enum(["positive", "neutral", "negative"]),
-  sentimentScore: z.number().min(0).max(1),
-  topicLabels: z.array(z.string()).max(6),
-  keywords: z.array(z.string()).max(12),
-  summary: z.string().max(200),
-  painPoints: z.array(z.string()).max(5),
-  highlights: z.array(z.string()).max(5),
-  suggestion: z.string().max(160),
-  needsAttention: z.boolean()
-});
+function normalizeSentimentValue(value: unknown) {
+  const text = String(value || "").trim().toLowerCase();
+  if (!text) {
+    return "neutral";
+  }
+  if (
+    ["positive", "pos", "good", "support", "like", "praise", "正面", "正向", "积极", "支持", "赞同", "喜爱"].some((item) =>
+      text.includes(item)
+    )
+  ) {
+    return "positive";
+  }
+  if (
+    ["negative", "neg", "bad", "critical", "oppose", "question", "skeptic", "质疑", "负面", "负向", "消极", "反对", "批评"].some(
+      (item) => text.includes(item)
+    )
+  ) {
+    return "negative";
+  }
+  if (["neutral", "mixed", "中性", "中立", "观望", "普通", "一般"].some((item) => text.includes(item))) {
+    return "neutral";
+  }
+  return "neutral";
+}
+
+function normalizeStringList(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/[,，、;\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function normalizeBooleanValue(value: unknown) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const text = String(value || "").trim().toLowerCase();
+  if (["true", "yes", "1", "需要", "是", "高", "关注"].includes(text)) {
+    return true;
+  }
+  return false;
+}
+
+function normalizeAnalysisPayload(value: unknown) {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const sentiment = normalizeSentimentValue(raw.sentiment);
+  const sentimentScore = Number(raw.sentimentScore ?? raw.sentiment_score);
+  return {
+    sentiment,
+    sentimentScore: Number.isFinite(sentimentScore)
+      ? Math.min(Math.max(sentimentScore, 0), 1)
+      : sentiment === "positive"
+        ? 0.82
+        : sentiment === "negative"
+          ? 0.18
+          : 0.55,
+    topicLabels: normalizeStringList(raw.topicLabels ?? raw.topic_labels),
+    keywords: normalizeStringList(raw.keywords),
+    summary: String(raw.summary || "").slice(0, 200),
+    painPoints: normalizeStringList(raw.painPoints ?? raw.pain_points),
+    highlights: normalizeStringList(raw.highlights),
+    suggestion: String(raw.suggestion || "").slice(0, 160),
+    needsAttention: normalizeBooleanValue(raw.needsAttention ?? raw.needs_attention)
+  };
+}
+
+const analysisSchema = z.preprocess(
+  normalizeAnalysisPayload,
+  z.object({
+    sentiment: z.enum(["positive", "neutral", "negative"]),
+    sentimentScore: z.number().min(0).max(1),
+    topicLabels: z.array(z.string()).max(6),
+    keywords: z.array(z.string()).max(12),
+    summary: z.string().max(200),
+    painPoints: z.array(z.string()).max(5),
+    highlights: z.array(z.string()).max(5),
+    suggestion: z.string().max(160),
+    needsAttention: z.boolean()
+  })
+);
 const batchAnalysisSchema = z.object({ analyses: z.array(analysisSchema) });
 
 type AnalysisResult = z.infer<typeof analysisSchema>;
@@ -929,6 +1022,14 @@ function buildAnalysisData(result: AnalysisResult) {
   };
 }
 
+function chunkArray<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
 async function addRunLog(runId: string, level: "info" | "warn" | "error", message: string, meta?: Prisma.InputJsonValue) {
   try {
     await prisma.analysisRunLog.create({
@@ -1065,7 +1166,16 @@ const worker = new Worker(
       modelName: setting.modelName,
       baseUrl: setting.baseUrl,
       analysisType: setting.analysisType,
-      taxonomy: setting.taxonomy
+      taxonomy: setting.taxonomy,
+      throughput: {
+        batchSize: ANALYSIS_BATCH_SIZE,
+        batchConcurrency: ANALYSIS_BATCH_CONCURRENCY,
+        singleConcurrency: ANALYSIS_SINGLE_CONCURRENCY,
+        requestTimeoutMs: ANALYSIS_REQUEST_TIMEOUT_MS,
+        batchPauseMs: ANALYSIS_BATCH_PAUSE_MS,
+        workerConcurrency: ANALYSIS_WORKER_CONCURRENCY,
+        splitBatchSize: ANALYSIS_SPLIT_BATCH_SIZE
+      }
     });
     const existingReviewIds = await prisma.reviewAnalysis
       .findMany({ where: { runId }, select: { reviewId: true } })
@@ -1092,8 +1202,6 @@ const worker = new Worker(
     let successCount = existingReviewIds.size;
     let failedCount = 0;
     let lastError: string | undefined;
-    const batchSize = 10;
-    const requestTimeoutMs = 120000;
     const useMock = process.env.ENABLE_MOCK_AI === "true";
 
     async function persistResult(reviewId: string, result: AnalysisResult) {
@@ -1105,28 +1213,41 @@ const worker = new Worker(
       });
     }
 
+    async function persistBatchResults(batch: (typeof pendingReviews)[number][], results: AnalysisResult[]) {
+      if (!results.length) {
+        return;
+      }
+      await prisma.reviewAnalysis.createMany({
+        data: results.map((result, index) => ({
+          runId,
+          reviewId: batch[index].id,
+          ...buildAnalysisData(result)
+        })),
+        skipDuplicates: true
+      });
+    }
+
     async function processOne(review: (typeof pendingReviews)[number]) {
       const item = {
         comment: review.comment || review.commentTr || "",
         commentTr: review.commentTr,
         ratingStar: review.ratingStar
       };
-      const result = await withTimeout(analyzeWithRetry(client, setting, item), requestTimeoutMs);
+      const result = await withTimeout(analyzeWithRetry(client, setting, item), ANALYSIS_REQUEST_TIMEOUT_MS);
       await persistResult(review.id, result);
     }
 
-    for (let i = 0; i < pendingReviews.length; i += batchSize) {
-      const status = await prisma.analysisRun.findUnique({ where: { id: runId }, select: { status: true } });
-      if (status?.status !== "running") {
-        console.log(`Run ${runId} stopped because status changed to ${status?.status}`);
-        return { successCount, failedCount, cancelled: true };
-      }
-
-      const batch = pendingReviews.slice(i, i + batchSize);
+    async function processBatch(batch: (typeof pendingReviews)[number][], batchIndex: number) {
+      const batchStart = batchIndex * ANALYSIS_BATCH_SIZE + 1;
+      const batchEnd = batchStart + batch.length - 1;
       let batchSucceeded = false;
+      let localSuccessCount = 0;
+      let localFailedCount = 0;
+      let localLastError: string | undefined;
+
       await addRunLog(runId, "info", "Processing review batch", {
-        batchStart: i + 1,
-        batchEnd: i + batch.length,
+        batchStart,
+        batchEnd,
         batchSize: batch.length
       });
 
@@ -1137,45 +1258,101 @@ const worker = new Worker(
             commentTr: review.commentTr,
             ratingStar: review.ratingStar
           }));
-          const results = await withTimeout(analyzeBatch(client, setting, items), requestTimeoutMs);
-          for (let index = 0; index < batch.length; index += 1) {
-            await persistResult(batch[index].id, results[index]);
-            successCount += 1;
-          }
+          const results = await withTimeout(analyzeBatch(client, setting, items), ANALYSIS_REQUEST_TIMEOUT_MS);
+          await persistBatchResults(batch, results);
+          localSuccessCount += results.length;
           batchSucceeded = true;
           await addRunLog(runId, "info", "Batch analysis succeeded", {
-            batchStart: i + 1,
-            batchEnd: i + batch.length,
-            successCount
+            batchStart,
+            batchEnd,
+            successCount: localSuccessCount
           });
         } catch (error) {
-          lastError = error instanceof Error ? error.message : String(error);
-          console.warn(`Batch analysis failed, fallback to single review: ${lastError}`);
+          localLastError = error instanceof Error ? error.message : String(error);
+          console.warn(`Batch analysis failed, fallback to single review: ${localLastError}`);
           await addRunLog(runId, "warn", "Batch analysis failed, falling back to single reviews", {
-            batchStart: i + 1,
-            batchEnd: i + batch.length,
-            error: lastError
+            batchStart,
+            batchEnd,
+            error: localLastError
           });
-        }
-      }
-
-      if (!batchSucceeded) {
-        const parallel = 3;
-        for (let cursor = 0; cursor < batch.length; cursor += parallel) {
-          const slice = batch.slice(cursor, cursor + parallel);
-          const settled = await Promise.allSettled(slice.map((review) => processOne(review)));
-          for (const result of settled) {
-            if (result.status === "fulfilled") {
-              successCount += 1;
-            } else {
-              failedCount += 1;
-              lastError = result.reason instanceof Error ? result.reason.message : String(result.reason);
-              await addRunLog(runId, "error", "Single review analysis failed", {
-                error: lastError
+          if (batch.length > ANALYSIS_SPLIT_BATCH_SIZE) {
+            try {
+              const splitBatches = chunkArray(batch, ANALYSIS_SPLIT_BATCH_SIZE);
+              let splitSuccessCount = 0;
+              for (let splitIndex = 0; splitIndex < splitBatches.length; splitIndex += 1) {
+                const splitBatch = splitBatches[splitIndex];
+                const splitItems = splitBatch.map((review) => ({
+                  comment: review.comment || review.commentTr || "",
+                  commentTr: review.commentTr,
+                  ratingStar: review.ratingStar
+                }));
+                const splitResults = await withTimeout(analyzeBatch(client, setting, splitItems), ANALYSIS_REQUEST_TIMEOUT_MS);
+                await persistBatchResults(splitBatch, splitResults);
+                splitSuccessCount += splitResults.length;
+              }
+              localSuccessCount += splitSuccessCount;
+              localLastError = undefined;
+              batchSucceeded = true;
+              await addRunLog(runId, "info", "Split batch analysis succeeded", {
+                batchStart,
+                batchEnd,
+                splitBatchSize: ANALYSIS_SPLIT_BATCH_SIZE,
+                successCount: splitSuccessCount
+              });
+            } catch (splitError) {
+              localLastError = splitError instanceof Error ? splitError.message : String(splitError);
+              await addRunLog(runId, "warn", "Split batch analysis failed, falling back to single reviews", {
+                batchStart,
+                batchEnd,
+                splitBatchSize: ANALYSIS_SPLIT_BATCH_SIZE,
+                error: localLastError
               });
             }
           }
         }
+      }
+
+      if (!batchSucceeded) {
+        for (let cursor = 0; cursor < batch.length; cursor += ANALYSIS_SINGLE_CONCURRENCY) {
+          const slice = batch.slice(cursor, cursor + ANALYSIS_SINGLE_CONCURRENCY);
+          const settled = await Promise.allSettled(slice.map((review) => processOne(review)));
+          for (const result of settled) {
+            if (result.status === "fulfilled") {
+              localSuccessCount += 1;
+            } else {
+              localFailedCount += 1;
+              localLastError = result.reason instanceof Error ? result.reason.message : String(result.reason);
+              await addRunLog(runId, "error", "Single review analysis failed", {
+                batchStart,
+                batchEnd,
+                error: localLastError
+              });
+            }
+          }
+        }
+      }
+
+      return {
+        successCount: localSuccessCount,
+        failedCount: localFailedCount,
+        lastError: localFailedCount > 0 ? localLastError : undefined
+      };
+    }
+
+    const reviewBatches = chunkArray(pendingReviews, ANALYSIS_BATCH_SIZE);
+    for (let i = 0; i < reviewBatches.length; i += ANALYSIS_BATCH_CONCURRENCY) {
+      const status = await prisma.analysisRun.findUnique({ where: { id: runId }, select: { status: true } });
+      if (status?.status !== "running") {
+        console.log(`Run ${runId} stopped because status changed to ${status?.status}`);
+        return { successCount, failedCount, cancelled: true };
+      }
+
+      const batchGroup = reviewBatches.slice(i, i + ANALYSIS_BATCH_CONCURRENCY);
+      const batchResults = await Promise.all(batchGroup.map((batch, offset) => processBatch(batch, i + offset)));
+      for (const result of batchResults) {
+        successCount += result.successCount;
+        failedCount += result.failedCount;
+        lastError = result.lastError || lastError;
       }
 
       await updateRunProgress(runId, successCount, failedCount, lastError);
@@ -1183,10 +1360,12 @@ const worker = new Worker(
         successCount,
         failedCount,
         totalReviews: reviews.length,
+        processedBatches: Math.min(i + batchGroup.length, reviewBatches.length),
+        totalBatches: reviewBatches.length,
         lastError: lastError || null
       });
-      if (i + batchSize < pendingReviews.length) {
-        await sleep(800);
+      if (ANALYSIS_BATCH_PAUSE_MS > 0 && i + ANALYSIS_BATCH_CONCURRENCY < reviewBatches.length) {
+        await sleep(ANALYSIS_BATCH_PAUSE_MS);
       }
     }
 
@@ -1251,7 +1430,7 @@ const worker = new Worker(
     await prisma.task.update({ where: { id: taskId }, data: { status: "completed" } });
     return { successCount: analyses.length, failedCount };
   },
-  { connection, concurrency: 2 }
+  { connection, concurrency: ANALYSIS_WORKER_CONCURRENCY }
 );
 
 worker.on("completed", (job) => {
