@@ -20,7 +20,7 @@
         </div>
         <div class="shared-meta">
           <span>评论 {{ report.dashboard.reviewCount }}</span>
-          <span>NPS {{ report.dashboard.nps }}</span>
+          <span>{{ scoreLabel }} {{ report.dashboard.nps }}</span>
           <span>浏览 {{ report.share.viewCount }}</span>
           <a-button size="small" @click="printReport">打印/PDF</a-button>
         </div>
@@ -29,6 +29,25 @@
       <section v-if="report.dashboard.aiSummary" class="shared-summary">
         <div class="panel-label">AI Summary</div>
         <div>{{ report.dashboard.aiSummary }}</div>
+      </section>
+
+      <section v-if="report.dashboard.qualityAlerts?.length" class="quality-alerts-panel">
+        <div class="settings-section-head">
+          <div>
+            <div class="panel-label">Quality Check</div>
+            <div class="settings-section-title">分析质量提醒</div>
+          </div>
+        </div>
+        <div class="quality-alert-list">
+          <a-alert
+            v-for="alert in report.dashboard.qualityAlerts"
+            :key="alert.id"
+            show-icon
+            :type="qualityAlertType(alert.level)"
+            :message="alert.title"
+            :description="`${alert.detail} ${alert.recommendation}`"
+          />
+        </div>
       </section>
 
       <div class="shared-stat-grid">
@@ -43,9 +62,9 @@
           <div class="stat-note">用户认可和可放大的反馈</div>
         </article>
         <article class="stat-card stat-card-accent">
-          <div class="stat-label">负向评论</div>
+          <div class="stat-label">{{ negativeMetricLabel }}</div>
           <div class="stat-value">{{ report.dashboard.negativeCount }}</div>
-          <div class="stat-note">需要优先跟进的问题信号</div>
+          <div class="stat-note">{{ negativeMetricNote }}</div>
         </article>
       </div>
 
@@ -56,8 +75,38 @@
 
       <div class="chart-row">
         <EChartCard title="高频问题统计" :option="issueOption" />
+        <EChartCard v-if="report.dashboard.intentDistribution?.length" title="评论意图分布" :option="intentOption" />
         <EChartCard title="用户声音词云" :option="wordCloudOption" />
       </div>
+
+      <section v-if="report.dashboard.insightClusters?.length" class="insight-clusters-panel">
+        <div class="settings-section-head">
+          <div>
+            <div class="panel-label">Opinion Clusters</div>
+            <div class="settings-section-title">观点聚类与证据评论</div>
+          </div>
+        </div>
+        <div class="insight-cluster-grid">
+          <article v-for="cluster in report.dashboard.insightClusters" :key="cluster.id" class="insight-cluster-card">
+            <div class="insight-cluster-head">
+              <div>
+                <div class="insight-cluster-title">{{ cluster.title }}</div>
+                <div class="muted">{{ cluster.count }} 条评论 · {{ cluster.percent }}% · {{ sentimentText(cluster.sentiment) }}</div>
+              </div>
+            </div>
+            <p class="insight-cluster-summary">{{ cluster.summary }}</p>
+            <a-space wrap>
+              <a-tag v-for="intent in cluster.intentLabels" :key="intent" color="blue">{{ intent }}</a-tag>
+              <a-tag v-for="topic in cluster.topicLabels.slice(0, 3)" :key="topic">{{ topic }}</a-tag>
+            </a-space>
+            <div class="cluster-evidence-list">
+              <div v-for="review in cluster.evidenceReviews.slice(0, 2)" :key="review.reviewId" class="cluster-evidence-item">
+                {{ truncate(review.commentTr || review.comment, 92) }}
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
 
       <section v-if="report.dashboard.productInsights" class="shared-insights">
         <div class="settings-section-head">
@@ -125,6 +174,13 @@ const positivePercent = computed(() => {
   const positive = report.value?.dashboard.sentimentDistribution.find((item) => item.sentiment === "positive");
   return positive?.percent || 0;
 });
+const isVideoReport = computed(() => report.value?.task.analysisType === "video");
+const isTweetReport = computed(() => report.value?.task.analysisType === "tweet");
+const scoreLabel = computed(() => report.value?.dashboard.scoreLabel || (isVideoReport.value ? "观众支持度" : isTweetReport.value ? "舆情支持度" : "NPS"));
+const negativeMetricLabel = computed(() => (isVideoReport.value ? "负向/争议观众" : isTweetReport.value ? "反对/风险评论" : "负向评论"));
+const negativeMetricNote = computed(() =>
+  isVideoReport.value ? "需要澄清或复盘的观众反馈" : isTweetReport.value ? "需要回应或降风险的讨论" : "需要优先跟进的问题信号"
+);
 
 const insightReportTitle = computed(() => {
   const type = report.value?.task.analysisType;
@@ -171,6 +227,20 @@ function sentimentText(sentiment: Sentiment) {
     return "负向";
   }
   return "中性";
+}
+
+function qualityAlertType(level: SharedReportDTO["dashboard"]["qualityAlerts"][number]["level"]) {
+  if (level === "critical") {
+    return "error";
+  }
+  if (level === "warning") {
+    return "warning";
+  }
+  return "info";
+}
+
+function truncate(value: string, max: number) {
+  return value.length > max ? `${value.slice(0, max)}...` : value;
 }
 
 function analysisTypeLabel(type?: string | null) {
@@ -233,6 +303,24 @@ const issueOption = computed<EChartsOption>(() => ({
       barWidth: 36,
       itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.negative[0], CHART_COLORS.accent[0]) },
       data: (report.value?.dashboard.issues || []).map((item) => item.count)
+    }
+  ]
+}));
+
+const intentOption = computed<EChartsOption>(() => ({
+  tooltip: getTooltip() as EChartsOption["tooltip"],
+  xAxis: getXAxis({
+    data: (report.value?.dashboard.intentDistribution || []).map((item) => item.label),
+    axisLabel: { interval: 0, rotate: 18, color: "#6b7280", fontSize: 12 }
+  }) as EChartsOption["xAxis"],
+  yAxis: getYAxis() as EChartsOption["yAxis"],
+  grid: getGrid({ bottom: 70 }) as EChartsOption["grid"],
+  series: [
+    {
+      type: "bar",
+      barWidth: 34,
+      itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.primary[0], CHART_COLORS.positive[0]) },
+      data: (report.value?.dashboard.intentDistribution || []).map((item) => item.count)
     }
   ]
 }));

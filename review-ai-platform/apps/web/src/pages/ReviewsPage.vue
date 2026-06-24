@@ -121,6 +121,10 @@
           <a-select-option value="negative">负向</a-select-option>
         </a-select>
 
+        <a-select v-model:value="filters.intent" allow-clear placeholder="评论意图" class="filter-select">
+          <a-select-option v-for="intent in intentOptions" :key="intent" :value="intent">{{ intent }}</a-select-option>
+        </a-select>
+
         <a-select v-model:value="filters.hasMedia" allow-clear placeholder="媒体" class="filter-select">
           <a-select-option :value="true">有图/视频</a-select-option>
           <a-select-option :value="false">纯文本</a-select-option>
@@ -134,6 +138,7 @@
           <a-select-option value="sentiment">按情感分组</a-select-option>
           <a-select-option value="ratingStar">按星级分组</a-select-option>
           <a-select-option value="analysisTag">按 AI 标签分组</a-select-option>
+          <a-select-option value="intent">按评论意图分组</a-select-option>
         </a-select>
 
         <a-segmented v-model:value="viewMode" :options="viewOptions" />
@@ -190,6 +195,11 @@
           <template v-else-if="column.key === 'sentiment'">
             <a-tag :color="sentimentColor(record.sentiment)">{{ sentimentLabel(record.sentiment) }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'intentLabels'">
+            <a-space wrap>
+              <a-tag v-for="intent in record.intentLabels" :key="intent" color="blue">{{ intent }}</a-tag>
+            </a-space>
+          </template>
           <template v-else-if="column.key === 'comment'">
             <a class="table-comment-link" @click="selectedRow = record">{{ truncate(record.comment, 72) }}</a>
           </template>
@@ -243,6 +253,7 @@
           <a-descriptions-item label="AI 摘要">{{ selectedRow.summary || "-" }}</a-descriptions-item>
           <a-descriptions-item label="AI 情感">{{ sentimentLabel(selectedRow.sentiment) }}</a-descriptions-item>
           <a-descriptions-item label="AI 标签">{{ selectedRow.analysisTags.join("、") || "-" }}</a-descriptions-item>
+          <a-descriptions-item label="评论意图">{{ selectedRow.intentLabels.join("、") || "-" }}</a-descriptions-item>
           <a-descriptions-item label="关键词">{{ selectedRow.keywords.join("、") || "-" }}</a-descriptions-item>
           <a-descriptions-item label="问题点">{{ selectedRow.painPoints.join("、") || "-" }}</a-descriptions-item>
         </a-descriptions>
@@ -319,6 +330,7 @@ type ColumnKey =
   | "sourceChannel"
   | "hasMedia"
   | "analysisTags"
+  | "intentLabels"
   | "sentiment";
 
 type SavedView = {
@@ -328,10 +340,11 @@ type SavedView = {
   filters: {
     ratingStar?: number;
     sentiment?: string;
+    intent?: string;
     hasMedia?: boolean;
     keyword: string;
   };
-  groupBy: "sentiment" | "ratingStar" | "analysisTag";
+  groupBy: "sentiment" | "ratingStar" | "analysisTag" | "intent";
   viewMode: "table" | "grouped";
   sortBy: string;
   sortOrder: "asc" | "desc";
@@ -366,12 +379,13 @@ const pagination = reactive<PaginationConfig>({
 const filters = reactive({
   ratingStar: undefined as number | undefined,
   sentiment: undefined as string | undefined,
+  intent: undefined as string | undefined,
   hasMedia: undefined as boolean | undefined,
   keyword: ""
 });
 
 const viewMode = ref<"table" | "grouped">("table");
-const groupBy = ref<"sentiment" | "ratingStar" | "analysisTag">("sentiment");
+const groupBy = ref<"sentiment" | "ratingStar" | "analysisTag" | "intent">("sentiment");
 const sortState = reactive({
   sortBy: "commentTime",
   sortOrder: "desc" as "asc" | "desc"
@@ -392,17 +406,23 @@ const allColumns = [
   { title: "渠道", dataIndex: "sourceChannel", key: "sourceChannel", width: 120 },
   { title: "媒体", dataIndex: "hasMedia", key: "hasMedia", width: 100 },
   { title: "AI 标签", dataIndex: "analysisTags", key: "analysisTags", width: 220 },
+  { title: "评论意图", dataIndex: "intentLabels", key: "intentLabels", width: 200 },
   { title: "AI 情感", dataIndex: "sentiment", key: "sentiment", width: 120, sorter: true }
 ] as const;
 
 const columnOptions = allColumns.map((column) => ({ label: column.title, value: column.key }));
 const visibleColumnKeys = ref<ColumnKey[]>(allColumns.map((column) => column.key));
+const intentOptions = computed(() =>
+  [...new Set(rows.value.flatMap((item) => item.intentLabels || []))]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))
+);
 const totalCount = computed(() => pagination.total || 0);
 const mediaCount = computed(() => rows.value.filter((item) => item.hasMedia).length);
 const negativeCount = computed(() => rows.value.filter((item) => item.sentiment === "negative").length);
 const visibleColumns = computed(() => allColumns.filter((column) => visibleColumnKeys.value.includes(column.key)));
 const activeFilterCount = computed(() =>
-  [filters.ratingStar, filters.sentiment, filters.hasMedia, filters.keyword.trim()].filter((value) => value !== undefined && value !== "").length
+  [filters.ratingStar, filters.sentiment, filters.intent, filters.hasMedia, filters.keyword.trim()].filter((value) => value !== undefined && value !== "").length
 );
 const canCancelRun = computed(() => Boolean(latestRun.value && ["queued", "running"].includes(latestRun.value.status)));
 const resultRuns = computed(() => allRuns.value.filter((run) => ["completed", "partial_failed"].includes(run.status)));
@@ -444,6 +464,14 @@ const groupedRows = computed(() => {
     if (groupBy.value === "ratingStar") {
       const key = String(row.ratingStar);
       addGroupItem(groups, key, `${row.ratingStar} 星`, row);
+      continue;
+    }
+
+    if (groupBy.value === "intent") {
+      const intents = row.intentLabels.length ? row.intentLabels : ["未识别意图"];
+      for (const intent of intents) {
+        addGroupItem(groups, intent, intent, row);
+      }
       continue;
     }
 
@@ -491,10 +519,11 @@ function savedViewFromDto(view: SavedReviewViewDTO): SavedView {
     filters: {
       ratingStar: typeof filters.ratingStar === "number" ? filters.ratingStar : undefined,
       sentiment: typeof filters.sentiment === "string" ? filters.sentiment : undefined,
+      intent: typeof filters.intent === "string" ? filters.intent : undefined,
       hasMedia: typeof filters.hasMedia === "boolean" ? filters.hasMedia : undefined,
       keyword: typeof filters.keyword === "string" ? filters.keyword : ""
     },
-    groupBy: ["sentiment", "ratingStar", "analysisTag"].includes(view.groupBy)
+    groupBy: ["sentiment", "ratingStar", "analysisTag", "intent"].includes(view.groupBy)
       ? (view.groupBy as SavedView["groupBy"])
       : "sentiment",
     viewMode: view.viewMode === "grouped" ? "grouped" : "table",
@@ -514,6 +543,7 @@ function snapshotCurrentView(name: string, id?: string): SavedView {
     filters: {
       ratingStar: filters.ratingStar,
       sentiment: filters.sentiment,
+      intent: filters.intent,
       hasMedia: filters.hasMedia,
       keyword: filters.keyword
     },
@@ -540,6 +570,7 @@ function applyView(view: SavedView) {
   applyingSavedView.value = true;
   filters.ratingStar = view.filters.ratingStar;
   filters.sentiment = view.filters.sentiment;
+  filters.intent = view.filters.intent;
   filters.hasMedia = view.filters.hasMedia;
   filters.keyword = view.filters.keyword;
   groupBy.value = view.groupBy;
@@ -740,6 +771,7 @@ async function loadReviews() {
       pageSize,
       ratingStar: filters.ratingStar,
       sentiment: filters.sentiment,
+      intent: filters.intent,
       hasMedia: filters.hasMedia,
       keyword: filters.keyword || undefined,
       sortBy: sortState.sortBy,
@@ -816,6 +848,7 @@ async function handleExport() {
     const { blob, filename } = await exportReviews(selectedTask.value.id, {
       ratingStar: filters.ratingStar,
       sentiment: filters.sentiment,
+      intent: filters.intent,
       hasMedia: filters.hasMedia,
       keyword: filters.keyword || undefined,
       runId: selectedResultRunId.value,
@@ -840,6 +873,7 @@ async function handleExport() {
 function resetFilters() {
   filters.ratingStar = undefined;
   filters.sentiment = undefined;
+  filters.intent = undefined;
   filters.hasMedia = undefined;
   filters.keyword = "";
   sortState.sortBy = "commentTime";
@@ -931,7 +965,7 @@ watch([groupBy, visibleColumnKeys], () => {
 });
 
 watch(
-  [() => filters.ratingStar, () => filters.sentiment, () => filters.hasMedia, () => filters.keyword],
+  [() => filters.ratingStar, () => filters.sentiment, () => filters.intent, () => filters.hasMedia, () => filters.keyword],
   () => {
     if (!applyingSavedView.value) {
       clearActiveView();

@@ -89,6 +89,7 @@ CREATE TABLE "review_analysis" (
     "sentiment" "Sentiment" NOT NULL,
     "sentiment_score" DOUBLE PRECISION NOT NULL,
     "topic_labels" TEXT[],
+    "intent_labels" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "keywords" TEXT[],
     "summary" TEXT NOT NULL,
     "pain_points" TEXT[],
@@ -150,4 +151,3 @@ ALTER TABLE "issue_stat" ADD CONSTRAINT "issue_stat_run_id_fkey" FOREIGN KEY ("r
 
 -- AddForeignKey
 ALTER TABLE "tag_stat" ADD CONSTRAINT "tag_stat_run_id_fkey" FOREIGN KEY ("run_id") REFERENCES "analysis_run"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-

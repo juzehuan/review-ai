@@ -325,6 +325,7 @@ export function serializeReviewRow(
     sourceChannel: review.sourceChannel,
     hasMedia: review.hasMedia,
     analysisTags: latest?.topicLabels || [],
+    intentLabels: latest?.intentLabels || [],
     sentiment: latest?.sentiment || null,
     sentimentScore: latest?.sentimentScore || null,
     summary: latest?.summary || null,

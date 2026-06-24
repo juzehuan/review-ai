@@ -441,6 +441,7 @@ model ReviewAnalysis {
   sentiment      Sentiment
   sentimentScore Float       @map("sentiment_score")
   topicLabels    String[]    @map("topic_labels")
+  intentLabels   String[]    @default([]) @map("intent_labels")
   keywords       String[]
   summary        String
   painPoints     String[]    @map("pain_points")

@@ -5,6 +5,7 @@ export type Sentiment = "positive" | "neutral" | "negative";
 export type PlanTier = "free" | "pro" | "business";
 export type MemberRole = "owner" | "admin" | "analyst" | "viewer";
 export type AnalysisType = "product" | "video" | "tweet";
+export type DashboardScoreKind = "nps" | "support_index" | "stance_index";
 
 export interface UserDTO {
   id: string;
@@ -381,12 +382,13 @@ export const DEFAULT_USER_PROMPT_TEMPLATE = [
   "",
   "要求：",
   "1. topicLabels 选择 1-5 个最核心主题。",
-  "2. painPoints 仅保留用户明确不满的问题主题；正向评论可以为空数组。",
-  "3. highlights 仅保留用户明确认可的亮点主题；负向评论可以为空数组。",
-  "4. keywords 输出 4-10 个中文或英文短词，用于后续检索和词云，不要输出句子。",
-  "5. summary 用一句中文概括评论重点和情绪，不要超过 80 字。",
-  "6. suggestion 用一句中文给商品、运营或客服团队建议，不要超过 70 字。",
-  "7. sentimentScore 为 0 到 1，小数越高表示情感越强烈。",
+  "2. intentLabels 选择 1-3 个评论意图，只能从以下意图中选择：{intentTaxonomy}。",
+  "3. painPoints 仅保留用户明确不满的问题主题；正向评论可以为空数组。",
+  "4. highlights 仅保留用户明确认可的亮点主题；负向评论可以为空数组。",
+  "5. keywords 输出 4-10 个中文或英文短词，用于后续检索和词云，不要输出句子。",
+  "6. summary 用一句中文概括评论重点和情绪，不要超过 80 字。",
+  "7. suggestion 用一句中文给商品、运营或客服团队建议，不要超过 70 字。",
+  "8. sentimentScore 为 0 到 1，小数越高表示情感越强烈。",
   "",
   "rating_star: {ratingStar}",
   "comment_original: {comment}",
@@ -435,12 +437,14 @@ export const VIDEO_USER_PROMPT_TEMPLATE = [
   "",
   "要求：",
   "1. topicLabels 选择 1-5 个最核心主题。",
-  "2. painPoints 表示观众明确质疑、反感、争议或需要澄清的点。",
-  "3. highlights 表示观众认可、共鸣、赞赏或希望延展的点。",
-  "4. keywords 输出 4-10 个中文或英文短词，用于后续检索和词云。",
-  "5. summary 用一句中文概括评论重点和情绪，不要超过 80 字。",
-  "6. suggestion 给内容团队一条选题、标题、剪辑、澄清或互动建议，不要超过 70 字。",
-  "7. sentimentScore 为 0 到 1，小数越高表示情感越强烈。",
+  "2. intentLabels 选择 1-3 个评论意图，只能从以下意图中选择：{intentTaxonomy}。",
+  "3. 普通提问、事实补充、玩梗互动、求后续不应直接判为负向；只有明确批评、反对、愤怒、不信任或风险提醒才判为负向。",
+  "4. painPoints 表示观众明确质疑、反感、争议或需要澄清的点。",
+  "5. highlights 表示观众认可、共鸣、赞赏或希望延展的点。",
+  "6. keywords 输出 4-10 个中文或英文短词，用于后续检索和词云，只输出评论中真实出现或明确指向的人物、事件、观点、术语、梗、争议点；不要输出商品、电商、售后、物流等泛化标签。",
+  "7. summary 用一句中文概括评论重点和情绪，不要超过 80 字。",
+  "8. suggestion 给内容团队一条选题、标题、剪辑、澄清或互动建议，不要超过 70 字。",
+  "9. sentimentScore 为 0 到 1，小数越高表示情感越强烈。",
   "",
   "comment_original: {comment}",
   "comment_translated: {commentTr}"
@@ -454,12 +458,13 @@ export const TWEET_USER_PROMPT_TEMPLATE = [
   "",
   "要求：",
   "1. topicLabels 选择 1-5 个最核心主题。",
-  "2. painPoints 表示反对、质疑、误解、攻击、风险或需要回应的点。",
-  "3. highlights 表示支持、共鸣、扩散理由或可放大的传播点。",
-  "4. keywords 输出 4-10 个中文或英文短词，用于后续检索和词云。",
-  "5. summary 用一句中文概括评论重点、立场和情绪，不要超过 80 字。",
-  "6. suggestion 给社媒运营一条回应、澄清、控评或放大传播的建议，不要超过 70 字。",
-  "7. sentimentScore 为 0 到 1，小数越高表示情感越强烈。",
+  "2. intentLabels 选择 1-3 个评论意图，只能从以下意图中选择：{intentTaxonomy}。",
+  "3. painPoints 表示反对、质疑、误解、攻击、风险或需要回应的点。",
+  "4. highlights 表示支持、共鸣、扩散理由或可放大的传播点。",
+  "5. keywords 输出 4-10 个中文或英文短词，用于后续检索和词云，只输出真实话题、人物、事件、观点、风险点或传播梗。",
+  "6. summary 用一句中文概括评论重点、立场和情绪，不要超过 80 字。",
+  "7. suggestion 给社媒运营一条回应、澄清、控评或放大传播的建议，不要超过 70 字。",
+  "8. sentimentScore 为 0 到 1，小数越高表示情感越强烈。",
   "",
   "comment_original: {comment}",
   "comment_translated: {commentTr}"
@@ -562,6 +567,7 @@ export interface ReviewRowDTO {
   sourceChannel: string;
   hasMedia: boolean;
   analysisTags: string[];
+  intentLabels: string[];
   sentiment: Sentiment | null;
   sentimentScore: number | null;
   summary: string | null;
@@ -607,11 +613,17 @@ export interface DashboardDTO {
   negativeCount: number;
   avgRating: number;
   nps: number;
+  scoreKind: DashboardScoreKind;
+  scoreLabel: string;
+  scoreDescription: string;
   npsBreakdown: Array<{ label: string; percent: number; count: number }>;
   ratingSentiment: Array<{ ratingStar: number; positive: number; neutral: number; negative: number }>;
   ratingDistribution: Array<{ star: number; count: number }>;
   sentimentDistribution: Array<{ sentiment: Sentiment; count: number; percent: number }>;
   sourceDistribution: Array<{ source: string; count: number }>;
+  intentDistribution: Array<{ label: string; count: number; percent: number }>;
+  insightClusters: InsightClusterDTO[];
+  qualityAlerts: DashboardQualityAlertDTO[];
   wordCloud: WordCloudItemDTO[];
   issues: IssueStatDTO[];
   representativeReviews: { positive: RepresentativeReview[]; negative: RepresentativeReview[] };
@@ -714,6 +726,7 @@ export interface ReviewAnalysisDTO {
   sentiment: Sentiment;
   sentimentScore: number;
   topicLabels: string[];
+  intentLabels: string[];
   keywords: string[];
   summary: string;
   painPoints: string[];
@@ -727,6 +740,28 @@ export interface IssueStatDTO {
   issueName: string;
   count: number;
   sampleReviewIds: string[];
+}
+
+export interface InsightClusterDTO {
+  id: string;
+  title: string;
+  summary: string;
+  sentiment: Sentiment;
+  count: number;
+  percent: number;
+  topicLabels: string[];
+  intentLabels: string[];
+  keywords: string[];
+  sampleReviewIds: string[];
+  evidenceReviews: RepresentativeReview[];
+}
+
+export interface DashboardQualityAlertDTO {
+  id: string;
+  level: AlertLevel;
+  title: string;
+  detail: string;
+  recommendation: string;
 }
 
 export interface WordCloudItemDTO {
@@ -822,6 +857,7 @@ type DashboardReviewLike = {
   sentiment: Sentiment;
   sentimentScore: number;
   topicLabels: string[];
+  intentLabels?: string[];
   keywords: string[];
   painPoints: string[];
   highlights: string[];
@@ -842,19 +878,335 @@ function round(value: number) {
   return Number(value.toFixed(1));
 }
 
-export function buildDashboardSnapshot(taskId: string, analyses: DashboardReviewLike[]): DashboardDTO {
+function getDashboardScoreMeta(analysisType: AnalysisType, hasRatingNps: boolean) {
+  if (hasRatingNps && analysisType === "product") {
+    return {
+      scoreKind: "nps" as const,
+      scoreLabel: "NPS",
+      scoreDescription: "推荐者与批评者净差"
+    };
+  }
+  if (analysisType === "video") {
+    return {
+      scoreKind: "support_index" as const,
+      scoreLabel: "观众支持度",
+      scoreDescription: "正向观众占比与负向争议占比的净差"
+    };
+  }
+  if (analysisType === "tweet") {
+    return {
+      scoreKind: "stance_index" as const,
+      scoreLabel: "舆情支持度",
+      scoreDescription: "支持立场占比与反对/风险占比的净差"
+    };
+  }
+  return {
+    scoreKind: "support_index" as const,
+    scoreLabel: "情绪支持度",
+    scoreDescription: "正向评论占比与负向评论占比的净差"
+  };
+}
+
+function normalizeDashboardKeyword(word: string, analysisType: AnalysisType) {
+  const trimmed = word.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (analysisType !== "product") {
+    const taxonomy = new Set(getAnalysisPromptProfile(analysisType).taxonomy);
+    const genericNoise = new Set([
+      "视频评论",
+      "观众反馈",
+      "社媒评论",
+      "舆情反馈",
+      "用户声音",
+      "评论",
+      "观点",
+      "内容",
+      "视频",
+      "商品",
+      "产品",
+      "质量",
+      "售后",
+      "物流",
+      "包装",
+      "价格",
+      "客服"
+    ]);
+    if (taxonomy.has(trimmed) || genericNoise.has(trimmed)) {
+      return "";
+    }
+  }
+  return trimmed;
+}
+
+function topEntries(map: Map<string, number>, limit: number) {
+  return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
+}
+
+function sentimentLabelZh(sentiment: Sentiment) {
+  if (sentiment === "positive") {
+    return "正向";
+  }
+  if (sentiment === "negative") {
+    return "负向";
+  }
+  return "中性";
+}
+
+function toRepresentativeReview(item: DashboardReviewLike): RepresentativeReview {
+  return {
+    reviewId: item.reviewId,
+    comment: item.review.comment,
+    commentTr: item.review.commentTr,
+    ratingStar: item.review.ratingStar,
+    summary: item.summary,
+    sentiment: item.sentiment
+  };
+}
+
+function addCount(map: Map<string, number>, value: string | null | undefined) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) {
+    return;
+  }
+  map.set(trimmed, (map.get(trimmed) || 0) + 1);
+}
+
+function dominantSentiment(items: DashboardReviewLike[]): Sentiment {
+  const counts = new Map<Sentiment, number>([
+    ["positive", 0],
+    ["neutral", 0],
+    ["negative", 0]
+  ]);
+  for (const item of items) {
+    counts.set(item.sentiment, (counts.get(item.sentiment) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "neutral";
+}
+
+function buildInsightClusters(analyses: DashboardReviewLike[], analysisType: AnalysisType): InsightClusterDTO[] {
+  const total = analyses.length;
+  if (!total) {
+    return [];
+  }
+
+  const clusters = new Map<
+    string,
+    {
+      sentiment: Sentiment;
+      items: DashboardReviewLike[];
+      topicMap: Map<string, number>;
+      intentMap: Map<string, number>;
+      keywordMap: Map<string, number>;
+    }
+  >();
+
+  for (const analysis of analyses) {
+    const topic =
+      analysis.painPoints[0] ||
+      analysis.highlights[0] ||
+      analysis.topicLabels[0] ||
+      (analysisType === "video" ? "观众综合反馈" : analysisType === "tweet" ? "舆情综合反馈" : "综合体验");
+    const intent = analysis.intentLabels?.[0] || (analysis.sentiment === "positive" ? "正向反馈" : analysis.sentiment === "negative" ? "风险反馈" : "中性讨论");
+    const key = `${analysis.sentiment}|${topic}|${intent}`;
+    const cluster =
+      clusters.get(key) ||
+      ({
+        sentiment: analysis.sentiment,
+        items: [],
+        topicMap: new Map<string, number>(),
+        intentMap: new Map<string, number>(),
+        keywordMap: new Map<string, number>()
+      } satisfies {
+        sentiment: Sentiment;
+        items: DashboardReviewLike[];
+        topicMap: Map<string, number>;
+        intentMap: Map<string, number>;
+        keywordMap: Map<string, number>;
+      });
+
+    cluster.items.push(analysis);
+    for (const label of analysis.topicLabels) {
+      addCount(cluster.topicMap, label);
+    }
+    for (const label of analysis.intentLabels || []) {
+      addCount(cluster.intentMap, label);
+    }
+    for (const word of analysis.keywords) {
+      const keyword = normalizeDashboardKeyword(word, analysisType);
+      addCount(cluster.keywordMap, keyword);
+    }
+    clusters.set(key, cluster);
+  }
+
+  const minClusterCount = total >= 50 ? Math.max(3, Math.ceil(total * 0.02)) : 1;
+  const mappedClusters = [...clusters.entries()]
+    .map(([id, cluster]) => {
+      const sentiment = dominantSentiment(cluster.items);
+      const topicLabels = topEntries(cluster.topicMap, 4).map(([label]) => label);
+      const intentLabels = topEntries(cluster.intentMap, 3).map(([label]) => label);
+      const keywords = topEntries(cluster.keywordMap, 6).map(([label]) => label);
+      const evidenceItems = [...cluster.items]
+        .sort((a, b) => {
+          if (sentiment === "negative") {
+            return a.sentimentScore - b.sentimentScore;
+          }
+          if (sentiment === "positive") {
+            return b.sentimentScore - a.sentimentScore;
+          }
+          return b.review.comment.length - a.review.comment.length;
+        })
+        .slice(0, 3);
+      const topic = topicLabels[0] || "综合反馈";
+      const intent = intentLabels[0] || "评论反馈";
+      return {
+        id: `cluster-${Math.abs([...id].reduce((sum, char) => sum + char.charCodeAt(0), 0))}`,
+        title: topic === intent ? topic : `${topic} · ${intent}`,
+        summary: `${cluster.items.length} 条评论集中在「${topic}」，主要意图为「${intent}」，情绪以${sentimentLabelZh(sentiment)}为主${keywords.length ? `，关键词：${keywords.slice(0, 4).join("、")}` : ""}。`,
+        sentiment,
+        count: cluster.items.length,
+        percent: round((cluster.items.length / total) * 100),
+        topicLabels,
+        intentLabels,
+        keywords,
+        sampleReviewIds: evidenceItems.map((item) => item.reviewId),
+        evidenceReviews: evidenceItems.map(toRepresentativeReview)
+      } satisfies InsightClusterDTO;
+    });
+  const filteredClusters = mappedClusters.filter((cluster) => cluster.count >= minClusterCount);
+  return (filteredClusters.length ? filteredClusters : mappedClusters).sort((a, b) => b.count - a.count).slice(0, 8);
+}
+
+function buildQualityAlerts(params: {
+  analyses: DashboardReviewLike[];
+  analysisType: AnalysisType;
+  positiveCount: number;
+  neutralCount: number;
+  negativeCount: number;
+  nps: number;
+  keywordMap: Map<string, number>;
+  topicMap: Map<string, number>;
+  intentMap: Map<string, number>;
+}): DashboardQualityAlertDTO[] {
+  const { analyses, analysisType, positiveCount, neutralCount, negativeCount, nps, keywordMap, topicMap, intentMap } = params;
+  const total = analyses.length;
+  if (!total) {
+    return [];
+  }
+
+  const alerts: DashboardQualityAlertDTO[] = [];
+  const negativePercent = round((negativeCount / total) * 100);
+  const sentimentEntries: Array<[Sentiment, number]> = [
+    ["positive", positiveCount],
+    ["neutral", neutralCount],
+    ["negative", negativeCount]
+  ];
+  const [dominantMood, dominantMoodCount] = sentimentEntries.sort((a, b) => b[1] - a[1])[0] || ["neutral", 0];
+  const dominantMoodPercent = total ? round((dominantMoodCount / total) * 100) : 0;
+  const topTopic = topEntries(topicMap, 1)[0];
+  const topIntent = topEntries(intentMap, 1)[0];
+  const commerceNoiseWords = ["质量", "售后", "物流", "包装", "价格", "客服", "发货", "快递", "退换", "保修"];
+  const commerceNoiseCount =
+    analysisType === "product"
+      ? 0
+      : analyses.filter((item) =>
+          [...item.topicLabels, ...item.keywords].some((word) => commerceNoiseWords.some((noise) => word.includes(noise)))
+        ).length;
+
+  if (total >= 20 && negativePercent >= 85) {
+    alerts.push({
+      id: "negative-rate-anomaly",
+      level: "critical",
+      title: "负向占比异常偏高",
+      detail: `本次 ${negativePercent}% 的评论被判为负向，明显高于常规评论分布。`,
+      recommendation: "建议抽样复核负向评论，确认是否存在提示词偏置、数据源异常或真实舆情危机。"
+    });
+  }
+
+  if (total >= 30 && dominantMoodPercent >= 90) {
+    alerts.push({
+      id: "sentiment-concentration",
+      level: dominantMood === "negative" ? "critical" : "warning",
+      title: "情感分布过度集中",
+      detail: `${dominantMoodPercent}% 的评论被判为${sentimentLabelZh(dominantMood)}，可能存在分类口径过窄或评论样本单一。`,
+      recommendation: "建议查看代表评论，确认提问、补充信息、玩梗互动是否被误归为同一情感。"
+    });
+  }
+
+  if (topTopic && total >= 30) {
+    const topTopicPercent = round((topTopic[1] / total) * 100);
+    if (topTopicPercent >= 80) {
+      alerts.push({
+        id: "topic-concentration",
+        level: "warning",
+        title: "主题标签过度集中",
+        detail: `「${topTopic[0]}」覆盖 ${topTopicPercent}% 的评论，洞察可能不够细分。`,
+        recommendation: "建议结合评论意图和关键词查看，必要时补充更细的视频/社媒分类标签。"
+      });
+    }
+  }
+
+  if (topIntent && total >= 30) {
+    const topIntentPercent = round((topIntent[1] / total) * 100);
+    if (topIntentPercent >= 80) {
+      alerts.push({
+        id: "intent-concentration",
+        level: "warning",
+        title: "评论意图过度集中",
+        detail: `「${topIntent[0]}」覆盖 ${topIntentPercent}% 的评论，可能漏掉提问、纠错、玩梗或求后续等细分意图。`,
+        recommendation: "建议抽查不同情感下的评论意图，确认意图识别是否过粗。"
+      });
+    }
+  }
+
+  if (total >= 50 && keywordMap.size < 5) {
+    alerts.push({
+      id: "keyword-diversity-low",
+      level: "warning",
+      title: "用户声音词云过少",
+      detail: `本次仅识别出 ${keywordMap.size} 个有效关键词，词云可能无法代表真实讨论。`,
+      recommendation: "建议检查 AI 输出的 keywords 是否过于泛化，或评论是否包含大量无意义短句。"
+    });
+  }
+
+  if (total >= 20 && commerceNoiseCount / total >= 0.2) {
+    alerts.push({
+      id: "commerce-noise",
+      level: "warning",
+      title: "非商品评论出现电商词污染",
+      detail: `${round((commerceNoiseCount / total) * 100)}% 的视频/社媒评论含有质量、物流、售后等电商词。`,
+      recommendation: "建议复核任务类型和提示词配置，避免把视频评论误套商品评价框架。"
+    });
+  }
+
+  if (analysisType !== "product" && total >= 30 && nps === 0 && positiveCount > 0 && negativeCount > 0) {
+    alerts.push({
+      id: "support-index-zero",
+      level: "info",
+      title: "支持度正负抵消",
+      detail: "当前支持度为 0，通常表示正向认可与负向争议数量接近。",
+      recommendation: "建议优先查看观点聚类，而不是只看总分，判断争议点是否集中在少数话题。"
+    });
+  }
+
+  return alerts.slice(0, 5);
+}
+
+export function buildDashboardSnapshot(taskId: string, analyses: DashboardReviewLike[], analysisType: AnalysisType = "product"): DashboardDTO {
   const total = analyses.length;
   const ratedAnalyses = analyses.filter((item) => item.review.ratingStar > 0);
   const ratingTotal = ratedAnalyses.length;
   const positiveCount = analyses.filter((item) => item.sentiment === "positive").length;
   const neutralCount = analyses.filter((item) => item.sentiment === "neutral").length;
   const negativeCount = analyses.filter((item) => item.sentiment === "negative").length;
-  const hasRatingNps = ratingTotal > 0;
+  const hasRatingNps = ratingTotal > 0 && analysisType === "product";
   const promoters = hasRatingNps ? ratedAnalyses.filter((item) => item.review.ratingStar === 5).length : positiveCount;
   const passives = hasRatingNps ? ratedAnalyses.filter((item) => item.review.ratingStar === 4).length : neutralCount;
   const detractors = hasRatingNps ? ratedAnalyses.filter((item) => item.review.ratingStar <= 3).length : negativeCount;
   const npsTotal = hasRatingNps ? ratingTotal : total;
   const nps = npsTotal ? round(((promoters - detractors) / npsTotal) * 100) : 0;
+  const scoreMeta = getDashboardScoreMeta(analysisType, hasRatingNps);
   const avgRating = ratingTotal ? round(ratedAnalyses.reduce((sum, item) => sum + item.review.ratingStar, 0) / ratingTotal) : 0;
 
   const npsBreakdown = [
@@ -865,9 +1217,21 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
   const effectiveNpsBreakdown = hasRatingNps
     ? npsBreakdown
     : [
-        { label: "负向观众", count: detractors, percent: npsTotal ? round((detractors / npsTotal) * 100) : 0 },
-        { label: "中性观众", count: passives, percent: npsTotal ? round((passives / npsTotal) * 100) : 0 },
-        { label: "正向观众", count: promoters, percent: npsTotal ? round((promoters / npsTotal) * 100) : 0 }
+        {
+          label: analysisType === "tweet" ? "反对/风险评论" : analysisType === "video" ? "负向/争议观众" : "负向评论",
+          count: detractors,
+          percent: npsTotal ? round((detractors / npsTotal) * 100) : 0
+        },
+        {
+          label: analysisType === "tweet" ? "中立/观望评论" : analysisType === "video" ? "中性/讨论观众" : "中性评论",
+          count: passives,
+          percent: npsTotal ? round((passives / npsTotal) * 100) : 0
+        },
+        {
+          label: analysisType === "tweet" ? "支持/扩散评论" : analysisType === "video" ? "正向/认可观众" : "正向评论",
+          count: promoters,
+          percent: npsTotal ? round((promoters / npsTotal) * 100) : 0
+        }
       ];
 
   const ratingSentiment = [1, 2, 3, 4, 5].map((ratingStar) => {
@@ -897,6 +1261,8 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
 
   const sourceMap = new Map<string, number>();
   const keywordMap = new Map<string, number>();
+  const intentMap = new Map<string, number>();
+  const topicMap = new Map<string, number>();
   const issueMap = new Map<string, { count: number; samples: string[] }>();
   const trendMap = new Map<string, { count: number; positive: number; neutral: number; negative: number }>();
   const variantMap = new Map<string, number>();
@@ -919,12 +1285,25 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
       }
     }
 
-    for (const word of [...analysis.topicLabels, ...analysis.keywords]) {
-      const trimmed = word.trim();
+    for (const topic of analysis.topicLabels) {
+      addCount(topicMap, topic);
+    }
+
+    const wordCandidates = analysisType === "product" ? [...analysis.topicLabels, ...analysis.keywords] : analysis.keywords;
+    for (const word of wordCandidates) {
+      const trimmed = normalizeDashboardKeyword(word, analysisType);
       if (!trimmed) {
         continue;
       }
       keywordMap.set(trimmed, (keywordMap.get(trimmed) || 0) + 1);
+    }
+
+    for (const intent of analysis.intentLabels || []) {
+      const trimmed = intent.trim();
+      if (!trimmed) {
+        continue;
+      }
+      intentMap.set(trimmed, (intentMap.get(trimmed) || 0) + 1);
     }
 
     for (const issue of analysis.painPoints) {
@@ -969,6 +1348,18 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
 
   const withMedia = analyses.filter((item) => item.review.hasMedia).length;
   const needsAttentionCount = analyses.filter((item) => item.needsAttention).length;
+  const insightClusters = buildInsightClusters(analyses, analysisType);
+  const qualityAlerts = buildQualityAlerts({
+    analyses,
+    analysisType,
+    positiveCount,
+    neutralCount,
+    negativeCount,
+    nps,
+    keywordMap,
+    topicMap,
+    intentMap
+  });
   const userProfile: UserProfileDTO = {
     mediaRate: total ? round((withMedia / total) * 100) : 0,
     needsAttentionCount,
@@ -1002,11 +1393,20 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
     negativeCount,
     avgRating,
     nps,
+    scoreKind: scoreMeta.scoreKind,
+    scoreLabel: scoreMeta.scoreLabel,
+    scoreDescription: scoreMeta.scoreDescription,
     npsBreakdown: effectiveNpsBreakdown,
     ratingSentiment,
     ratingDistribution,
     sentimentDistribution,
     sourceDistribution: [...sourceMap.entries()].map(([source, count]) => ({ source, count })),
+    intentDistribution: [...intentMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([label, count]) => ({ label, count, percent: total ? round((count / total) * 100) : 0 })),
+    insightClusters,
+    qualityAlerts,
     wordCloud: [...keywordMap.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 50)

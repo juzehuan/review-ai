@@ -31,6 +31,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const { searchParams } = new URL(request.url);
   const sentiment = searchParams.get("sentiment");
   const issue = searchParams.get("issue");
+  const intent = searchParams.get("intent");
   const tag = searchParams.get("tag");
   const needsAttention = searchParams.get("needsAttention");
   const ratingStar = Number(searchParams.get("ratingStar") || 0);
@@ -39,7 +40,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const variant = searchParams.get("variant");
 
   const run = await findAnalysisRunForResults(taskId, searchParams.get("runId"));
-  const hasAnalysisFilter = Boolean(sentiment || issue || tag || needsAttention !== null);
+  const hasAnalysisFilter = Boolean(sentiment || issue || intent || tag || needsAttention !== null);
   if (hasAnalysisFilter && !run) {
     return fail("当前项目还没有可导出的分析结果", 404);
   }
@@ -48,6 +49,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
         runId: run.id,
         ...(sentiment ? { sentiment: sentiment as never } : {}),
         ...(issue ? { painPoints: { has: issue } } : {}),
+        ...(intent ? { intentLabels: { has: intent } } : {}),
         ...(tag ? { topicLabels: { has: tag } } : {}),
         ...(needsAttention !== null ? { needsAttention: needsAttention === "true" } : {})
       }
@@ -99,6 +101,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     "AI情感",
     "情感分数",
     "AI标签",
+    "评论意图",
     "关键词",
     "问题点",
     "亮点",
@@ -121,6 +124,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
       row.sentiment || "",
       row.sentimentScore ?? "",
       row.analysisTags.join("; "),
+      row.intentLabels.join("; "),
       row.keywords.join("; "),
       row.painPoints.join("; "),
       row.highlights.join("; "),

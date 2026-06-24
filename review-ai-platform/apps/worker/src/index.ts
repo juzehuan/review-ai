@@ -16,7 +16,8 @@ import {
   type CrawlerChannel,
   type AnalysisType,
   type DashboardDTO,
-  type ProductInsightsDTO
+  type ProductInsightsDTO,
+  type Sentiment
 } from "@review-ai/shared";
 import Redis from "ioredis";
 
@@ -268,13 +269,13 @@ function normalizeSentimentValue(value: unknown) {
     return "positive";
   }
   if (
-    ["negative", "neg", "bad", "critical", "oppose", "question", "skeptic", "质疑", "负面", "负向", "消极", "反对", "批评"].some(
+    ["negative", "neg", "bad", "critical", "oppose", "负面", "负向", "消极", "反对", "批评"].some(
       (item) => text.includes(item)
     )
   ) {
     return "negative";
   }
-  if (["neutral", "mixed", "中性", "中立", "观望", "普通", "一般"].some((item) => text.includes(item))) {
+  if (["neutral", "mixed", "question", "skeptic", "中性", "中立", "观望", "普通", "一般", "提问", "疑问", "质疑"].some((item) => text.includes(item))) {
     return "neutral";
   }
   return "neutral";
@@ -318,6 +319,7 @@ function normalizeAnalysisPayload(value: unknown) {
           ? 0.18
           : 0.55,
     topicLabels: normalizeStringList(raw.topicLabels ?? raw.topic_labels),
+    intentLabels: normalizeStringList(raw.intentLabels ?? raw.intent_labels ?? raw.intents ?? raw.commentIntents ?? raw.comment_intents),
     keywords: normalizeStringList(raw.keywords),
     summary: String(raw.summary || "").slice(0, 200),
     painPoints: normalizeStringList(raw.painPoints ?? raw.pain_points),
@@ -333,6 +335,7 @@ const analysisSchema = z.preprocess(
     sentiment: z.enum(["positive", "neutral", "negative"]),
     sentimentScore: z.number().min(0).max(1),
     topicLabels: z.array(z.string()).max(6),
+    intentLabels: z.array(z.string()).max(4),
     keywords: z.array(z.string()).max(12),
     summary: z.string().max(200),
     painPoints: z.array(z.string()).max(5),
@@ -443,6 +446,53 @@ const AUDIENCE_NEGATIVE_HINTS = [
   "误导",
   "离谱"
 ];
+
+const VIDEO_INTENT_LABELS = [
+  "赞同/夸奖",
+  "质疑/反驳",
+  "提问求解",
+  "事实补充",
+  "纠错澄清",
+  "建议选题",
+  "期待后续",
+  "玩梗互动",
+  "风险提醒",
+  "无效/垃圾"
+];
+
+const TWEET_INTENT_LABELS = [
+  "支持扩散",
+  "反对批评",
+  "中立观望",
+  "事实核查",
+  "风险提醒",
+  "误解澄清",
+  "情绪宣泄",
+  "行动号召",
+  "玩梗调侃",
+  "无效/垃圾"
+];
+
+const PRODUCT_INTENT_LABELS = [
+  "好评推荐",
+  "差评投诉",
+  "使用反馈",
+  "购买咨询",
+  "物流反馈",
+  "售后求助",
+  "价格评价",
+  "复购意愿"
+];
+
+function getIntentTaxonomy(analysisType: AnalysisType) {
+  if (analysisType === "video") {
+    return VIDEO_INTENT_LABELS;
+  }
+  if (analysisType === "tweet") {
+    return TWEET_INTENT_LABELS;
+  }
+  return PRODUCT_INTENT_LABELS;
+}
 
 function topicLabel(setting: ResolvedAiSetting, index: number, fallback: string) {
   return setting.taxonomy[index] || fallback;
@@ -699,6 +749,119 @@ function normalizeTopicList(
   return result.length ? result : [fallbackLabel].filter(Boolean).slice(0, maxItems);
 }
 
+function mapIntentAlias(label: string, setting: ResolvedAiSetting) {
+  const normalized = label.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  const rules: Array<{ patterns: string[]; product: string; video: string; tweet: string }> = [
+    {
+      patterns: ["支持", "赞同", "认可", "夸", "praise", "agree", "support", "love", "like"],
+      product: "好评推荐",
+      video: "赞同/夸奖",
+      tweet: "支持扩散"
+    },
+    {
+      patterns: ["反对", "批评", "不满", "disagree", "oppose", "critical", "angry"],
+      product: "差评投诉",
+      video: "质疑/反驳",
+      tweet: "反对批评"
+    },
+    {
+      patterns: ["问题", "提问", "求问", "疑问", "question", "ask", "why", "how"],
+      product: "购买咨询",
+      video: "提问求解",
+      tweet: "中立观望"
+    },
+    {
+      patterns: ["事实", "补充", "信息", "source", "context", "data", "链接"],
+      product: "使用反馈",
+      video: "事实补充",
+      tweet: "事实核查"
+    },
+    {
+      patterns: ["纠错", "澄清", "错误", "误导", "fake", "wrong", "misleading", "clarify"],
+      product: "差评投诉",
+      video: "纠错澄清",
+      tweet: "误解澄清"
+    },
+    {
+      patterns: ["下期", "继续", "系列", "more", "next", "episode"],
+      product: "复购意愿",
+      video: "期待后续",
+      tweet: "行动号召"
+    },
+    {
+      patterns: ["建议", "选题", "希望", "suggest", "request"],
+      product: "使用反馈",
+      video: "建议选题",
+      tweet: "行动号召"
+    },
+    {
+      patterns: ["梗", "哈哈", "lol", "meme", "joke", "讽刺", "调侃"],
+      product: "使用反馈",
+      video: "玩梗互动",
+      tweet: "玩梗调侃"
+    },
+    {
+      patterns: ["风险", "危险", "注意", "警惕", "risk", "warning"],
+      product: "差评投诉",
+      video: "风险提醒",
+      tweet: "风险提醒"
+    }
+  ];
+  const matched = rules.find((rule) => rule.patterns.some((pattern) => normalized.includes(pattern.toLowerCase())));
+  return matched ? matched[setting.analysisType] : null;
+}
+
+function fallbackIntentLabel(result: AnalysisResult, setting: ResolvedAiSetting) {
+  if (setting.analysisType === "video") {
+    if (result.sentiment === "positive") {
+      return "赞同/夸奖";
+    }
+    if (result.sentiment === "negative") {
+      return "质疑/反驳";
+    }
+    return "提问求解";
+  }
+  if (setting.analysisType === "tweet") {
+    if (result.sentiment === "positive") {
+      return "支持扩散";
+    }
+    if (result.sentiment === "negative") {
+      return "反对批评";
+    }
+    return "中立观望";
+  }
+  if (result.sentiment === "positive") {
+    return "好评推荐";
+  }
+  if (result.sentiment === "negative") {
+    return "差评投诉";
+  }
+  return "使用反馈";
+}
+
+function normalizeIntentList(labels: string[], setting: ResolvedAiSetting, result: AnalysisResult) {
+  const allowed = new Set(getIntentTaxonomy(setting.analysisType));
+  const normalized = labels
+    .map((label) => label.trim())
+    .filter(Boolean)
+    .flatMap((label) => {
+      if (allowed.has(label)) {
+        return [label];
+      }
+      const fuzzy = [...allowed].find((item) => label.includes(item) || item.includes(label));
+      if (fuzzy) {
+        return [fuzzy];
+      }
+      const alias = mapIntentAlias(label, setting);
+      return alias && allowed.has(alias) ? [alias] : [];
+    });
+  const resultLabels = unique(normalized).slice(0, 4);
+  return resultLabels.length ? resultLabels : [fallbackIntentLabel(result, setting)];
+}
+
 function sanitizeAnalysisResult(result: AnalysisResult, setting: ResolvedAiSetting): AnalysisResult {
   const fallbackTopic = setting.taxonomy[0] || ALL_TOPIC_TAXONOMY[0];
   const invalidLabels = unique([...result.topicLabels, ...result.painPoints, ...result.highlights].map((label) => label.trim()).filter(Boolean)).filter(
@@ -712,6 +875,7 @@ function sanitizeAnalysisResult(result: AnalysisResult, setting: ResolvedAiSetti
   return {
     ...result,
     topicLabels,
+    intentLabels: normalizeIntentList(result.intentLabels, setting, result),
     painPoints,
     highlights,
     keywords: unique([...result.keywords.map((item) => item.trim()).filter(Boolean), ...invalidLabels]).slice(0, 12)
@@ -827,6 +991,61 @@ function inferSentiment(text: string, ratingStar: number) {
   return { sentiment: "positive" as const, sentimentScore: positiveHits >= 2 ? 0.92 : 0.84 };
 }
 
+function inferIntentLabels(text: string, sentiment: Sentiment, setting: ResolvedAiSetting) {
+  const hits: string[] = [];
+  const add = (label: string, words: string[]) => {
+    if (words.some((word) => text.includes(word.toLowerCase()))) {
+      hits.push(label);
+    }
+  };
+
+  if (setting.analysisType === "video") {
+    add("提问求解", ["?", "why", "how", "what", "为什么", "怎么", "请问", "求问"]);
+    add("事实补充", ["source", "context", "data", "补充", "资料", "来源", "事实"]);
+    add("纠错澄清", ["wrong", "fake", "misleading", "clarify", "错误", "造假", "误导", "澄清"]);
+    add("建议选题", ["suggest", "request", "希望讲", "建议", "选题"]);
+    add("期待后续", ["next", "more", "episode", "下期", "继续", "系列"]);
+    add("玩梗互动", ["lol", "haha", "meme", "哈哈", "笑死", "梗"]);
+    add("风险提醒", ["risk", "warning", "danger", "风险", "警惕", "危险"]);
+    add("赞同/夸奖", ["agree", "support", "love", "like", "thanks", "赞", "支持", "感谢", "精彩"]);
+    add("质疑/反驳", ["disagree", "bias", "biased", "反对", "不认同", "偏见", "质疑"]);
+  } else if (setting.analysisType === "tweet") {
+    add("支持扩散", ["support", "agree", "share", "支持", "赞同", "转发"]);
+    add("反对批评", ["oppose", "disagree", "wrong", "反对", "批评", "错误"]);
+    add("事实核查", ["source", "proof", "fact", "来源", "证据", "事实"]);
+    add("风险提醒", ["risk", "warning", "风险", "警惕"]);
+    add("误解澄清", ["rumor", "misleading", "clarify", "谣言", "误解", "澄清"]);
+    add("行动号召", ["boycott", "join", "call", "抵制", "行动", "参与"]);
+    add("玩梗调侃", ["lol", "meme", "sarcasm", "哈哈", "梗", "讽刺"]);
+  } else {
+    add("购买咨询", ["?", "how", "where", "请问", "怎么买", "咨询"]);
+    add("物流反馈", ["shipping", "delivery", "物流", "发货", "快递"]);
+    add("售后求助", ["service", "repair", "return", "售后", "维修", "退换"]);
+    add("价格评价", ["price", "cheap", "worth", "价格", "便宜", "划算"]);
+    add("复购意愿", ["again", "repurchase", "回购", "复购"]);
+  }
+
+  if (!hits.length) {
+    const fallback = fallbackIntentLabel(
+      {
+        sentiment,
+        sentimentScore: sentiment === "positive" ? 0.84 : sentiment === "negative" ? 0.18 : 0.55,
+        topicLabels: [],
+        intentLabels: [],
+        keywords: [],
+        summary: "",
+        painPoints: [],
+        highlights: [],
+        suggestion: "",
+        needsAttention: false
+      },
+      setting
+    );
+    hits.push(fallback);
+  }
+  return unique(hits).slice(0, 3);
+}
+
 function mockAnalyze(comment: string, commentTr: string | null, ratingStar: number, setting: ResolvedAiSetting): AnalysisResult {
   const original = comment.trim();
   const translated = (commentTr || "").trim();
@@ -835,6 +1054,7 @@ function mockAnalyze(comment: string, commentTr: string | null, ratingStar: numb
   const topicLabels = unique(matchedTopics.map((item) => item.label)).slice(0, 5);
   const keywords = inferKeywords(combined, matchedTopics, setting);
   const { sentiment, sentimentScore } = inferSentiment(combined, ratingStar);
+  const intentLabels = inferIntentLabels(combined, sentiment, setting);
   const issueTopics = matchedTopics.filter((item) => item.kind !== "highlight").map((item) => item.label);
   const highlightTopics = matchedTopics.filter((item) => item.kind !== "issue").map((item) => item.label);
   const painPoints = sentiment === "negative" ? unique(issueTopics).slice(0, 3) : sentiment === "neutral" ? unique(issueTopics).slice(0, 2) : [];
@@ -857,6 +1077,7 @@ function mockAnalyze(comment: string, commentTr: string | null, ratingStar: numb
     sentiment,
     sentimentScore,
     topicLabels: topicLabels.length ? topicLabels : [fallbackTopic],
+    intentLabels,
     keywords,
     summary: `${tone}${topicLabels.length ? `，重点涉及${topicLabels.join("、")}` : ""}。${(translated || original).slice(0, 56)}`,
     painPoints,
@@ -869,6 +1090,7 @@ function mockAnalyze(comment: string, commentTr: string | null, ratingStar: numb
 function buildSinglePrompt(setting: ResolvedAiSetting, item: BatchInput) {
   return renderTemplate(setting.userPromptTemplate, {
     taxonomy: setting.taxonomy.join("、"),
+    intentTaxonomy: getIntentTaxonomy(setting.analysisType).join("、"),
     ratingStar: item.ratingStar,
     rating_star: item.ratingStar,
     comment: item.comment,
@@ -881,6 +1103,7 @@ function buildSinglePrompt(setting: ResolvedAiSetting, item: BatchInput) {
 function buildBatchPrompt(setting: ResolvedAiSetting, items: BatchInput[]) {
   const instructions = renderTemplate(setting.userPromptTemplate, {
     taxonomy: setting.taxonomy.join("、"),
+    intentTaxonomy: getIntentTaxonomy(setting.analysisType).join("、"),
     ratingStar: "",
     rating_star: "",
     comment: "",
@@ -957,7 +1180,7 @@ async function analyzeBatch(client: OpenAI, setting: ResolvedAiSetting, items: B
         },
         {
           role: "user",
-          content: `${buildBatchPrompt(setting, items)}\n\nReturn JSON in this exact shape: {"analyses":[{"sentiment":"positive|neutral|negative","sentimentScore":0.5,"topicLabels":[],"keywords":[],"summary":"","painPoints":[],"highlights":[],"suggestion":"","needsAttention":false}]}`
+          content: `${buildBatchPrompt(setting, items)}\n\nReturn JSON in this exact shape: {"analyses":[{"sentiment":"positive|neutral|negative","sentimentScore":0.5,"topicLabels":[],"intentLabels":[],"keywords":[],"summary":"","painPoints":[],"highlights":[],"suggestion":"","needsAttention":false}]}`
         }
       ]
     });
@@ -1012,6 +1235,7 @@ function buildAnalysisData(result: AnalysisResult) {
     sentiment: result.sentiment,
     sentimentScore: result.sentimentScore,
     topicLabels: result.topicLabels,
+    intentLabels: result.intentLabels,
     keywords: result.keywords,
     summary: result.summary,
     painPoints: result.painPoints,
@@ -1371,7 +1595,7 @@ const worker = new Worker(
 
     await addRunLog(runId, "info", "Generating dashboard summary");
     const analyses = await prisma.reviewAnalysis.findMany({ where: { runId }, include: { review: true } });
-    const dashboard = buildDashboardSnapshot(taskId, analyses);
+    const dashboard = buildDashboardSnapshot(taskId, analyses, setting.analysisType);
     dashboard.aiSummary = await generateAiSummary(client, setting, dashboard);
     dashboard.productInsights = await generateProductInsights(client, setting, dashboard, analyses);
 

@@ -100,6 +100,25 @@
       <div class="ai-summary-text">{{ dashboard.aiSummary }}</div>
     </section>
 
+    <section v-if="dashboard?.qualityAlerts?.length" class="quality-alerts-panel">
+      <div class="settings-section-head">
+        <div>
+          <div class="panel-label">Quality Check</div>
+          <div class="settings-section-title">分析质量提醒</div>
+        </div>
+      </div>
+      <div class="quality-alert-list">
+        <a-alert
+          v-for="alert in dashboard.qualityAlerts"
+          :key="alert.id"
+          show-icon
+          :type="qualityAlertType(alert.level)"
+          :message="alert.title"
+          :description="`${alert.detail} ${alert.recommendation}`"
+        />
+      </div>
+    </section>
+
     <div class="summary-grid">
       <div class="stat-card stat-card-primary">
         <div class="stat-label">评论总量</div>
@@ -108,15 +127,15 @@
       </div>
 
       <div class="stat-card stat-card-accent">
-        <div class="stat-label">负向评论</div>
+        <div class="stat-label">{{ negativeMetricLabel }}</div>
         <div class="stat-value">{{ dashboard?.negativeCount || 0 }}</div>
-        <div class="stat-note">需要运营跟进的低分反馈</div>
+        <div class="stat-note">{{ negativeMetricNote }}</div>
       </div>
 
       <div class="stat-card stat-card-success">
-        <div class="stat-label">NPS</div>
+        <div class="stat-label">{{ scoreLabel }}</div>
         <div class="stat-value">{{ dashboard?.nps || 0 }}</div>
-        <div class="stat-note">推荐者与批评者净差</div>
+        <div class="stat-note">{{ scoreDescription }}</div>
       </div>
     </div>
 
@@ -124,8 +143,8 @@
       <div class="chart-card">
         <div class="chart-header">
           <div>
-            <div class="chart-title">满意度 NPS</div>
-            <div class="chart-subtitle">按 1-5 星评价拆分推荐倾向</div>
+            <div class="chart-title">{{ scoreChartTitle }}</div>
+            <div class="chart-subtitle">{{ scoreChartSubtitle }}</div>
           </div>
         </div>
         <div class="nps-layout">
@@ -142,7 +161,7 @@
       </div>
 
       <div class="insight-panel">
-        <div class="insight-title">客户声音摘要</div>
+        <div class="insight-title">{{ voiceSummaryTitle }}</div>
         <div class="insight-list">
           <div class="insight-item">
             <span class="insight-dot positive" />
@@ -155,7 +174,7 @@
             <span class="insight-dot warning" />
             <div>
               <strong>{{ issueCount }}</strong>
-              <span>高频问题类型</span>
+              <span>{{ issueMetricLabel }}</span>
             </div>
           </div>
           <div class="insight-item">
@@ -169,7 +188,7 @@
       </div>
     </div>
 
-    <EChartCard title="各星级情感倾向" :option="ratingSentimentOption" />
+    <EChartCard v-if="showRatingCharts" title="各星级情感倾向" :option="ratingSentimentOption" />
 
     <div class="chart-row">
       <EChartCard title="整体情感分布" :option="sentimentOption" />
@@ -177,9 +196,40 @@
     </div>
 
     <div class="chart-row">
+      <EChartCard v-if="dashboard?.intentDistribution?.length" title="评论意图分布" :option="intentOption" />
       <EChartCard title="用户声音词云" :option="wordCloudOption" />
       <EChartCard title="用户问题统计" :option="issueOption" />
     </div>
+
+    <section v-if="dashboard?.insightClusters?.length" class="insight-clusters-panel">
+      <div class="settings-section-head">
+        <div>
+          <div class="panel-label">Opinion Clusters</div>
+          <div class="settings-section-title">观点聚类与证据评论</div>
+        </div>
+      </div>
+      <div class="insight-cluster-grid">
+        <article v-for="cluster in dashboard.insightClusters" :key="cluster.id" class="insight-cluster-card">
+          <div class="insight-cluster-head">
+            <div>
+              <div class="insight-cluster-title">{{ cluster.title }}</div>
+              <div class="muted">{{ cluster.count }} 条评论 · {{ cluster.percent }}% · {{ sentimentText(cluster.sentiment) }}</div>
+            </div>
+            <a-button size="small" type="primary" ghost @click="openClusterEvidence(cluster.sampleReviewIds)">查看证据</a-button>
+          </div>
+          <p class="insight-cluster-summary">{{ cluster.summary }}</p>
+          <a-space wrap>
+            <a-tag v-for="intent in cluster.intentLabels" :key="intent" color="blue">{{ intent }}</a-tag>
+            <a-tag v-for="topic in cluster.topicLabels.slice(0, 3)" :key="topic">{{ topic }}</a-tag>
+          </a-space>
+          <div class="cluster-evidence-list">
+            <div v-for="review in cluster.evidenceReviews.slice(0, 2)" :key="review.reviewId" class="cluster-evidence-item">
+              {{ truncate(review.commentTr || review.comment, 92) }}
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
 
     <section v-if="dashboard?.issues?.length" class="evidence-panel">
       <div class="settings-section-head">
@@ -295,6 +345,29 @@ const positivePercent = computed(() => {
   const positive = dashboard.value?.sentimentDistribution?.find((item) => item.sentiment === "positive");
   return positive?.percent || 0;
 });
+const isVideoTask = computed(() => selectedTask.value?.analysisType === "video");
+const isTweetTask = computed(() => selectedTask.value?.analysisType === "tweet");
+const scoreLabel = computed(() => dashboard.value?.scoreLabel || (isVideoTask.value ? "观众支持度" : isTweetTask.value ? "舆情支持度" : "NPS"));
+const scoreDescription = computed(
+  () =>
+    dashboard.value?.scoreDescription ||
+    (isVideoTask.value
+      ? "正向观众占比与负向争议占比的净差"
+      : isTweetTask.value
+        ? "支持立场占比与反对/风险占比的净差"
+        : "推荐者与批评者净差")
+);
+const scoreChartTitle = computed(() => (dashboard.value?.scoreKind === "nps" ? "满意度 NPS" : scoreLabel.value));
+const scoreChartSubtitle = computed(() =>
+  dashboard.value?.scoreKind === "nps" ? "按 1-5 星评价拆分推荐倾向" : "按情感与立场拆分支持、观望和争议"
+);
+const voiceSummaryTitle = computed(() => (isVideoTask.value ? "观众声音摘要" : isTweetTask.value ? "舆情声音摘要" : "客户声音摘要"));
+const issueMetricLabel = computed(() => (isVideoTask.value ? "争议/澄清类型" : isTweetTask.value ? "风险/回应类型" : "高频问题类型"));
+const negativeMetricLabel = computed(() => (isVideoTask.value ? "负向/争议观众" : isTweetTask.value ? "反对/风险评论" : "负向评论"));
+const negativeMetricNote = computed(() =>
+  isVideoTask.value ? "需要澄清或复盘的观众反馈" : isTweetTask.value ? "需要回应或降风险的讨论" : "需要运营跟进的低分反馈"
+);
+const showRatingCharts = computed(() => selectedTask.value?.analysisType === "product" && (dashboard.value?.ratingDistribution || []).some((item) => item.count > 0));
 const productInsightSections = computed(() => {
   const insights = dashboard.value?.productInsights;
   if (!insights) {
@@ -338,6 +411,20 @@ function sentimentText(sentiment: Sentiment) {
     return "负向";
   }
   return "中性";
+}
+
+function qualityAlertType(level: DashboardDTO["qualityAlerts"][number]["level"]) {
+  if (level === "critical") {
+    return "error";
+  }
+  if (level === "warning") {
+    return "warning";
+  }
+  return "info";
+}
+
+function truncate(value: string, max: number) {
+  return value.length > max ? `${value.slice(0, max)}...` : value;
 }
 
 function analysisTypeLabel(type?: string | null) {
@@ -400,7 +487,7 @@ function renderGauge() {
             color: "#111827"
           },
           title: { offsetCenter: [0, "8%"], color: "#6b7280", fontSize: 13 },
-          data: [{ value: npsValue, name: "NPS 净推荐值" }]
+          data: [{ value: npsValue, name: scoreLabel.value }]
         }
       ]
     },
@@ -533,6 +620,19 @@ function openIssueEvidence(issueName: string) {
   });
 }
 
+function openClusterEvidence(reviewIds: string[]) {
+  if (!selectedTask.value || !reviewIds.length) {
+    return;
+  }
+  router.push({
+    path: `/tasks/${selectedTask.value.id}/reviews`,
+    query: {
+      reviewIds: reviewIds.join(","),
+      ...(dashboard.value?.runId ? { runId: dashboard.value.runId } : {})
+    }
+  });
+}
+
 function startPolling() {
   stopPolling();
   timer = setInterval(load, 10000);
@@ -616,6 +716,24 @@ const sourceOption = computed<EChartsOption>(() => ({
       barWidth: 42,
       itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.primary[0], CHART_COLORS.accent[0]) },
       data: (dashboard.value?.sourceDistribution || []).map((item) => item.count)
+    }
+  ]
+}));
+
+const intentOption = computed<EChartsOption>(() => ({
+  tooltip: getTooltip() as EChartsOption["tooltip"],
+  xAxis: getXAxis({
+    data: (dashboard.value?.intentDistribution || []).map((item) => item.label),
+    axisLabel: { interval: 0, rotate: 20, color: "#6b7280", fontSize: 12 }
+  }) as EChartsOption["xAxis"],
+  yAxis: getYAxis() as EChartsOption["yAxis"],
+  grid: getGrid({ bottom: 76 }) as EChartsOption["grid"],
+  series: [
+    {
+      type: "bar",
+      barWidth: 34,
+      itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.primary[0], CHART_COLORS.positive[0]) },
+      data: (dashboard.value?.intentDistribution || []).map((item) => item.count)
     }
   ]
 }));

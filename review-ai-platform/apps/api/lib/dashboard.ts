@@ -1,9 +1,34 @@
 import { prisma } from "@review-ai/db";
-import type { DashboardDTO } from "@review-ai/shared";
+import type { AnalysisType, DashboardDTO, DashboardScoreKind } from "@review-ai/shared";
 import { buildDashboardSnapshot } from "@review-ai/shared";
 import { findAnalysisRunForResults } from "@/lib/analysis-runs";
 
+function scoreMeta(analysisType: AnalysisType): { scoreKind: DashboardScoreKind; scoreLabel: string; scoreDescription: string } {
+  if (analysisType === "video") {
+    return {
+      scoreKind: "support_index",
+      scoreLabel: "观众支持度",
+      scoreDescription: "正向观众占比与负向争议占比的净差"
+    };
+  }
+  if (analysisType === "tweet") {
+    return {
+      scoreKind: "stance_index",
+      scoreLabel: "舆情支持度",
+      scoreDescription: "支持立场占比与反对/风险占比的净差"
+    };
+  }
+  return {
+    scoreKind: "nps",
+    scoreLabel: "NPS",
+    scoreDescription: "推荐者与批评者净差"
+  };
+}
+
 export async function buildDashboardForTask(taskId: string, requestedRunId?: string | null): Promise<DashboardDTO> {
+  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { analysisType: true } });
+  const analysisType = ((task?.analysisType as AnalysisType | null) || "product");
+  const metric = scoreMeta(analysisType);
   const latestRun = await findAnalysisRunForResults(taskId, requestedRunId);
 
   if (!latestRun) {
@@ -15,6 +40,9 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
       negativeCount: 0,
       avgRating: 0,
       nps: 0,
+      scoreKind: metric.scoreKind,
+      scoreLabel: metric.scoreLabel,
+      scoreDescription: metric.scoreDescription,
       npsBreakdown: [],
       ratingSentiment: [1, 2, 3, 4, 5].map((ratingStar) => ({
         ratingStar,
@@ -29,6 +57,9 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
         { sentiment: "negative", count: 0, percent: 0 }
       ],
       sourceDistribution: [],
+      intentDistribution: [],
+      insightClusters: [],
+      qualityAlerts: [],
       wordCloud: [],
       issues: [],
       representativeReviews: { positive: [], negative: [] },
@@ -48,7 +79,16 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
   }
 
   if (latestRun.dashboardSnapshot) {
-    return latestRun.dashboardSnapshot as unknown as DashboardDTO;
+    const snapshot = latestRun.dashboardSnapshot as unknown as Partial<DashboardDTO>;
+    return {
+      scoreKind: metric.scoreKind,
+      scoreLabel: metric.scoreLabel,
+      scoreDescription: metric.scoreDescription,
+      intentDistribution: [],
+      insightClusters: [],
+      qualityAlerts: [],
+      ...snapshot
+    } as DashboardDTO;
   }
 
   const analyses = await prisma.reviewAnalysis.findMany({
@@ -60,5 +100,5 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
     throw new Error("当前分析结果为空");
   }
 
-  return buildDashboardSnapshot(taskId, analyses);
+  return buildDashboardSnapshot(taskId, analyses, analysisType);
 }

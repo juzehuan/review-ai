@@ -19,6 +19,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const { searchParams } = new URL(request.url);
   const sentiment = searchParams.get("sentiment");
   const issue = searchParams.get("issue");
+  const intent = searchParams.get("intent");
   const reviewIds = searchParams
     .get("reviewIds")
     ?.split(",")
@@ -36,7 +37,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const pageSize = Math.min(Math.max(Number(searchParams.get("pageSize") || 20), 1), 500);
 
   const run = await findAnalysisRunForResults(taskId, searchParams.get("runId"));
-  const hasAnalysisFilter = Boolean(sentiment || issue || tag || needsAttention !== null);
+  const hasAnalysisFilter = Boolean(sentiment || issue || intent || tag || needsAttention !== null);
   if (hasAnalysisFilter && !run) {
     return ok({ total: 0, page, pageSize, items: [] });
   }
@@ -62,6 +63,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
         runId: run.id,
         ...(sentiment ? { sentiment: sentiment as never } : {}),
         ...(issue ? { painPoints: { has: issue } } : {}),
+        ...(intent ? { intentLabels: { has: intent } } : {}),
         ...(tag ? { topicLabels: { has: tag } } : {}),
         ...(needsAttention !== null ? { needsAttention: needsAttention === "true" } : {})
       }

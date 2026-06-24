@@ -172,6 +172,8 @@ select {
 .group-card,
 .insight-panel,
 .ai-summary-card,
+.quality-alerts-panel,
+.insight-clusters-panel,
 .product-insights-panel,
 .product-insight-card,
 .overview-band {
@@ -659,10 +661,18 @@ select {
 }
 
 .ai-summary-card,
+.quality-alerts-panel,
+.insight-clusters-panel,
 .product-insights-panel,
 .evidence-panel,
 .product-insight-card {
   padding: 18px;
+}
+
+.quality-alert-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
 }
 
 .ai-summary-text {
@@ -709,6 +719,57 @@ select {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #f8fafc;
+}
+
+.insight-cluster-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.insight-cluster-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.insight-cluster-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.insight-cluster-title {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.insight-cluster-summary {
+  margin: 0;
+  color: #374151;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.cluster-evidence-list {
+  display: grid;
+  gap: 8px;
+}
+
+.cluster-evidence-item {
+  padding: 10px 12px;
+  border-left: 3px solid #7c9cff;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #475467;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .evidence-title {
@@ -1307,6 +1368,7 @@ select {
   .settings-layout,
   .group-list,
   .product-insights-grid,
+  .insight-cluster-grid,
   .evidence-grid,
   .nps-layout {
     grid-template-columns: 1fr;
@@ -1614,6 +1676,8 @@ body {
 .group-card,
 .insight-panel,
 .ai-summary-card,
+.quality-alerts-panel,
+.insight-clusters-panel,
 .product-insights-panel,
 .product-insight-card,
 .overview-band,
@@ -1688,6 +1752,8 @@ body {
 .group-card,
 .table-shell,
 .ai-summary-card,
+.quality-alerts-panel,
+.insight-clusters-panel,
 .product-insights-panel,
 .product-insight-card {
   position: relative;
@@ -2342,6 +2408,8 @@ body {
   .chart-card,
   .insight-panel,
   .ai-summary-card,
+  .quality-alerts-panel,
+  .insight-clusters-panel,
   .product-insights-panel,
   .product-insight-card,
   .settings-panel {
@@ -2408,6 +2476,7 @@ body {
 
   .group-list,
   .product-insights-grid,
+  .insight-cluster-grid,
   .evidence-grid,
   .chart-row,
   .chart-row-featured,
