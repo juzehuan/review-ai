@@ -1510,7 +1510,7 @@ async function generateProductInsights(
   dashboard: DashboardDTO,
   analyses: AnalysisRow[]
 ): Promise<ProductInsightsDTO | null> {
-  if (process.env.ENABLE_MOCK_AI === "true" || !client) {
+  if (setting.analysisType !== "product" || process.env.ENABLE_MOCK_AI === "true" || !client) {
     return null;
   }
   const sample = (item: AnalysisRow) =>
@@ -1556,7 +1556,7 @@ async function generateProductInsights(
     negative_samples: negativeSamples,
     neutralSamples,
     neutral_samples: neutralSamples
-  })}\n\n补充分析上下文：\n${buildDashboardPromptContext(setting, dashboard)}\n\n请严格输出 JSON；字段内容必须匹配当前任务类型，视频/社媒任务不要写成商品卖点、物流、售后、包装分析。`;
+  })}\n\n补充分析上下文：\n${buildDashboardPromptContext(setting, dashboard)}\n\n请严格输出 JSON；字段内容必须匹配当前商品评论任务。`;
   try {
     const response = await client.chat.completions.create({
       model: setting.modelName,
