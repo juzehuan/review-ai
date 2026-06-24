@@ -624,6 +624,7 @@ export interface DashboardDTO {
   intentDistribution: Array<{ label: string; count: number; percent: number }>;
   insightClusters: InsightClusterDTO[];
   qualityAlerts: DashboardQualityAlertDTO[];
+  contentProfile: ContentProfileDTO;
   wordCloud: WordCloudItemDTO[];
   issues: IssueStatDTO[];
   representativeReviews: { positive: RepresentativeReview[]; negative: RepresentativeReview[] };
@@ -762,6 +763,14 @@ export interface DashboardQualityAlertDTO {
   title: string;
   detail: string;
   recommendation: string;
+}
+
+export interface ContentProfileDTO {
+  primaryCategory: string;
+  categoryDistribution: Array<{ label: string; count: number; percent: number }>;
+  valuableCommentCount: number;
+  lowValueCommentCount: number;
+  lowValueCommentRate: number;
 }
 
 export interface WordCloudItemDTO {
@@ -940,6 +949,128 @@ function normalizeDashboardKeyword(word: string, analysisType: AnalysisType) {
   return trimmed;
 }
 
+function normalizeCommentText(item: DashboardReviewLike) {
+  return `${item.review.commentTr || ""}\n${item.review.comment || ""}`.trim().toLowerCase();
+}
+
+function isLowValueComment(item: DashboardReviewLike, analysisType: AnalysisType) {
+  const original = item.review.comment.trim();
+  const text = normalizeCommentText(item);
+  const compact = original.replace(/\s+/g, "");
+  const asciiWords = text.replace(/https?:\/\/\S+/g, "").match(/[a-z0-9]+/gi) || [];
+  const hasMostlyEmojiOrPunctuation = compact.length > 0 && !/[\p{L}\p{N}]/u.test(compact);
+  const repeatedShortText = compact.length <= 12 && /^(.{1,3})\1{2,}$/u.test(compact);
+  const genericShortWords = new Set([
+    "first",
+    "1st",
+    "lol",
+    "lmao",
+    "haha",
+    "nice",
+    "ok",
+    "yes",
+    "no",
+    "good",
+    "wow",
+    "cool",
+    "thanks",
+    "thankyou",
+    "subscribe",
+    "follow",
+    "哈哈",
+    "笑死",
+    "不错",
+    "支持",
+    "第一",
+    "沙发",
+    "关注"
+  ]);
+  const genericShort = compact.length <= 16 && genericShortWords.has(compact.toLowerCase());
+  const linkOrSubscribeSpam = /(subscribe|follow me|check my channel|whatsapp|telegram|http|www\.)/i.test(original);
+  const tooShortWithoutSignal =
+    analysisType !== "product" &&
+    compact.length <= 4 &&
+    !item.painPoints.length &&
+    !item.highlights.length &&
+    !item.keywords.some((word) => word.length > 3);
+
+  return hasMostlyEmojiOrPunctuation || repeatedShortText || genericShort || linkOrSubscribeSpam || tooShortWithoutSignal || (asciiWords.length <= 1 && compact.length <= 3);
+}
+
+function categoryHitScore(text: string, words: string[]) {
+  return words.reduce((score, word) => score + (text.includes(word.toLowerCase()) ? 1 : 0), 0);
+}
+
+function inferContentCategory(item: DashboardReviewLike, analysisType: AnalysisType) {
+  if (analysisType === "product") {
+    if (item.painPoints.some((label) => ["物流速度", "包装保护", "售后服务", "客服响应"].includes(label))) {
+      return "履约/售后体验";
+    }
+    if (item.topicLabels.some((label) => ["清洁效果", "吸力表现", "噪音控制", "续航表现", "建图导航", "APP连接"].includes(label))) {
+      return "功能体验";
+    }
+    if (item.topicLabels.some((label) => ["性价比", "质量做工"].includes(label))) {
+      return "价值与品质";
+    }
+    return "商品综合体验";
+  }
+
+  const text = normalizeCommentText(item);
+  const candidates =
+    analysisType === "video"
+      ? [
+          { label: "新闻/公共事件", words: ["news", "事件", "新闻", "警方", "法律", "案件", "政府", "社会", "公共"] },
+          { label: "教程/知识科普", words: ["tutorial", "how to", "learn", "education", "教程", "教学", "科普", "知识", "解释"] },
+          { label: "财经/商业", words: ["market", "stock", "money", "business", "finance", "经济", "股票", "投资", "金融", "商业"] },
+          { label: "娱乐/影视", words: ["movie", "music", "show", "actor", "娱乐", "电影", "音乐", "剧情", "演员", "综艺"] },
+          { label: "游戏/二创", words: ["game", "gaming", "stream", "游戏", "玩家", "直播", "二创"] },
+          { label: "观点评论", words: ["opinion", "agree", "disagree", "观点", "立场", "认同", "反对", "评论"] },
+          { label: "创作者/频道互动", words: ["channel", "creator", "subscribe", "reply", "频道", "博主", "作者", "订阅", "下期"] }
+        ]
+      : [
+          { label: "品牌舆情", words: ["brand", "company", "customer", "品牌", "公司", "公关", "客服"] },
+          { label: "公共议题", words: ["policy", "government", "public", "社会", "政策", "政府", "公共", "法律"] },
+          { label: "传播扩散", words: ["share", "viral", "trend", "转发", "扩散", "传播", "热搜"] },
+          { label: "风险争议", words: ["risk", "crisis", "fake", "rumor", "风险", "争议", "谣言", "误导"] },
+          { label: "活动营销", words: ["campaign", "event", "launch", "活动", "营销", "发布", "新品"] },
+          { label: "用户讨论", words: ["agree", "disagree", "why", "how", "赞同", "反对", "提问", "讨论"] }
+        ];
+
+  const topicText = [...item.topicLabels, ...(item.intentLabels || []), ...item.keywords].join(" ").toLowerCase();
+  const scored = candidates
+    .map((candidate) => ({
+      label: candidate.label,
+      score: categoryHitScore(text, candidate.words) + categoryHitScore(topicText, candidate.words)
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  if (scored[0]?.score) {
+    return scored[0].label;
+  }
+  return analysisType === "video" ? "视频综合讨论" : "社媒综合讨论";
+}
+
+function buildContentProfile(analyses: DashboardReviewLike[], analysisType: AnalysisType, lowValueReviewIds: Set<string>): ContentProfileDTO {
+  const total = analyses.length;
+  const categoryMap = new Map<string, number>();
+  for (const analysis of analyses) {
+    addCount(categoryMap, inferContentCategory(analysis, analysisType));
+  }
+  const categoryDistribution = topEntries(categoryMap, 10).map(([label, count]) => ({
+    label,
+    count,
+    percent: total ? round((count / total) * 100) : 0
+  }));
+  const lowValueCommentCount = lowValueReviewIds.size;
+  return {
+    primaryCategory: categoryDistribution[0]?.label || (analysisType === "video" ? "视频综合讨论" : analysisType === "tweet" ? "社媒综合讨论" : "商品综合体验"),
+    categoryDistribution,
+    valuableCommentCount: Math.max(total - lowValueCommentCount, 0),
+    lowValueCommentCount,
+    lowValueCommentRate: total ? round((lowValueCommentCount / total) * 100) : 0
+  };
+}
+
 function topEntries(map: Map<string, number>, limit: number) {
   return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
 }
@@ -985,7 +1116,7 @@ function dominantSentiment(items: DashboardReviewLike[]): Sentiment {
   return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "neutral";
 }
 
-function buildInsightClusters(analyses: DashboardReviewLike[], analysisType: AnalysisType): InsightClusterDTO[] {
+function buildInsightClusters(analyses: DashboardReviewLike[], analysisType: AnalysisType, totalBase = analyses.length): InsightClusterDTO[] {
   const total = analyses.length;
   if (!total) {
     return [];
@@ -1066,7 +1197,7 @@ function buildInsightClusters(analyses: DashboardReviewLike[], analysisType: Ana
         summary: `${cluster.items.length} 条评论集中在「${topic}」，主要意图为「${intent}」，情绪以${sentimentLabelZh(sentiment)}为主${keywords.length ? `，关键词：${keywords.slice(0, 4).join("、")}` : ""}。`,
         sentiment,
         count: cluster.items.length,
-        percent: round((cluster.items.length / total) * 100),
+        percent: round((cluster.items.length / Math.max(totalBase, 1)) * 100),
         topicLabels,
         intentLabels,
         keywords,
@@ -1088,8 +1219,9 @@ function buildQualityAlerts(params: {
   keywordMap: Map<string, number>;
   topicMap: Map<string, number>;
   intentMap: Map<string, number>;
+  contentProfile: ContentProfileDTO;
 }): DashboardQualityAlertDTO[] {
-  const { analyses, analysisType, positiveCount, neutralCount, negativeCount, nps, keywordMap, topicMap, intentMap } = params;
+  const { analyses, analysisType, positiveCount, neutralCount, negativeCount, nps, keywordMap, topicMap, intentMap, contentProfile } = params;
   const total = analyses.length;
   if (!total) {
     return [];
@@ -1170,6 +1302,26 @@ function buildQualityAlerts(params: {
     });
   }
 
+  if (total >= 30 && contentProfile.lowValueCommentRate >= 35) {
+    alerts.push({
+      id: "low-value-comment-rate",
+      level: "warning",
+      title: "低价值评论占比较高",
+      detail: `${contentProfile.lowValueCommentRate}% 的评论疑似为表情、刷屏、短口号或求订阅等低信息量内容。`,
+      recommendation: "建议重点查看有效评论聚类，避免把互动噪音误解为主要用户声音。"
+    });
+  }
+
+  if (total >= 30 && contentProfile.categoryDistribution.length <= 1 && analysisType !== "product") {
+    alerts.push({
+      id: "category-diversity-low",
+      level: "info",
+      title: "内容类别较单一",
+      detail: `本次评论主要集中在「${contentProfile.primaryCategory}」。`,
+      recommendation: "如果视频本身跨多个议题，建议检查评论采样是否覆盖完整讨论区。"
+    });
+  }
+
   if (total >= 20 && commerceNoiseCount / total >= 0.2) {
     alerts.push({
       id: "commerce-noise",
@@ -1195,6 +1347,9 @@ function buildQualityAlerts(params: {
 
 export function buildDashboardSnapshot(taskId: string, analyses: DashboardReviewLike[], analysisType: AnalysisType = "product"): DashboardDTO {
   const total = analyses.length;
+  const lowValueReviewIds = new Set(analyses.filter((item) => isLowValueComment(item, analysisType)).map((item) => item.reviewId));
+  const valuableAnalyses = analyses.filter((item) => !lowValueReviewIds.has(item.reviewId));
+  const analysesForInsights = valuableAnalyses.length ? valuableAnalyses : analyses;
   const ratedAnalyses = analyses.filter((item) => item.review.ratingStar > 0);
   const ratingTotal = ratedAnalyses.length;
   const positiveCount = analyses.filter((item) => item.sentiment === "positive").length;
@@ -1289,13 +1444,15 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
       addCount(topicMap, topic);
     }
 
-    const wordCandidates = analysisType === "product" ? [...analysis.topicLabels, ...analysis.keywords] : analysis.keywords;
-    for (const word of wordCandidates) {
-      const trimmed = normalizeDashboardKeyword(word, analysisType);
-      if (!trimmed) {
-        continue;
+    if (!lowValueReviewIds.has(analysis.reviewId)) {
+      const wordCandidates = analysisType === "product" ? [...analysis.topicLabels, ...analysis.keywords] : analysis.keywords;
+      for (const word of wordCandidates) {
+        const trimmed = normalizeDashboardKeyword(word, analysisType);
+        if (!trimmed) {
+          continue;
+        }
+        keywordMap.set(trimmed, (keywordMap.get(trimmed) || 0) + 1);
       }
-      keywordMap.set(trimmed, (keywordMap.get(trimmed) || 0) + 1);
     }
 
     for (const intent of analysis.intentLabels || []) {
@@ -1348,7 +1505,8 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
 
   const withMedia = analyses.filter((item) => item.review.hasMedia).length;
   const needsAttentionCount = analyses.filter((item) => item.needsAttention).length;
-  const insightClusters = buildInsightClusters(analyses, analysisType);
+  const contentProfile = buildContentProfile(analyses, analysisType, lowValueReviewIds);
+  const insightClusters = buildInsightClusters(analysesForInsights, analysisType, total);
   const qualityAlerts = buildQualityAlerts({
     analyses,
     analysisType,
@@ -1358,7 +1516,8 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
     nps,
     keywordMap,
     topicMap,
-    intentMap
+    intentMap,
+    contentProfile
   });
   const userProfile: UserProfileDTO = {
     mediaRate: total ? round((withMedia / total) * 100) : 0,
@@ -1407,6 +1566,7 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
       .map(([label, count]) => ({ label, count, percent: total ? round((count / total) * 100) : 0 })),
     insightClusters,
     qualityAlerts,
+    contentProfile,
     wordCloud: [...keywordMap.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 50)

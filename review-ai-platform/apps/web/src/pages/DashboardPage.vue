@@ -137,6 +137,12 @@
         <div class="stat-value">{{ dashboard?.nps || 0 }}</div>
         <div class="stat-note">{{ scoreDescription }}</div>
       </div>
+
+      <div class="stat-card stat-card-ink">
+        <div class="stat-label">有效评论</div>
+        <div class="stat-value">{{ dashboard?.contentProfile?.valuableCommentCount || 0 }}</div>
+        <div class="stat-note">低价值评论 {{ dashboard?.contentProfile?.lowValueCommentRate || 0 }}% 已降权</div>
+      </div>
     </div>
 
     <div class="chart-row chart-row-featured">
@@ -196,6 +202,7 @@
     </div>
 
     <div class="chart-row">
+      <EChartCard v-if="dashboard?.contentProfile?.categoryDistribution?.length" title="内容类别分布" :option="contentCategoryOption" />
       <EChartCard v-if="dashboard?.intentDistribution?.length" title="评论意图分布" :option="intentOption" />
       <EChartCard title="用户声音词云" :option="wordCloudOption" />
       <EChartCard title="用户问题统计" :option="issueOption" />
@@ -716,6 +723,21 @@ const sourceOption = computed<EChartsOption>(() => ({
       barWidth: 42,
       itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.primary[0], CHART_COLORS.accent[0]) },
       data: (dashboard.value?.sourceDistribution || []).map((item) => item.count)
+    }
+  ]
+}));
+
+const contentCategoryOption = computed<EChartsOption>(() => ({
+  tooltip: getTooltip("item") as EChartsOption["tooltip"],
+  legend: getLegend({ bottom: 6 }) as EChartsOption["legend"],
+  color: [CHART_COLORS.primary[0], CHART_COLORS.cyan[0], CHART_COLORS.positive[0], CHART_COLORS.accent[0], CHART_COLORS.negative[0]],
+  series: [
+    {
+      ...(getPieItem(["42%", "72%"]) as Record<string, unknown>),
+      data: (dashboard.value?.contentProfile?.categoryDistribution || []).map((item) => ({
+        name: item.label,
+        value: item.count
+      }))
     }
   ]
 }));

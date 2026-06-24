@@ -60,6 +60,13 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
       intentDistribution: [],
       insightClusters: [],
       qualityAlerts: [],
+      contentProfile: {
+        primaryCategory: analysisType === "video" ? "视频综合讨论" : analysisType === "tweet" ? "社媒综合讨论" : "商品综合体验",
+        categoryDistribution: [],
+        valuableCommentCount: 0,
+        lowValueCommentCount: 0,
+        lowValueCommentRate: 0
+      },
       wordCloud: [],
       issues: [],
       representativeReviews: { positive: [], negative: [] },
@@ -87,6 +94,13 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
       intentDistribution: [],
       insightClusters: [],
       qualityAlerts: [],
+      contentProfile: {
+        primaryCategory: analysisType === "video" ? "视频综合讨论" : analysisType === "tweet" ? "社媒综合讨论" : "商品综合体验",
+        categoryDistribution: [],
+        valuableCommentCount: snapshot.reviewCount || 0,
+        lowValueCommentCount: 0,
+        lowValueCommentRate: 0
+      },
       ...snapshot
     } as DashboardDTO;
   }
