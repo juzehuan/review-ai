@@ -444,8 +444,60 @@ const AUDIENCE_NEGATIVE_HINTS = [
   "偏见",
   "标题党",
   "误导",
-  "离谱"
+  "离谱",
+  "垃圾",
+  "失望",
+  "恶心",
+  "难看",
+  "废话",
+  "骗人",
+  "假的",
+  "不喜欢",
+  "无聊",
+  "糟糕",
+  "什么鬼"
 ];
+const AUDIENCE_NEUTRAL_HINTS = [
+  "?",
+  "why",
+  "how",
+  "what",
+  "when",
+  "where",
+  "source",
+  "context",
+  "data",
+  "link",
+  "next",
+  "more",
+  "episode",
+  "lol",
+  "haha",
+  "meme",
+  "请问",
+  "为什么",
+  "怎么",
+  "吗",
+  "有没有",
+  "求问",
+  "来源",
+  "资料",
+  "链接",
+  "补充",
+  "下期",
+  "继续",
+  "系列",
+  "哈哈",
+  "笑死",
+  "梗"
+];
+
+const VIDEO_NEUTRAL_INTENTS = new Set(["提问求解", "事实补充", "建议选题", "期待后续", "玩梗互动"]);
+const VIDEO_NEGATIVE_INTENTS = new Set(["质疑/反驳", "纠错澄清", "风险提醒"]);
+const VIDEO_POSITIVE_INTENTS = new Set(["赞同/夸奖"]);
+const TWEET_NEUTRAL_INTENTS = new Set(["中立观望", "事实核查", "玩梗调侃"]);
+const TWEET_NEGATIVE_INTENTS = new Set(["反对批评", "风险提醒", "误解澄清"]);
+const TWEET_POSITIVE_INTENTS = new Set(["支持扩散"]);
 
 const VIDEO_INTENT_LABELS = [
   "赞同/夸奖",
@@ -862,7 +914,7 @@ function normalizeIntentList(labels: string[], setting: ResolvedAiSetting, resul
   return resultLabels.length ? resultLabels : [fallbackIntentLabel(result, setting)];
 }
 
-function sanitizeAnalysisResult(result: AnalysisResult, setting: ResolvedAiSetting): AnalysisResult {
+function sanitizeAnalysisResult(result: AnalysisResult, setting: ResolvedAiSetting, item?: BatchInput): AnalysisResult {
   const fallbackTopic = setting.taxonomy[0] || ALL_TOPIC_TAXONOMY[0];
   const invalidLabels = unique([...result.topicLabels, ...result.painPoints, ...result.highlights].map((label) => label.trim()).filter(Boolean)).filter(
     (label) => !setting.taxonomy.includes(label)
@@ -872,7 +924,7 @@ function sanitizeAnalysisResult(result: AnalysisResult, setting: ResolvedAiSetti
     result.painPoints.length > 0 ? normalizeTopicList(result.painPoints, setting, topicLabels[0] || fallbackTopic, 5) : [];
   const highlights =
     result.highlights.length > 0 ? normalizeTopicList(result.highlights, setting, topicLabels[0] || fallbackTopic, 5) : [];
-  return {
+  const normalizedResult = {
     ...result,
     topicLabels,
     intentLabels: normalizeIntentList(result.intentLabels, setting, result),
@@ -880,6 +932,7 @@ function sanitizeAnalysisResult(result: AnalysisResult, setting: ResolvedAiSetti
     highlights,
     keywords: unique([...result.keywords.map((item) => item.trim()).filter(Boolean), ...invalidLabels]).slice(0, 12)
   };
+  return calibrateAudienceSentiment(normalizedResult, setting, item);
 }
 
 function renderTemplate(template: string, vars: Record<string, string | number | null | undefined>) {
@@ -956,6 +1009,88 @@ function withTimeout<T>(promise: Promise<T>, ms: number) {
 
 function scoreHits(text: string, words: string[]) {
   return words.filter((word) => text.includes(word.toLowerCase())).length;
+}
+
+function analysisText(item?: BatchInput) {
+  return `${item?.commentTr || ""}\n${item?.comment || ""}`.trim().toLowerCase();
+}
+
+function hasIntent(labels: string[], allowed: Set<string>) {
+  return labels.some((label) => allowed.has(label));
+}
+
+function calibrateAudienceSentiment(result: AnalysisResult, setting: ResolvedAiSetting, item?: BatchInput): AnalysisResult {
+  if (setting.analysisType === "product") {
+    return result;
+  }
+  const text = analysisText(item);
+  const positiveHits = scoreHits(text, AUDIENCE_POSITIVE_HINTS);
+  const negativeHits = scoreHits(text, AUDIENCE_NEGATIVE_HINTS);
+  const neutralHits = scoreHits(text, AUDIENCE_NEUTRAL_HINTS);
+  const neutralIntents = setting.analysisType === "video" ? VIDEO_NEUTRAL_INTENTS : TWEET_NEUTRAL_INTENTS;
+  const negativeIntents = setting.analysisType === "video" ? VIDEO_NEGATIVE_INTENTS : TWEET_NEGATIVE_INTENTS;
+  const positiveIntents = setting.analysisType === "video" ? VIDEO_POSITIVE_INTENTS : TWEET_POSITIVE_INTENTS;
+  const hasNeutralIntent = hasIntent(result.intentLabels, neutralIntents);
+  const hasNegativeIntent = hasIntent(result.intentLabels, negativeIntents);
+  const hasPositiveIntent = hasIntent(result.intentLabels, positiveIntents);
+  const hasExplicitNegative = negativeHits > 0 || (hasNegativeIntent && !hasNeutralIntent && neutralHits === 0);
+
+  if (result.sentiment === "negative" && hasPositiveIntent && positiveHits >= negativeHits && !hasNegativeIntent) {
+    return {
+      ...result,
+      sentiment: "positive",
+      sentimentScore: Math.max(result.sentimentScore, 0.78),
+      painPoints: [],
+      highlights: result.highlights.length ? result.highlights : result.topicLabels.slice(0, 3),
+      needsAttention: false
+    };
+  }
+
+  if (result.sentiment === "negative" && (hasNeutralIntent || neutralHits > 0) && !hasExplicitNegative) {
+    return {
+      ...result,
+      sentiment: "neutral",
+      sentimentScore: 0.55,
+      painPoints: [],
+      needsAttention: false
+    };
+  }
+
+  if (result.sentiment === "neutral" && hasPositiveIntent && positiveHits > negativeHits + 1) {
+    return {
+      ...result,
+      sentiment: "positive",
+      sentimentScore: Math.max(result.sentimentScore, 0.78),
+      highlights: result.highlights.length ? result.highlights : result.topicLabels.slice(0, 3),
+      needsAttention: false
+    };
+  }
+
+  if (result.sentiment === "positive" && hasNegativeIntent && negativeHits > positiveHits) {
+    return {
+      ...result,
+      sentiment: "negative",
+      sentimentScore: Math.min(result.sentimentScore, 0.24),
+      painPoints: result.painPoints.length ? result.painPoints : result.topicLabels.slice(0, 3),
+      highlights: [],
+      needsAttention: true
+    };
+  }
+
+  if (result.sentiment === "negative" && !hasExplicitNegative && positiveHits === 0 && neutralHits === 0) {
+    return {
+      ...result,
+      sentiment: "neutral",
+      sentimentScore: 0.55,
+      painPoints: [],
+      needsAttention: false
+    };
+  }
+
+  return {
+    ...result,
+    needsAttention: result.needsAttention || (result.sentiment === "negative" && hasExplicitNegative)
+  };
 }
 
 function inferTopics(text: string, setting: ResolvedAiSetting) {
@@ -1122,7 +1257,7 @@ function buildBatchPrompt(setting: ResolvedAiSetting, items: BatchInput[]) {
 
 async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, item: BatchInput): Promise<AnalysisResult> {
   if (process.env.ENABLE_MOCK_AI === "true") {
-    return mockAnalyze(item.comment, item.commentTr, item.ratingStar, setting);
+    return sanitizeAnalysisResult(mockAnalyze(item.comment, item.commentTr, item.ratingStar, setting), setting, item);
   }
   if (!client) {
     throw new Error(`API key for provider "${setting.provider}" is not configured`);
@@ -1149,7 +1284,7 @@ async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, ite
       throw new Error("AI response was empty");
     }
     const parsed = parseJsonObject(content);
-    return sanitizeAnalysisResult(analysisSchema.parse(parsed.analysis || parsed), setting);
+    return sanitizeAnalysisResult(analysisSchema.parse(parsed.analysis || parsed), setting, item);
   }
   const response = await client.responses.parse({
     model: setting.modelName,
@@ -1163,7 +1298,7 @@ async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, ite
   if (!response.output_parsed) {
     throw new Error("OpenAI response was not parsed");
   }
-  return sanitizeAnalysisResult(response.output_parsed, setting);
+  return sanitizeAnalysisResult(response.output_parsed, setting, item);
 }
 
 async function analyzeBatch(client: OpenAI, setting: ResolvedAiSetting, items: BatchInput[]) {
@@ -1194,7 +1329,7 @@ async function analyzeBatch(client: OpenAI, setting: ResolvedAiSetting, items: B
     if (validated.analyses.length !== items.length) {
       throw new Error(`Batch expected ${items.length} analyses but got ${validated.analyses.length}`);
     }
-    return validated.analyses.map((analysis) => sanitizeAnalysisResult(analysis, setting));
+    return validated.analyses.map((analysis, index) => sanitizeAnalysisResult(analysis, setting, items[index]));
   }
   const response = await client.responses.parse({
     model: setting.modelName,
@@ -1212,7 +1347,7 @@ async function analyzeBatch(client: OpenAI, setting: ResolvedAiSetting, items: B
   if (!parsed || parsed.analyses.length !== items.length) {
     throw new Error(`Batch expected ${items.length} analyses but got ${parsed?.analyses.length || 0}`);
   }
-  return parsed.analyses.map((analysis) => sanitizeAnalysisResult(analysis, setting));
+  return parsed.analyses.map((analysis, index) => sanitizeAnalysisResult(analysis, setting, items[index]));
 }
 
 async function analyzeWithRetry(client: OpenAI | null, setting: ResolvedAiSetting, item: BatchInput, maxRetries = 3) {
@@ -1276,20 +1411,69 @@ async function updateRunProgress(runId: string, successCount: number, failedCoun
   });
 }
 
+function buildDashboardPromptContext(setting: ResolvedAiSetting, dashboard: DashboardDTO) {
+  const topCategories =
+    dashboard.contentProfile.categoryDistribution.slice(0, 5).map((item) => `${item.label}(${item.percent}%)`).join("、") || dashboard.contentProfile.primaryCategory;
+  const topClusters =
+    dashboard.insightClusters.slice(0, 5).map((item) => `${item.title}(${item.count})`).join("、") || "暂无明显聚类";
+  const issueLabel =
+    setting.analysisType === "product" ? "主要痛点" : setting.analysisType === "video" ? "主要争议/问题" : "主要风险/争议";
+  return [
+    `任务类型：${setting.analysisType === "product" ? "商品评论" : setting.analysisType === "video" ? "视频评论" : "社媒评论"}`,
+    `核心指标：${dashboard.scoreLabel} ${dashboard.nps}（${dashboard.scoreDescription}）`,
+    `主要内容类别：${dashboard.contentProfile.primaryCategory}`,
+    `内容类别分布：${topCategories}`,
+    `有效评论：${dashboard.contentProfile.valuableCommentCount}/${dashboard.reviewCount}`,
+    `低价值评论占比：${dashboard.contentProfile.lowValueCommentRate}%`,
+    `${issueLabel}：${dashboard.issues.slice(0, 5).map((item) => `${item.issueName}(${item.count})`).join("、") || "暂无明显问题"}`,
+    `主要洞察聚类：${topClusters}`
+  ].join("\n");
+}
+
+function buildSummaryFallback(setting: ResolvedAiSetting, dashboard: DashboardDTO, positive: number, neutral: number, negative: number, topIssues: string) {
+  if (setting.analysisType === "video") {
+    return `本次共分析 ${dashboard.reviewCount} 条视频评论，有效评论 ${dashboard.contentProfile.valuableCommentCount} 条，主要内容类别为${dashboard.contentProfile.primaryCategory}。${dashboard.scoreLabel}为 ${dashboard.nps}，正向 ${positive}%、中性 ${neutral}%、负向 ${negative}%。主要争议/问题：${topIssues}。`;
+  }
+  if (setting.analysisType === "tweet") {
+    return `本次共分析 ${dashboard.reviewCount} 条社媒评论，有效评论 ${dashboard.contentProfile.valuableCommentCount} 条，主要讨论类别为${dashboard.contentProfile.primaryCategory}。${dashboard.scoreLabel}为 ${dashboard.nps}，正向 ${positive}%、中性 ${neutral}%、负向 ${negative}%。主要风险/争议：${topIssues}。`;
+  }
+  return `本次共分析 ${dashboard.reviewCount} 条评论，平均评分 ${dashboard.avgRating}，NPS 为 ${dashboard.nps}。有效评论 ${dashboard.contentProfile.valuableCommentCount} 条，正向占比 ${positive}%，负向占比 ${negative}%。主要痛点：${topIssues}。`;
+}
+
 async function generateAiSummary(client: OpenAI | null, setting: ResolvedAiSetting, dashboard: DashboardDTO) {
   const positive = dashboard.sentimentDistribution.find((item) => item.sentiment === "positive")?.percent || 0;
   const neutral = dashboard.sentimentDistribution.find((item) => item.sentiment === "neutral")?.percent || 0;
   const negative = dashboard.sentimentDistribution.find((item) => item.sentiment === "negative")?.percent || 0;
   const topIssues = dashboard.issues.slice(0, 5).map((item) => `${item.issueName}(${item.count})`).join("、") || "暂无明显痛点";
+  const topCategories =
+    dashboard.contentProfile.categoryDistribution.slice(0, 5).map((item) => `${item.label}(${item.percent}%)`).join("、") || dashboard.contentProfile.primaryCategory;
+  const topClusters =
+    dashboard.insightClusters.slice(0, 5).map((item) => `${item.title}(${item.count})`).join("、") || "暂无明显聚类";
   if (process.env.ENABLE_MOCK_AI === "true" || !client) {
-    return `本次共分析 ${dashboard.reviewCount} 条评论，平均评分 ${dashboard.avgRating}，NPS 为 ${dashboard.nps}。正向占比 ${positive}%，负向占比 ${negative}%。主要痛点：${topIssues}。`;
+    return buildSummaryFallback(setting, dashboard, positive, neutral, negative, topIssues);
   }
-  const prompt = renderTemplate(setting.summaryPrompt, {
+  const prompt = `${renderTemplate(setting.summaryPrompt, {
     reviewCount: dashboard.reviewCount,
     review_count: dashboard.reviewCount,
     avgRating: dashboard.avgRating,
     avg_rating: dashboard.avgRating,
     nps: dashboard.nps,
+    scoreLabel: dashboard.scoreLabel,
+    score_label: dashboard.scoreLabel,
+    scoreValue: dashboard.nps,
+    score_value: dashboard.nps,
+    scoreDescription: dashboard.scoreDescription,
+    score_description: dashboard.scoreDescription,
+    primaryCategory: dashboard.contentProfile.primaryCategory,
+    primary_category: dashboard.contentProfile.primaryCategory,
+    valuableCommentCount: dashboard.contentProfile.valuableCommentCount,
+    valuable_comment_count: dashboard.contentProfile.valuableCommentCount,
+    lowValueCommentRate: dashboard.contentProfile.lowValueCommentRate,
+    low_value_comment_rate: dashboard.contentProfile.lowValueCommentRate,
+    topCategories,
+    top_categories: topCategories,
+    topClusters,
+    top_clusters: topClusters,
     positivePercent: positive,
     positive_pct: positive,
     neutralPercent: neutral,
@@ -1298,7 +1482,7 @@ async function generateAiSummary(client: OpenAI | null, setting: ResolvedAiSetti
     negative_pct: negative,
     topIssues: topIssues,
     top_issues: topIssues
-  });
+  })}\n\n补充分析上下文：\n${buildDashboardPromptContext(setting, dashboard)}\n\n请按照任务类型生成总结；视频/社媒任务不要套用商品、物流、售后、包装等电商口径，除非评论明确提到。`;
   const response = await client.chat.completions.create({
     model: setting.modelName,
     messages: [{ role: "user", content: prompt }],
@@ -1331,12 +1515,32 @@ async function generateProductInsights(
   const neutralSamples = analyses.filter((item) => item.sentiment === "neutral").slice(0, 6).map(sample).join("\n") || "无";
   const topIssues = dashboard.issues.slice(0, 8).map((item) => `${item.issueName}(${item.count})`).join("、") || "暂无";
   const topVariants = dashboard.userProfile.variantDistribution.slice(0, 5).map((item) => `${item.variant}(${item.count})`).join("、") || "暂无";
-  const prompt = renderTemplate(setting.insightsPrompt, {
+  const topCategories =
+    dashboard.contentProfile.categoryDistribution.slice(0, 5).map((item) => `${item.label}(${item.percent}%)`).join("、") || dashboard.contentProfile.primaryCategory;
+  const topClusters =
+    dashboard.insightClusters.slice(0, 5).map((item) => `${item.title}(${item.count})`).join("、") || "暂无明显聚类";
+  const prompt = `${renderTemplate(setting.insightsPrompt, {
     reviewCount: dashboard.reviewCount,
     review_count: dashboard.reviewCount,
     avgRating: dashboard.avgRating,
     avg_rating: dashboard.avgRating,
     nps: dashboard.nps,
+    scoreLabel: dashboard.scoreLabel,
+    score_label: dashboard.scoreLabel,
+    scoreValue: dashboard.nps,
+    score_value: dashboard.nps,
+    scoreDescription: dashboard.scoreDescription,
+    score_description: dashboard.scoreDescription,
+    primaryCategory: dashboard.contentProfile.primaryCategory,
+    primary_category: dashboard.contentProfile.primaryCategory,
+    valuableCommentCount: dashboard.contentProfile.valuableCommentCount,
+    valuable_comment_count: dashboard.contentProfile.valuableCommentCount,
+    lowValueCommentRate: dashboard.contentProfile.lowValueCommentRate,
+    low_value_comment_rate: dashboard.contentProfile.lowValueCommentRate,
+    topCategories,
+    top_categories: topCategories,
+    topClusters,
+    top_clusters: topClusters,
     topIssues,
     top_issues: topIssues,
     topVariants,
@@ -1347,7 +1551,7 @@ async function generateProductInsights(
     negative_samples: negativeSamples,
     neutralSamples,
     neutral_samples: neutralSamples
-  });
+  })}\n\n补充分析上下文：\n${buildDashboardPromptContext(setting, dashboard)}\n\n请严格输出 JSON；字段内容必须匹配当前任务类型，视频/社媒任务不要写成商品卖点、物流、售后、包装分析。`;
   try {
     const response = await client.chat.completions.create({
       model: setting.modelName,
