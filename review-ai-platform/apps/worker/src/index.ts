@@ -1404,10 +1404,15 @@ async function addRunLog(runId: string, level: "info" | "warn" | "error", messag
   }
 }
 
-async function updateRunProgress(runId: string, successCount: number, failedCount: number, lastError?: string) {
-  await prisma.analysisRun.update({
+async function incrementRunProgress(runId: string, successCount: number, failedCount: number, lastError?: string) {
+  return prisma.analysisRun.update({
     where: { id: runId },
-    data: { successCount, failedCount, ...(lastError ? { lastError } : {}) }
+    data: {
+      successCount: { increment: successCount },
+      failedCount: { increment: failedCount },
+      ...(lastError ? { lastError } : {})
+    },
+    select: { successCount: true, failedCount: true, reviewCount: true }
   });
 }
 
@@ -1760,6 +1765,19 @@ const worker = new Worker(
         }
       }
 
+      const progress = await incrementRunProgress(runId, localSuccessCount, localFailedCount, localLastError);
+      await addRunLog(runId, localFailedCount > 0 ? "warn" : "info", "Analysis batch progress updated", {
+        batchStart,
+        batchEnd,
+        batchSize: batch.length,
+        batchSuccessCount: localSuccessCount,
+        batchFailedCount: localFailedCount,
+        successCount: progress.successCount,
+        failedCount: progress.failedCount,
+        totalReviews: progress.reviewCount,
+        lastError: localLastError || null
+      });
+
       return {
         successCount: localSuccessCount,
         failedCount: localFailedCount,
@@ -1783,8 +1801,7 @@ const worker = new Worker(
         lastError = result.lastError || lastError;
       }
 
-      await updateRunProgress(runId, successCount, failedCount, lastError);
-      await addRunLog(runId, failedCount > 0 ? "warn" : "info", "Analysis progress updated", {
+      await addRunLog(runId, failedCount > 0 ? "warn" : "info", "Analysis batch group completed", {
         successCount,
         failedCount,
         totalReviews: reviews.length,
