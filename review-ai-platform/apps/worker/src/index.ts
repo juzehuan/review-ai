@@ -41,6 +41,7 @@ const ANALYSIS_BATCH_SIZE = readPositiveIntEnv("ANALYSIS_BATCH_SIZE", 50, { min:
 const ANALYSIS_BATCH_CONCURRENCY = readPositiveIntEnv("ANALYSIS_BATCH_CONCURRENCY", 2, { min: 1, max: 6 });
 const ANALYSIS_SINGLE_CONCURRENCY = readPositiveIntEnv("ANALYSIS_SINGLE_CONCURRENCY", 6, { min: 1, max: 20 });
 const ANALYSIS_REQUEST_TIMEOUT_MS = readPositiveIntEnv("ANALYSIS_REQUEST_TIMEOUT_MS", 180000, { min: 30000, max: 600000 });
+const ANALYSIS_SUMMARY_TIMEOUT_MS = readPositiveIntEnv("ANALYSIS_SUMMARY_TIMEOUT_MS", ANALYSIS_REQUEST_TIMEOUT_MS, { min: 30000, max: 600000 });
 const ANALYSIS_BATCH_PAUSE_MS = readPositiveIntEnv("ANALYSIS_BATCH_PAUSE_MS", 0, { min: 0, max: 30000 });
 const ANALYSIS_WORKER_CONCURRENCY = readPositiveIntEnv("ANALYSIS_WORKER_CONCURRENCY", 2, { min: 1, max: 10 });
 const ANALYSIS_SPLIT_BATCH_SIZE = readPositiveIntEnv("ANALYSIS_SPLIT_BATCH_SIZE", 10, { min: 2, max: 50 });
@@ -1488,13 +1489,21 @@ async function generateAiSummary(client: OpenAI | null, setting: ResolvedAiSetti
     topIssues: topIssues,
     top_issues: topIssues
   })}\n\n补充分析上下文：\n${buildDashboardPromptContext(setting, dashboard)}\n\n请按照任务类型生成总结；视频/社媒任务不要套用商品、物流、售后、包装等电商口径，除非评论明确提到。`;
-  const response = await client.chat.completions.create({
-    model: setting.modelName,
-    messages: [{ role: "user", content: prompt }],
-    max_tokens: 300,
-    temperature: 0.6
-  });
-  return response.choices[0]?.message?.content?.trim() || null;
+  try {
+    const response = await withTimeout(
+      client.chat.completions.create({
+        model: setting.modelName,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 300,
+        temperature: 0.6
+      }),
+      ANALYSIS_SUMMARY_TIMEOUT_MS
+    );
+    return response.choices[0]?.message?.content?.trim() || buildSummaryFallback(setting, dashboard, positive, neutral, negative, topIssues);
+  } catch (error) {
+    console.error("Failed to generate AI summary, using fallback", error);
+    return buildSummaryFallback(setting, dashboard, positive, neutral, negative, topIssues);
+  }
 }
 
 type AnalysisRow = {
@@ -1558,12 +1567,15 @@ async function generateProductInsights(
     neutral_samples: neutralSamples
   })}\n\n补充分析上下文：\n${buildDashboardPromptContext(setting, dashboard)}\n\n请严格输出 JSON；字段内容必须匹配当前商品评论任务。`;
   try {
-    const response = await client.chat.completions.create({
-      model: setting.modelName,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 3000,
-      temperature: 0.6
-    });
+    const response = await withTimeout(
+      client.chat.completions.create({
+        model: setting.modelName,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 3000,
+        temperature: 0.6
+      }),
+      ANALYSIS_SUMMARY_TIMEOUT_MS
+    );
     const content = response.choices[0]?.message?.content?.trim() || "";
     const parsed = JSON.parse(content.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim());
     if (
@@ -1605,6 +1617,7 @@ const worker = new Worker(
         batchConcurrency: ANALYSIS_BATCH_CONCURRENCY,
         singleConcurrency: ANALYSIS_SINGLE_CONCURRENCY,
         requestTimeoutMs: ANALYSIS_REQUEST_TIMEOUT_MS,
+        summaryTimeoutMs: ANALYSIS_SUMMARY_TIMEOUT_MS,
         batchPauseMs: ANALYSIS_BATCH_PAUSE_MS,
         workerConcurrency: ANALYSIS_WORKER_CONCURRENCY,
         splitBatchSize: ANALYSIS_SPLIT_BATCH_SIZE
