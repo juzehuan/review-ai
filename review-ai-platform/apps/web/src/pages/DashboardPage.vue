@@ -115,7 +115,13 @@
           :type="qualityAlertType(alert.level)"
           :message="alert.title"
           :description="`${alert.detail} ${alert.recommendation}`"
-        />
+        >
+          <template #action>
+            <a-button v-if="qualityAlertActionLabel(alert)" size="small" type="link" @click="openQualityAlertAction(alert)">
+              {{ qualityAlertActionLabel(alert) }}
+            </a-button>
+          </template>
+        </a-alert>
       </div>
     </section>
 
@@ -404,6 +410,8 @@ type ChartDataPayload = {
   ratingStar?: number;
 };
 
+type QualityAlert = DashboardDTO["qualityAlerts"][number];
+
 const npsColumns = [
   { title: "分类", dataIndex: "label", key: "label" },
   { title: "占比", dataIndex: "percent", key: "percent", customRender: ({ text }: { text: number }) => `${text}%` },
@@ -516,6 +524,121 @@ function qualityAlertType(level: DashboardDTO["qualityAlerts"][number]["level"])
     return "warning";
   }
   return "info";
+}
+
+function dominantSentiment() {
+  return [...(dashboard.value?.sentimentDistribution || [])].sort((a, b) => b.count - a.count)[0]?.sentiment;
+}
+
+function topIntentLabel() {
+  return dashboard.value?.intentDistribution?.[0]?.label || "";
+}
+
+function topDynamicTag() {
+  return dashboard.value?.dynamicContentTags?.[0];
+}
+
+function firstDuplicateGroup() {
+  return dashboard.value?.duplicateProfile?.topGroups?.find((group) => group.sampleReviewIds.length);
+}
+
+function firstClusterReviewIds() {
+  return dashboard.value?.insightClusters?.find((cluster) => cluster.sampleReviewIds.length)?.sampleReviewIds || [];
+}
+
+function topWordCloudKeyword() {
+  return dashboard.value?.wordCloud?.[0]?.name || "";
+}
+
+function commerceNoiseKeyword() {
+  const commerceWords = ["质量", "售后", "物流", "包装", "价格", "客服", "发货", "快递", "退换", "保修"];
+  return dashboard.value?.wordCloud?.find((item) => commerceWords.some((word) => item.name.includes(word)))?.name || commerceWords[0];
+}
+
+function qualityAlertActionLabel(alert: QualityAlert) {
+  if (alert.id === "duplicate-comment-rate") {
+    return firstDuplicateGroup() ? "查看重复证据" : "";
+  }
+  if (["neutral-signal-negative-anomaly", "negative-rate-anomaly"].includes(alert.id)) {
+    return "查看负向评论";
+  }
+  if (alert.id === "positive-signal-missing") {
+    return "查看中性评论";
+  }
+  if (alert.id === "sentiment-concentration") {
+    const sentiment = dominantSentiment();
+    return sentiment ? `查看${sentimentText(sentiment)}评论` : "";
+  }
+  if (alert.id === "intent-concentration") {
+    return topIntentLabel() ? "查看主要意图" : "";
+  }
+  if (["topic-concentration", "dynamic-tag-diversity-low", "dynamic-tag-concentration", "category-diversity-low"].includes(alert.id)) {
+    return topDynamicTag() ? "查看动态标签" : "";
+  }
+  if (alert.id === "keyword-diversity-low") {
+    return topWordCloudKeyword() ? "查看高频词评论" : "";
+  }
+  if (alert.id === "low-value-comment-rate") {
+    return firstClusterReviewIds().length ? "查看有效聚类" : "";
+  }
+  if (alert.id === "commerce-noise") {
+    return "搜索电商词";
+  }
+  return "";
+}
+
+function openQualityAlertAction(alert: QualityAlert) {
+  if (["neutral-signal-negative-anomaly", "negative-rate-anomaly"].includes(alert.id)) {
+    openFilteredReviews({ sentiment: "negative" }, "负向", "sentiment");
+    return;
+  }
+  if (alert.id === "positive-signal-missing") {
+    openFilteredReviews({ sentiment: "neutral" }, "中性", "sentiment");
+    return;
+  }
+  if (alert.id === "sentiment-concentration") {
+    const sentiment = dominantSentiment();
+    if (sentiment) {
+      openFilteredReviews({ sentiment }, sentimentText(sentiment), "sentiment");
+    }
+    return;
+  }
+  if (alert.id === "intent-concentration") {
+    const intent = topIntentLabel();
+    if (intent) {
+      openFilteredReviews({ intent }, intent, "intent");
+    }
+    return;
+  }
+  if (alert.id === "duplicate-comment-rate") {
+    const duplicateGroup = firstDuplicateGroup();
+    if (duplicateGroup) {
+      openEvidenceReviews(duplicateGroup.sampleReviewIds, "重复评论", "duplicate");
+    }
+    return;
+  }
+  if (["topic-concentration", "dynamic-tag-diversity-low", "dynamic-tag-concentration", "category-diversity-low"].includes(alert.id)) {
+    const tag = topDynamicTag();
+    if (tag) {
+      openDynamicTagEvidence(tag);
+    }
+    return;
+  }
+  if (alert.id === "keyword-diversity-low") {
+    const keyword = topWordCloudKeyword();
+    if (keyword) {
+      openFilteredReviews({ keyword }, keyword, "keyword");
+    }
+    return;
+  }
+  if (alert.id === "low-value-comment-rate") {
+    openClusterEvidence(firstClusterReviewIds());
+    return;
+  }
+  if (alert.id === "commerce-noise") {
+    const keyword = commerceNoiseKeyword();
+    openFilteredReviews({ keyword }, keyword, "keyword");
+  }
 }
 
 function dynamicTagKindText(kind: DashboardDTO["dynamicContentTags"][number]["kind"]) {
