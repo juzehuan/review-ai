@@ -130,6 +130,10 @@
           <a-select-option :value="false">纯文本</a-select-option>
         </a-select>
 
+        <a-select v-model:value="filters.sourceChannel" allow-clear placeholder="来源" class="filter-select">
+          <a-select-option v-for="source in sourceChannelOptions" :key="source" :value="source">{{ source }}</a-select-option>
+        </a-select>
+
         <a-input v-model:value="filters.keyword" placeholder="关键词或标签" class="filter-input" allow-clear>
           <template #prefix><SearchOutlined /></template>
         </a-input>
@@ -342,6 +346,7 @@ type SavedView = {
     sentiment?: string;
     intent?: string;
     hasMedia?: boolean;
+    sourceChannel?: string;
     keyword: string;
   };
   groupBy: "sentiment" | "ratingStar" | "analysisTag" | "intent";
@@ -383,6 +388,7 @@ const filters = reactive({
   sentiment: undefined as string | undefined,
   intent: undefined as string | undefined,
   hasMedia: undefined as boolean | undefined,
+  sourceChannel: undefined as string | undefined,
   keyword: ""
 });
 
@@ -419,12 +425,17 @@ const intentOptions = computed(() =>
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))
 );
+const sourceChannelOptions = computed(() =>
+  [...new Set(rows.value.map((item) => item.sourceChannel))]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))
+);
 const totalCount = computed(() => pagination.total || 0);
 const mediaCount = computed(() => rows.value.filter((item) => item.hasMedia).length);
 const negativeCount = computed(() => rows.value.filter((item) => item.sentiment === "negative").length);
 const visibleColumns = computed(() => allColumns.filter((column) => visibleColumnKeys.value.includes(column.key)));
 const activeFilterCount = computed(() =>
-  [filters.ratingStar, filters.sentiment, filters.intent, filters.hasMedia, filters.keyword.trim()].filter((value) => value !== undefined && value !== "").length +
+  [filters.ratingStar, filters.sentiment, filters.intent, filters.hasMedia, filters.sourceChannel, filters.keyword.trim()].filter((value) => value !== undefined && value !== "").length +
   (evidenceIssue.value || evidenceReviewIds.value.length ? 1 : 0)
 );
 const canCancelRun = computed(() => Boolean(latestRun.value && ["queued", "running"].includes(latestRun.value.status)));
@@ -525,6 +536,7 @@ function savedViewFromDto(view: SavedReviewViewDTO): SavedView {
       sentiment: typeof filters.sentiment === "string" ? filters.sentiment : undefined,
       intent: typeof filters.intent === "string" ? filters.intent : undefined,
       hasMedia: typeof filters.hasMedia === "boolean" ? filters.hasMedia : undefined,
+      sourceChannel: typeof filters.sourceChannel === "string" ? filters.sourceChannel : undefined,
       keyword: typeof filters.keyword === "string" ? filters.keyword : ""
     },
     groupBy: ["sentiment", "ratingStar", "analysisTag", "intent"].includes(view.groupBy)
@@ -549,6 +561,7 @@ function snapshotCurrentView(name: string, id?: string): SavedView {
       sentiment: filters.sentiment,
       intent: filters.intent,
       hasMedia: filters.hasMedia,
+      sourceChannel: filters.sourceChannel,
       keyword: filters.keyword
     },
     groupBy: groupBy.value,
@@ -576,6 +589,7 @@ function applyView(view: SavedView) {
   filters.sentiment = view.filters.sentiment;
   filters.intent = view.filters.intent;
   filters.hasMedia = view.filters.hasMedia;
+  filters.sourceChannel = view.filters.sourceChannel;
   filters.keyword = view.filters.keyword;
   groupBy.value = view.groupBy;
   viewMode.value = view.viewMode;
@@ -700,6 +714,9 @@ function evidenceTypeLabel(type: string) {
   if (type === "keyword") {
     return "关键词";
   }
+  if (type === "source") {
+    return "评论来源";
+  }
   return "证据";
 }
 
@@ -740,6 +757,9 @@ function clearRouteSourcedFilters(type: string) {
   }
   if (type === "keyword") {
     filters.keyword = "";
+  }
+  if (type === "source") {
+    filters.sourceChannel = undefined;
   }
 }
 
@@ -845,6 +865,7 @@ async function loadReviews() {
       sentiment: filters.sentiment,
       intent: filters.intent,
       hasMedia: filters.hasMedia,
+      sourceChannel: filters.sourceChannel,
       keyword: filters.keyword || undefined,
       sortBy: sortState.sortBy,
       sortOrder: sortState.sortOrder,
@@ -922,6 +943,7 @@ async function handleExport() {
       sentiment: filters.sentiment,
       intent: filters.intent,
       hasMedia: filters.hasMedia,
+      sourceChannel: filters.sourceChannel,
       keyword: filters.keyword || undefined,
       runId: selectedResultRunId.value,
       issue: evidenceIssue.value || undefined,
@@ -947,6 +969,7 @@ function resetFilters() {
   filters.sentiment = undefined;
   filters.intent = undefined;
   filters.hasMedia = undefined;
+  filters.sourceChannel = undefined;
   filters.keyword = "";
   evidenceIssue.value = "";
   evidenceLabel.value = "";
@@ -1022,15 +1045,17 @@ watch(
     route.query.ratingStar,
     route.query.sentiment,
     route.query.intent,
+    route.query.sourceChannel,
     route.query.keyword
   ],
-  ([issue, runId, reviewIds, nextEvidenceLabel, nextEvidenceType, ratingStar, sentiment, intent, keyword]) => {
+  ([issue, runId, reviewIds, nextEvidenceLabel, nextEvidenceType, ratingStar, sentiment, intent, sourceChannel, keyword]) => {
     evidenceIssue.value = routeString(issue) || "";
     evidenceLabel.value = routeString(nextEvidenceLabel) || "";
     evidenceType.value = routeString(nextEvidenceType) || "";
     filters.ratingStar = routeRatingStar(ratingStar);
     filters.sentiment = routeSentiment(sentiment);
     filters.intent = routeString(intent);
+    filters.sourceChannel = routeString(sourceChannel);
     filters.keyword = routeString(keyword) || "";
     const nextReviewIds = routeString(reviewIds);
     evidenceReviewIds.value = nextReviewIds
@@ -1064,7 +1089,7 @@ watch([groupBy, visibleColumnKeys], () => {
 });
 
 watch(
-  [() => filters.ratingStar, () => filters.sentiment, () => filters.intent, () => filters.hasMedia, () => filters.keyword],
+  [() => filters.ratingStar, () => filters.sentiment, () => filters.intent, () => filters.hasMedia, () => filters.sourceChannel, () => filters.keyword],
   () => {
     if (!applyingSavedView.value) {
       clearActiveView();

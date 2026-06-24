@@ -32,6 +32,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const variant = searchParams.get("variant");
   const keyword = searchParams.get("keyword")?.trim() || "";
   const hasMedia = searchParams.get("hasMedia");
+  const sourceChannel = searchParams.get("sourceChannel")?.trim() || "";
   const sortBy = searchParams.get("sortBy") || "commentTime";
   const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
   const page = Math.max(Number(searchParams.get("page") || 1), 1);
@@ -49,6 +50,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     ...(ratingStar ? { ratingStar } : {}),
     ...(variant ? { modelName: variant } : {}),
     ...(hasMedia !== null ? { hasMedia: hasMedia === "true" } : {}),
+    ...(sourceChannel ? { sourceChannel } : {}),
     ...(keyword ? buildKeywordReviewWhere(keyword, run?.id) : {})
   };
 

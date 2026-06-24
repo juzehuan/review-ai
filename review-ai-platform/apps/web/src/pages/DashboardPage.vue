@@ -210,7 +210,7 @@
 
     <div class="chart-row">
       <EChartCard title="整体情感分布" :option="sentimentOption" clickable @chart-click="openSentimentReviews" />
-      <EChartCard title="评论来源分布" :option="sourceOption" />
+      <EChartCard title="评论来源分布" :option="sourceOption" clickable @chart-click="openSourceReviews" />
     </div>
 
     <div class="chart-row">
@@ -408,6 +408,7 @@ type ChartDataPayload = {
   intent?: string;
   issueName?: string;
   ratingStar?: number;
+  sourceChannel?: string;
 };
 
 type QualityAlert = DashboardDTO["qualityAlerts"][number];
@@ -954,6 +955,14 @@ function openIntentReviews(params: unknown) {
   openFilteredReviews({ intent }, intent, "intent");
 }
 
+function openSourceReviews(params: unknown) {
+  const sourceChannel = getChartData(params).sourceChannel || getChartName(params);
+  if (!sourceChannel) {
+    return;
+  }
+  openFilteredReviews({ sourceChannel }, sourceChannel, "source");
+}
+
 function openKeywordReviews(params: unknown) {
   const keyword = getChartName(params);
   if (!keyword) {
@@ -1065,7 +1074,10 @@ const sourceOption = computed<EChartsOption>(() => ({
       type: "bar",
       barWidth: 42,
       itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.primary[0], CHART_COLORS.accent[0]) },
-      data: (dashboard.value?.sourceDistribution || []).map((item) => item.count)
+      data: (dashboard.value?.sourceDistribution || []).map((item) => ({
+        value: item.count,
+        sourceChannel: item.source
+      }))
     }
   ]
 }));

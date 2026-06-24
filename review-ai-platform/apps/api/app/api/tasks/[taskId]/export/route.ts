@@ -44,6 +44,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const keyword = searchParams.get("keyword")?.trim() || "";
   const hasMedia = searchParams.get("hasMedia");
   const variant = searchParams.get("variant");
+  const sourceChannel = searchParams.get("sourceChannel")?.trim() || "";
 
   const run = await findAnalysisRunForResults(taskId, searchParams.get("runId"));
   const hasAnalysisFilter = Boolean(sentiment || issue || intent || tag || needsAttention !== null);
@@ -68,6 +69,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
       ...(ratingStar ? { ratingStar } : {}),
       ...(variant ? { modelName: variant } : {}),
       ...(hasMedia !== null && hasMedia !== "" ? { hasMedia: hasMedia === "true" } : {}),
+      ...(sourceChannel ? { sourceChannel } : {}),
       ...(analysisFilter ? { analyses: { some: analysisFilter } } : {}),
       ...(keyword ? buildKeywordReviewWhere(keyword, run?.id) : {})
     },
