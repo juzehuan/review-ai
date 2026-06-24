@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@review-ai/db";
 import { ok } from "@/lib/http";
 import { findAnalysisRunForResults } from "@/lib/analysis-runs";
+import { buildKeywordReviewWhere } from "@/lib/review-filters";
 import { serializeReviewRow } from "@/lib/serializers";
 import { getWorkspaceContext, requireScopedTask } from "@/lib/workspace";
 
@@ -29,7 +30,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const needsAttention = searchParams.get("needsAttention");
   const ratingStar = Number(searchParams.get("ratingStar") || 0);
   const variant = searchParams.get("variant");
-  const keyword = searchParams.get("keyword");
+  const keyword = searchParams.get("keyword")?.trim() || "";
   const hasMedia = searchParams.get("hasMedia");
   const sortBy = searchParams.get("sortBy") || "commentTime";
   const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
@@ -48,14 +49,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     ...(ratingStar ? { ratingStar } : {}),
     ...(variant ? { modelName: variant } : {}),
     ...(hasMedia !== null ? { hasMedia: hasMedia === "true" } : {}),
-    ...(keyword
-      ? {
-          OR: [
-            { comment: { contains: keyword, mode: "insensitive" } },
-            { commentTr: { contains: keyword, mode: "insensitive" } }
-          ]
-        }
-      : {})
+    ...(keyword ? buildKeywordReviewWhere(keyword, run?.id) : {})
   };
 
   const analysisFilter: Prisma.ReviewAnalysisWhereInput | null = run

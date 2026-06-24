@@ -2,6 +2,7 @@ import { prisma } from "@review-ai/db";
 import { serializeReviewRow } from "@/lib/serializers";
 import { fail } from "@/lib/http";
 import { findAnalysisRunForResults } from "@/lib/analysis-runs";
+import { buildKeywordReviewWhere } from "@/lib/review-filters";
 import { getWorkspaceContext, requireScopedTask } from "@/lib/workspace";
 
 function escapeCsv(value: unknown) {
@@ -40,7 +41,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     .filter(Boolean);
   const needsAttention = searchParams.get("needsAttention");
   const ratingStar = Number(searchParams.get("ratingStar") || 0);
-  const keyword = searchParams.get("keyword");
+  const keyword = searchParams.get("keyword")?.trim() || "";
   const hasMedia = searchParams.get("hasMedia");
   const variant = searchParams.get("variant");
 
@@ -68,14 +69,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
       ...(variant ? { modelName: variant } : {}),
       ...(hasMedia !== null && hasMedia !== "" ? { hasMedia: hasMedia === "true" } : {}),
       ...(analysisFilter ? { analyses: { some: analysisFilter } } : {}),
-      ...(keyword
-        ? {
-            OR: [
-              { comment: { contains: keyword, mode: "insensitive" } },
-              { commentTr: { contains: keyword, mode: "insensitive" } }
-            ]
-          }
-        : {})
+      ...(keyword ? buildKeywordReviewWhere(keyword, run?.id) : {})
     },
     include: {
       task: true,
