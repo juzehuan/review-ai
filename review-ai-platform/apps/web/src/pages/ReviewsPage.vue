@@ -49,7 +49,7 @@
     </div>
 
     <a-alert
-      v-if="evidenceIssue || evidenceReviewIds.length"
+      v-if="evidenceIssue || evidenceLabel || evidenceReviewIds.length"
       type="info"
       show-icon
       class="evidence-alert"
@@ -688,7 +688,59 @@ function evidenceTypeLabel(type: string) {
   if (type === "issue") {
     return "问题证据";
   }
+  if (type === "sentiment") {
+    return "情感筛选";
+  }
+  if (type === "rating-sentiment") {
+    return "星级情感";
+  }
+  if (type === "intent") {
+    return "评论意图";
+  }
+  if (type === "keyword") {
+    return "关键词";
+  }
   return "证据";
+}
+
+function isSentiment(value: unknown): value is Sentiment {
+  return value === "positive" || value === "neutral" || value === "negative";
+}
+
+function routeString(value: unknown) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.find((item): item is string => typeof item === "string");
+  }
+  return undefined;
+}
+
+function routeRatingStar(value: unknown) {
+  const raw = routeString(value);
+  const ratingStar = raw ? Number(raw) : NaN;
+  return Number.isInteger(ratingStar) && ratingStar >= 1 && ratingStar <= 5 ? ratingStar : undefined;
+}
+
+function routeSentiment(value: unknown) {
+  const raw = routeString(value);
+  return isSentiment(raw) ? raw : undefined;
+}
+
+function clearRouteSourcedFilters(type: string) {
+  if (type === "sentiment" || type === "rating-sentiment") {
+    filters.sentiment = undefined;
+  }
+  if (type === "rating-sentiment") {
+    filters.ratingStar = undefined;
+  }
+  if (type === "intent") {
+    filters.intent = undefined;
+  }
+  if (type === "keyword") {
+    filters.keyword = "";
+  }
 }
 
 function runStatusLabel(status?: string | null) {
@@ -911,6 +963,7 @@ function resetFilters() {
 }
 
 function clearEvidenceFilter() {
+  clearRouteSourcedFilters(evidenceType.value);
   evidenceIssue.value = "";
   evidenceLabel.value = "";
   evidenceType.value = "";
@@ -960,20 +1013,35 @@ watch(
 );
 
 watch(
-  () => [route.query.issue, route.query.runId, route.query.reviewIds, route.query.evidenceLabel, route.query.evidenceType],
-  ([issue, runId, reviewIds, nextEvidenceLabel, nextEvidenceType]) => {
-    evidenceIssue.value = typeof issue === "string" ? issue : "";
-    evidenceLabel.value = typeof nextEvidenceLabel === "string" ? nextEvidenceLabel : "";
-    evidenceType.value = typeof nextEvidenceType === "string" ? nextEvidenceType : "";
-    evidenceReviewIds.value =
-      typeof reviewIds === "string"
-        ? reviewIds
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean)
-        : [];
-    if (typeof runId === "string") {
-      selectedResultRunId.value = runId;
+  () => [
+    route.query.issue,
+    route.query.runId,
+    route.query.reviewIds,
+    route.query.evidenceLabel,
+    route.query.evidenceType,
+    route.query.ratingStar,
+    route.query.sentiment,
+    route.query.intent,
+    route.query.keyword
+  ],
+  ([issue, runId, reviewIds, nextEvidenceLabel, nextEvidenceType, ratingStar, sentiment, intent, keyword]) => {
+    evidenceIssue.value = routeString(issue) || "";
+    evidenceLabel.value = routeString(nextEvidenceLabel) || "";
+    evidenceType.value = routeString(nextEvidenceType) || "";
+    filters.ratingStar = routeRatingStar(ratingStar);
+    filters.sentiment = routeSentiment(sentiment);
+    filters.intent = routeString(intent);
+    filters.keyword = routeString(keyword) || "";
+    const nextReviewIds = routeString(reviewIds);
+    evidenceReviewIds.value = nextReviewIds
+      ? nextReviewIds
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [];
+    const nextRunId = routeString(runId);
+    if (nextRunId) {
+      selectedResultRunId.value = nextRunId;
     }
     pagination.current = 1;
     loadReviews();

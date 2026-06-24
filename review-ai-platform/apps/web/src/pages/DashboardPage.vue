@@ -194,18 +194,30 @@
       </div>
     </div>
 
-    <EChartCard v-if="showRatingCharts" title="各星级情感倾向" :option="ratingSentimentOption" />
+    <EChartCard
+      v-if="showRatingCharts"
+      title="各星级情感倾向"
+      :option="ratingSentimentOption"
+      clickable
+      @chart-click="openRatingSentimentReviews"
+    />
 
     <div class="chart-row">
-      <EChartCard title="整体情感分布" :option="sentimentOption" />
+      <EChartCard title="整体情感分布" :option="sentimentOption" clickable @chart-click="openSentimentReviews" />
       <EChartCard title="评论来源分布" :option="sourceOption" />
     </div>
 
     <div class="chart-row">
       <EChartCard v-if="dashboard?.contentProfile?.categoryDistribution?.length" title="内容类别分布" :option="contentCategoryOption" />
-      <EChartCard v-if="dashboard?.intentDistribution?.length" title="评论意图分布" :option="intentOption" />
-      <EChartCard title="用户声音词云" :option="wordCloudOption" />
-      <EChartCard title="用户问题统计" :option="issueOption" />
+      <EChartCard
+        v-if="dashboard?.intentDistribution?.length"
+        title="评论意图分布"
+        :option="intentOption"
+        clickable
+        @chart-click="openIntentReviews"
+      />
+      <EChartCard title="用户声音词云" :option="wordCloudOption" clickable @chart-click="openKeywordReviews" />
+      <EChartCard title="用户问题统计" :option="issueOption" clickable @chart-click="openIssueChartReviews" />
     </div>
 
     <section v-if="dashboard?.dynamicContentTags?.length" class="dynamic-tags-panel">
@@ -378,6 +390,19 @@ const actionCreatingIssue = ref<string | null>(null);
 const gaugeRef = ref<HTMLDivElement | null>(null);
 let timer: ReturnType<typeof setInterval> | null = null;
 let gaugeChart: echarts.ECharts | null = null;
+
+type ChartClickParams = {
+  name?: string | number;
+  seriesName?: string;
+  data?: unknown;
+};
+
+type ChartDataPayload = {
+  sentiment?: Sentiment;
+  intent?: string;
+  issueName?: string;
+  ratingStar?: number;
+};
 
 const npsColumns = [
   { title: "分类", dataIndex: "label", key: "label" },
@@ -739,6 +764,89 @@ function openDynamicTagEvidence(tag: DashboardDTO["dynamicContentTags"][number])
   openEvidenceReviews(tag.sampleReviewIds, tag.label, "dynamic-tag");
 }
 
+function isSentiment(value: unknown): value is Sentiment {
+  return value === "positive" || value === "neutral" || value === "negative";
+}
+
+function getChartParams(params: unknown): ChartClickParams {
+  return params && typeof params === "object" ? (params as ChartClickParams) : {};
+}
+
+function getChartData(params: unknown): ChartDataPayload {
+  const data = getChartParams(params).data;
+  return data && typeof data === "object" ? (data as ChartDataPayload) : {};
+}
+
+function getChartName(params: unknown) {
+  const name = getChartParams(params).name;
+  if (typeof name === "string") {
+    return name;
+  }
+  if (typeof name === "number") {
+    return String(name);
+  }
+  return "";
+}
+
+function openFilteredReviews(query: Record<string, string>, label: string, type: string) {
+  if (!selectedTask.value) {
+    return;
+  }
+  router.push({
+    path: `/tasks/${selectedTask.value.id}/reviews`,
+    query: {
+      ...query,
+      evidenceLabel: label,
+      evidenceType: type,
+      ...(dashboard.value?.runId ? { runId: dashboard.value.runId } : {})
+    }
+  });
+}
+
+function openSentimentReviews(params: unknown) {
+  const sentiment = getChartData(params).sentiment;
+  if (!isSentiment(sentiment)) {
+    return;
+  }
+  openFilteredReviews({ sentiment }, sentimentText(sentiment), "sentiment");
+}
+
+function openRatingSentimentReviews(params: unknown) {
+  const data = getChartData(params);
+  if (!data.ratingStar || !isSentiment(data.sentiment)) {
+    return;
+  }
+  openFilteredReviews(
+    { ratingStar: String(data.ratingStar), sentiment: data.sentiment },
+    `${data.ratingStar} 星${sentimentText(data.sentiment)}`,
+    "rating-sentiment"
+  );
+}
+
+function openIntentReviews(params: unknown) {
+  const intent = getChartData(params).intent || getChartName(params);
+  if (!intent) {
+    return;
+  }
+  openFilteredReviews({ intent }, intent, "intent");
+}
+
+function openKeywordReviews(params: unknown) {
+  const keyword = getChartName(params);
+  if (!keyword) {
+    return;
+  }
+  openFilteredReviews({ keyword }, keyword, "keyword");
+}
+
+function openIssueChartReviews(params: unknown) {
+  const issueName = getChartData(params).issueName || getChartName(params);
+  if (!issueName) {
+    return;
+  }
+  openIssueEvidence(issueName);
+}
+
 function startPolling() {
   stopPolling();
   timer = setInterval(load, 10000);
@@ -773,7 +881,11 @@ const ratingSentimentOption = computed<EChartsOption>(() => ({
       stack: "sentiment",
       barWidth: 38,
       itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.positive[0], CHART_COLORS.positive[1]) },
-      data: (dashboard.value?.ratingSentiment || []).map((item) => item.positive)
+      data: (dashboard.value?.ratingSentiment || []).map((item) => ({
+        value: item.positive,
+        ratingStar: item.ratingStar,
+        sentiment: "positive"
+      }))
     },
     {
       name: "中性",
@@ -781,7 +893,11 @@ const ratingSentimentOption = computed<EChartsOption>(() => ({
       stack: "sentiment",
       barWidth: 38,
       itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.neutral[0], CHART_COLORS.neutral[1]) },
-      data: (dashboard.value?.ratingSentiment || []).map((item) => item.neutral)
+      data: (dashboard.value?.ratingSentiment || []).map((item) => ({
+        value: item.neutral,
+        ratingStar: item.ratingStar,
+        sentiment: "neutral"
+      }))
     },
     {
       name: "负向",
@@ -789,7 +905,11 @@ const ratingSentimentOption = computed<EChartsOption>(() => ({
       stack: "sentiment",
       barWidth: 38,
       itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.negative[0], CHART_COLORS.negative[1]) },
-      data: (dashboard.value?.ratingSentiment || []).map((item) => item.negative)
+      data: (dashboard.value?.ratingSentiment || []).map((item) => ({
+        value: item.negative,
+        ratingStar: item.ratingStar,
+        sentiment: "negative"
+      }))
     }
   ]
 }));
@@ -803,7 +923,8 @@ const sentimentOption = computed<EChartsOption>(() => ({
       ...(getPieItem(["46%", "74%"]) as Record<string, unknown>),
       data: (dashboard.value?.sentimentDistribution || []).map((item) => ({
         name: sentimentText(item.sentiment),
-        value: item.count
+        value: item.count,
+        sentiment: item.sentiment
       }))
     }
   ]
@@ -854,7 +975,10 @@ const intentOption = computed<EChartsOption>(() => ({
       type: "bar",
       barWidth: 34,
       itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.primary[0], CHART_COLORS.positive[0]) },
-      data: (dashboard.value?.intentDistribution || []).map((item) => item.count)
+      data: (dashboard.value?.intentDistribution || []).map((item) => ({
+        value: item.count,
+        intent: item.label
+      }))
     }
   ]
 }));
@@ -895,7 +1019,10 @@ const issueOption = computed<EChartsOption>(() => ({
       type: "bar",
       barWidth: 36,
       itemStyle: { borderRadius: [6, 6, 0, 0], color: getBarGradient(CHART_COLORS.negative[0], CHART_COLORS.accent[0]) },
-      data: (dashboard.value?.issues || []).map((item) => item.count)
+      data: (dashboard.value?.issues || []).map((item) => ({
+        value: item.count,
+        issueName: item.issueName
+      }))
     }
   ]
 }));

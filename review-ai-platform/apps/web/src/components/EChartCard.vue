@@ -1,5 +1,5 @@
 <template>
-  <div class="chart-card" @mouseenter="hovering = true" @mouseleave="hovering = false">
+  <div class="chart-card" :class="{ 'chart-card-clickable': clickable }" @mouseenter="hovering = true" @mouseleave="hovering = false">
     <div class="chart-header">
       <div class="chart-title">{{ title }}</div>
       <div class="chart-accent" :style="{ opacity: hovering ? 1 : 0.6 }" />
@@ -26,11 +26,20 @@ const props = defineProps<{
   title: string;
   option: EChartsOption;
   height?: string;
+  clickable?: boolean;
+}>();
+
+const emit = defineEmits<{
+  chartClick: [params: unknown];
 }>();
 
 const container = ref<HTMLDivElement | null>(null);
 const hovering = ref(false);
 let chart: EChartsType | null = null;
+
+function handleChartClick(params: unknown) {
+  emit("chartClick", params);
+}
 
 function render() {
   if (!container.value) {
@@ -39,6 +48,8 @@ function render() {
 
   const currentChart = chart ?? echarts.init(container.value);
   chart = currentChart;
+  currentChart.off("click", handleChartClick);
+  currentChart.on("click", handleChartClick);
   currentChart.setOption(props.option, true);
   currentChart.resize();
 }
@@ -68,6 +79,10 @@ onBeforeUnmount(() => {
 .chart-card:hover {
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
   border-color: #93c5fd;
+}
+
+.chart-card-clickable .chart-container {
+  cursor: pointer;
 }
 
 .chart-header {
