@@ -337,7 +337,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { message } from "ant-design-vue";
 import type { EChartsOption } from "echarts";
-import * as echarts from "echarts";
+import * as echarts from "echarts/lib/echarts";
 import {
   CheckSquareOutlined,
   CheckCircleOutlined,

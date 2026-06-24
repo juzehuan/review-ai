@@ -10,30 +10,37 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
-import * as echarts from "echarts";
+import type { EChartsOption } from "echarts";
+import type { EChartsType } from "echarts/core";
+import * as echarts from "echarts/lib/echarts";
+import "echarts/lib/chart/bar/install";
+import "echarts/lib/chart/gauge/install";
+import "echarts/lib/chart/pie/install";
+import "echarts/lib/component/grid/install";
+import "echarts/lib/component/legend/install";
+import "echarts/lib/component/tooltip/install";
+import "echarts/lib/renderer/installCanvasRenderer";
 import "echarts-wordcloud";
 
 const props = defineProps<{
   title: string;
-  option: echarts.EChartsOption;
+  option: EChartsOption;
   height?: string;
 }>();
 
 const container = ref<HTMLDivElement | null>(null);
 const hovering = ref(false);
-let chart: echarts.ECharts | null = null;
+let chart: EChartsType | null = null;
 
 function render() {
   if (!container.value) {
     return;
   }
 
-  if (!chart) {
-    chart = echarts.init(container.value);
-  }
-
-  chart.setOption(props.option, true);
-  chart.resize();
+  const currentChart = chart ?? echarts.init(container.value);
+  chart = currentChart;
+  currentChart.setOption(props.option, true);
+  currentChart.resize();
 }
 
 onMounted(render);

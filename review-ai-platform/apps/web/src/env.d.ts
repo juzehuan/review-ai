@@ -6,3 +6,6 @@ declare module "*.vue" {
   export default component;
 }
 
+declare module "echarts/lib/echarts" {
+  export * from "echarts/core";
+}

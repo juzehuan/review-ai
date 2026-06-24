@@ -19,5 +19,30 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  build: {
+    chunkSizeWarningLimit: 1100,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return undefined;
+          }
+          if (id.includes("echarts") || id.includes("zrender")) {
+            return "charts";
+          }
+          if (id.includes("@ant-design/icons-vue")) {
+            return "ui-icons";
+          }
+          if (id.includes("ant-design-vue")) {
+            return "ui";
+          }
+          if (id.includes("vue") || id.includes("vue-router") || id.includes("pinia")) {
+            return "vue-vendor";
+          }
+          return "vendor";
+        }
+      }
+    }
   }
 });

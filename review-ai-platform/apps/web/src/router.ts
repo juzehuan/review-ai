@@ -1,17 +1,18 @@
 import { createRouter, createWebHistory } from "vue-router";
-import DashboardPage from "./pages/DashboardPage.vue";
-import WorkspaceOverviewPage from "./pages/WorkspaceOverviewPage.vue";
-import ReviewsPage from "./pages/ReviewsPage.vue";
-import AnalysisRunsPage from "./pages/AnalysisRunsPage.vue";
-import CrawlJobsPage from "./pages/CrawlJobsPage.vue";
-import GrowthOpsPage from "./pages/GrowthOpsPage.vue";
-import ActionItemsPage from "./pages/ActionItemsPage.vue";
-import AdminPage from "./pages/AdminPage.vue";
-import LoginPage from "./pages/LoginPage.vue";
-import RegisterPage from "./pages/RegisterPage.vue";
-import SharedReportPage from "./pages/SharedReportPage.vue";
-import WorkspaceSettingsPage from "./pages/WorkspaceSettingsPage.vue";
 import { getAuthToken } from "./api";
+
+const DashboardPage = () => import("./pages/DashboardPage.vue");
+const WorkspaceOverviewPage = () => import("./pages/WorkspaceOverviewPage.vue");
+const ReviewsPage = () => import("./pages/ReviewsPage.vue");
+const AnalysisRunsPage = () => import("./pages/AnalysisRunsPage.vue");
+const CrawlJobsPage = () => import("./pages/CrawlJobsPage.vue");
+const GrowthOpsPage = () => import("./pages/GrowthOpsPage.vue");
+const ActionItemsPage = () => import("./pages/ActionItemsPage.vue");
+const AdminPage = () => import("./pages/AdminPage.vue");
+const LoginPage = () => import("./pages/LoginPage.vue");
+const RegisterPage = () => import("./pages/RegisterPage.vue");
+const SharedReportPage = () => import("./pages/SharedReportPage.vue");
+const WorkspaceSettingsPage = () => import("./pages/WorkspaceSettingsPage.vue");
 
 export const router = createRouter({
   history: createWebHistory(),
