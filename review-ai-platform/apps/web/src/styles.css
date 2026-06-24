@@ -664,6 +664,7 @@ select {
 .ai-summary-card,
 .quality-alerts-panel,
 .dynamic-tags-panel,
+.duplicate-noise-panel,
 .insight-clusters-panel,
 .product-insights-panel,
 .evidence-panel,
@@ -718,6 +719,73 @@ select {
 }
 
 .dynamic-tag-card .ant-btn-link {
+  justify-self: start;
+  height: auto;
+  padding: 0;
+}
+
+.duplicate-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.duplicate-summary-strip > div {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.duplicate-summary-strip strong {
+  color: #111827;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.duplicate-summary-strip span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.duplicate-group-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.duplicate-group-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.duplicate-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.duplicate-group-card p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #374151;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.duplicate-group-card .ant-btn-link {
   justify-self: start;
   height: auto;
   padding: 0;
@@ -1417,6 +1485,8 @@ select {
   .group-list,
   .product-insights-grid,
   .dynamic-tag-grid,
+  .duplicate-summary-strip,
+  .duplicate-group-grid,
   .insight-cluster-grid,
   .evidence-grid,
   .nps-layout {

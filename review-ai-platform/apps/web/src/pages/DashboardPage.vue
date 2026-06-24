@@ -223,7 +223,40 @@
           </div>
           <div class="dynamic-tag-title">{{ tag.label }}</div>
           <div class="dynamic-tag-meta">{{ sentimentText(tag.sentiment) }}为主 · {{ tag.sampleReviewIds.length }} 条证据</div>
-          <a-button size="small" type="link" @click="openClusterEvidence(tag.sampleReviewIds)">查看证据</a-button>
+          <a-button size="small" type="link" @click="openDynamicTagEvidence(tag)">查看证据</a-button>
+        </article>
+      </div>
+    </section>
+
+    <section v-if="dashboard?.duplicateProfile?.duplicateCommentCount" class="duplicate-noise-panel">
+      <div class="settings-section-head">
+        <div>
+          <div class="panel-label">Noise Control</div>
+          <div class="settings-section-title">重复/相似评论聚合</div>
+        </div>
+      </div>
+      <div class="duplicate-summary-strip">
+        <div>
+          <strong>{{ dashboard.duplicateProfile.duplicateRate }}%</strong>
+          <span>重复评论占比</span>
+        </div>
+        <div>
+          <strong>{{ dashboard.duplicateProfile.duplicateGroupCount }}</strong>
+          <span>重复评论簇</span>
+        </div>
+        <div>
+          <strong>{{ dashboard.duplicateProfile.largestGroupPercent }}%</strong>
+          <span>最大重复簇占比</span>
+        </div>
+      </div>
+      <div class="duplicate-group-grid">
+        <article v-for="group in dashboard.duplicateProfile.topGroups" :key="group.sampleText" class="duplicate-group-card">
+          <div class="duplicate-group-head">
+            <a-tag :color="sentimentColor(group.sentiment)">{{ sentimentText(group.sentiment) }}</a-tag>
+            <span>{{ group.count }} 条 · {{ group.percent }}%</span>
+          </div>
+          <p>{{ truncate(group.sampleText, 120) }}</p>
+          <a-button size="small" type="link" @click="openEvidenceReviews(group.sampleReviewIds, '重复评论', 'duplicate')">查看证据</a-button>
         </article>
       </div>
     </section>
@@ -438,6 +471,16 @@ function sentimentText(sentiment: Sentiment) {
     return "负向";
   }
   return "中性";
+}
+
+function sentimentColor(sentiment: Sentiment) {
+  if (sentiment === "positive") {
+    return "green";
+  }
+  if (sentiment === "negative") {
+    return "red";
+  }
+  return "blue";
 }
 
 function qualityAlertType(level: DashboardDTO["qualityAlerts"][number]["level"]) {
@@ -666,12 +709,14 @@ function openIssueEvidence(issueName: string) {
     path: `/tasks/${selectedTask.value.id}/reviews`,
     query: {
       issue: issueName,
+      evidenceLabel: issueName,
+      evidenceType: "issue",
       ...(dashboard.value?.runId ? { runId: dashboard.value.runId } : {})
     }
   });
 }
 
-function openClusterEvidence(reviewIds: string[]) {
+function openEvidenceReviews(reviewIds: string[], label: string, type: string) {
   if (!selectedTask.value || !reviewIds.length) {
     return;
   }
@@ -679,9 +724,19 @@ function openClusterEvidence(reviewIds: string[]) {
     path: `/tasks/${selectedTask.value.id}/reviews`,
     query: {
       reviewIds: reviewIds.join(","),
+      evidenceLabel: label,
+      evidenceType: type,
       ...(dashboard.value?.runId ? { runId: dashboard.value.runId } : {})
     }
   });
+}
+
+function openClusterEvidence(reviewIds: string[]) {
+  openEvidenceReviews(reviewIds, "观点聚类", "cluster");
+}
+
+function openDynamicTagEvidence(tag: DashboardDTO["dynamicContentTags"][number]) {
+  openEvidenceReviews(tag.sampleReviewIds, tag.label, "dynamic-tag");
 }
 
 function startPolling() {

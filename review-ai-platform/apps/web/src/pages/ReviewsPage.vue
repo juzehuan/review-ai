@@ -362,6 +362,8 @@ const allRuns = ref<AnalysisRunDTO[]>([]);
 const latestRun = ref<AnalysisRunDTO | null>(null);
 const selectedResultRunId = ref<string | undefined>();
 const evidenceIssue = ref("");
+const evidenceLabel = ref("");
+const evidenceType = ref("");
 const evidenceReviewIds = ref<string[]>([]);
 const actionItems = ref<ReviewActionItemDTO[]>([]);
 const selectedRow = ref<ReviewRowDTO | null>(null);
@@ -422,7 +424,8 @@ const mediaCount = computed(() => rows.value.filter((item) => item.hasMedia).len
 const negativeCount = computed(() => rows.value.filter((item) => item.sentiment === "negative").length);
 const visibleColumns = computed(() => allColumns.filter((column) => visibleColumnKeys.value.includes(column.key)));
 const activeFilterCount = computed(() =>
-  [filters.ratingStar, filters.sentiment, filters.intent, filters.hasMedia, filters.keyword.trim()].filter((value) => value !== undefined && value !== "").length
+  [filters.ratingStar, filters.sentiment, filters.intent, filters.hasMedia, filters.keyword.trim()].filter((value) => value !== undefined && value !== "").length +
+  (evidenceIssue.value || evidenceReviewIds.value.length ? 1 : 0)
 );
 const canCancelRun = computed(() => Boolean(latestRun.value && ["queued", "running"].includes(latestRun.value.status)));
 const resultRuns = computed(() => allRuns.value.filter((run) => ["completed", "partial_failed"].includes(run.status)));
@@ -443,9 +446,10 @@ const progressStatus = computed(() => {
 });
 const evidenceAlertMessage = computed(() => {
   if (evidenceReviewIds.value.length) {
-    return `正在查看行动项关联的 ${evidenceReviewIds.value.length} 条评论证据`;
+    const label = evidenceLabel.value || evidenceTypeLabel(evidenceType.value);
+    return `正在查看${label ? `「${label}」` : ""}关联的 ${evidenceReviewIds.value.length} 条评论证据`;
   }
-  return `正在查看「${evidenceIssue.value}」相关评论证据`;
+  return `正在查看「${evidenceLabel.value || evidenceIssue.value}」相关评论证据`;
 });
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -671,6 +675,22 @@ function sentimentColor(value: Sentiment | null) {
   return "default";
 }
 
+function evidenceTypeLabel(type: string) {
+  if (type === "dynamic-tag") {
+    return "动态标签";
+  }
+  if (type === "duplicate") {
+    return "重复评论";
+  }
+  if (type === "cluster") {
+    return "观点聚类";
+  }
+  if (type === "issue") {
+    return "问题证据";
+  }
+  return "证据";
+}
+
 function runStatusLabel(status?: string | null) {
   if (status === "running") {
     return "分析中";
@@ -876,15 +896,24 @@ function resetFilters() {
   filters.intent = undefined;
   filters.hasMedia = undefined;
   filters.keyword = "";
+  evidenceIssue.value = "";
+  evidenceLabel.value = "";
+  evidenceType.value = "";
+  evidenceReviewIds.value = [];
   sortState.sortBy = "commentTime";
   sortState.sortOrder = "desc";
   pagination.current = 1;
   clearActiveView();
+  if (selectedTask.value) {
+    router.replace(`/tasks/${selectedTask.value.id}/reviews`);
+  }
   loadReviews();
 }
 
 function clearEvidenceFilter() {
   evidenceIssue.value = "";
+  evidenceLabel.value = "";
+  evidenceType.value = "";
   evidenceReviewIds.value = [];
   if (selectedTask.value) {
     router.replace(`/tasks/${selectedTask.value.id}/reviews`);
@@ -931,9 +960,11 @@ watch(
 );
 
 watch(
-  () => [route.query.issue, route.query.runId, route.query.reviewIds],
-  ([issue, runId, reviewIds]) => {
+  () => [route.query.issue, route.query.runId, route.query.reviewIds, route.query.evidenceLabel, route.query.evidenceType],
+  ([issue, runId, reviewIds, nextEvidenceLabel, nextEvidenceType]) => {
     evidenceIssue.value = typeof issue === "string" ? issue : "";
+    evidenceLabel.value = typeof nextEvidenceLabel === "string" ? nextEvidenceLabel : "";
+    evidenceType.value = typeof nextEvidenceType === "string" ? nextEvidenceType : "";
     evidenceReviewIds.value =
       typeof reviewIds === "string"
         ? reviewIds

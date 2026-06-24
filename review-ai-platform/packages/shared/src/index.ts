@@ -650,6 +650,7 @@ export interface DashboardDTO {
   qualityAlerts: DashboardQualityAlertDTO[];
   contentProfile: ContentProfileDTO;
   dynamicContentTags: DynamicContentTagDTO[];
+  duplicateProfile: DuplicateCommentProfileDTO;
   wordCloud: WordCloudItemDTO[];
   issues: IssueStatDTO[];
   representativeReviews: { positive: RepresentativeReview[]; negative: RepresentativeReview[] };
@@ -799,6 +800,22 @@ export interface DynamicContentTagDTO {
   percent: number;
   sentiment: Sentiment;
   sampleReviewIds: string[];
+}
+
+export interface DuplicateCommentGroupDTO {
+  sampleText: string;
+  count: number;
+  percent: number;
+  sentiment: Sentiment;
+  sampleReviewIds: string[];
+}
+
+export interface DuplicateCommentProfileDTO {
+  duplicateGroupCount: number;
+  duplicateCommentCount: number;
+  duplicateRate: number;
+  largestGroupPercent: number;
+  topGroups: DuplicateCommentGroupDTO[];
 }
 
 export interface ContentProfileDTO {
@@ -1031,6 +1048,83 @@ function isLowValueComment(item: DashboardReviewLike, analysisType: AnalysisType
     !item.keywords.some((word) => word.length > 3);
 
   return hasMostlyEmojiOrPunctuation || repeatedShortText || genericShort || linkOrSubscribeSpam || tooShortWithoutSignal || (asciiWords.length <= 1 && compact.length <= 3);
+}
+
+function normalizeDuplicateText(item: DashboardReviewLike) {
+  return (item.review.commentTr || item.review.comment || "")
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/[@#＃＠][\p{L}\p{N}_-]+/gu, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function duplicateFingerprint(text: string) {
+  const compact = text.replace(/\s+/g, "");
+  if (compact.length < 8) {
+    return "";
+  }
+  if (compact.length <= 80) {
+    return compact;
+  }
+  const tokens = text
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !/^\d+$/.test(token));
+  const tokenFingerprint = [...new Set(tokens)].sort().slice(0, 18).join("|");
+  if (tokenFingerprint.length >= 20) {
+    return tokenFingerprint;
+  }
+  return compact.slice(0, 120);
+}
+
+function buildDuplicateCommentProfile(analyses: DashboardReviewLike[], totalBase = analyses.length) {
+  const groups = new Map<string, DashboardReviewLike[]>();
+  for (const analysis of analyses) {
+    const text = normalizeDuplicateText(analysis);
+    const fingerprint = duplicateFingerprint(text);
+    if (!fingerprint) {
+      continue;
+    }
+    const group = groups.get(fingerprint) || [];
+    group.push(analysis);
+    groups.set(fingerprint, group);
+  }
+
+  const duplicateReviewIds = new Set<string>();
+  const duplicateGroups = [...groups.values()]
+    .filter((group) => group.length > 1)
+    .sort((a, b) => b.length - a.length);
+  for (const group of duplicateGroups) {
+    for (const duplicate of group.slice(1)) {
+      duplicateReviewIds.add(duplicate.reviewId);
+    }
+  }
+
+  const topGroups = duplicateGroups.slice(0, 6).map((group) => {
+    const representative = group
+      .slice()
+      .sort((a, b) => (b.review.commentTr || b.review.comment).length - (a.review.commentTr || a.review.comment).length)[0];
+    return {
+      sampleText: (representative.review.commentTr || representative.review.comment).slice(0, 140),
+      count: group.length,
+      percent: totalBase ? round((group.length / totalBase) * 100) : 0,
+      sentiment: dominantSentiment(group),
+      sampleReviewIds: group.slice(0, 5).map((item) => item.reviewId)
+    } satisfies DuplicateCommentGroupDTO;
+  });
+  const duplicateCommentCount = duplicateGroups.reduce((sum, group) => sum + Math.max(group.length - 1, 0), 0);
+  return {
+    duplicateReviewIds,
+    profile: {
+      duplicateGroupCount: duplicateGroups.length,
+      duplicateCommentCount,
+      duplicateRate: totalBase ? round((duplicateCommentCount / totalBase) * 100) : 0,
+      largestGroupPercent: topGroups[0]?.percent || 0,
+      topGroups
+    } satisfies DuplicateCommentProfileDTO
+  };
 }
 
 function categoryHitScore(text: string, words: string[]) {
@@ -1422,8 +1516,9 @@ function buildQualityAlerts(params: {
   intentMap: Map<string, number>;
   contentProfile: ContentProfileDTO;
   dynamicContentTags: DynamicContentTagDTO[];
+  duplicateProfile: DuplicateCommentProfileDTO;
 }): DashboardQualityAlertDTO[] {
-  const { analyses, analysisType, positiveCount, neutralCount, negativeCount, nps, keywordMap, topicMap, intentMap, contentProfile, dynamicContentTags } = params;
+  const { analyses, analysisType, positiveCount, neutralCount, negativeCount, nps, keywordMap, topicMap, intentMap, contentProfile, dynamicContentTags, duplicateProfile } = params;
   const total = analyses.length;
   if (!total) {
     return [];
@@ -1475,6 +1570,16 @@ function buildQualityAlerts(params: {
       title: "正向信号缺失",
       detail: "本次没有识别到正向评论，但样本中存在互动、求后续或补充信息等非负向信号。",
       recommendation: "建议检查情绪提示词和模型输出，避免把非批评性评论统一判为负向。"
+    });
+  }
+
+  if (total >= 50 && duplicateProfile.duplicateRate >= 25) {
+    alerts.push({
+      id: "duplicate-comment-rate",
+      level: duplicateProfile.duplicateRate >= 45 ? "critical" : "warning",
+      title: "重复/相似评论占比较高",
+      detail: `${duplicateProfile.duplicateRate}% 的评论疑似为重复或高度相似内容，最大重复簇占 ${duplicateProfile.largestGroupPercent}%。`,
+      recommendation: "建议优先查看去重后的动态标签和观点聚类，避免刷屏内容放大单一声音。"
     });
   }
 
@@ -1605,7 +1710,10 @@ function buildQualityAlerts(params: {
 export function buildDashboardSnapshot(taskId: string, analyses: DashboardReviewLike[], analysisType: AnalysisType = "product"): DashboardDTO {
   const total = analyses.length;
   const lowValueReviewIds = new Set(analyses.filter((item) => isLowValueComment(item, analysisType)).map((item) => item.reviewId));
-  const valuableAnalyses = analyses.filter((item) => !lowValueReviewIds.has(item.reviewId));
+  const duplicateCommentResult = buildDuplicateCommentProfile(analyses, total);
+  const duplicateReviewIds = duplicateCommentResult.duplicateReviewIds;
+  const duplicateProfile = duplicateCommentResult.profile;
+  const valuableAnalyses = analyses.filter((item) => !lowValueReviewIds.has(item.reviewId) && !duplicateReviewIds.has(item.reviewId));
   const analysesForInsights = valuableAnalyses.length ? valuableAnalyses : analyses;
   const ratedAnalyses = analyses.filter((item) => item.review.ratingStar > 0);
   const ratingTotal = ratedAnalyses.length;
@@ -1701,7 +1809,7 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
       addCount(topicMap, topic);
     }
 
-    if (!lowValueReviewIds.has(analysis.reviewId)) {
+    if (!lowValueReviewIds.has(analysis.reviewId) && !duplicateReviewIds.has(analysis.reviewId)) {
       const wordCandidates = analysisType === "product" ? [...analysis.topicLabels, ...analysis.keywords] : analysis.keywords;
       for (const word of wordCandidates) {
         const trimmed = normalizeDashboardKeyword(word, analysisType);
@@ -1776,7 +1884,8 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
     topicMap,
     intentMap,
     contentProfile,
-    dynamicContentTags
+    dynamicContentTags,
+    duplicateProfile
   });
   const userProfile: UserProfileDTO = {
     mediaRate: total ? round((withMedia / total) * 100) : 0,
@@ -1827,6 +1936,7 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
     qualityAlerts,
     contentProfile,
     dynamicContentTags,
+    duplicateProfile,
     wordCloud: [...keywordMap.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 50)

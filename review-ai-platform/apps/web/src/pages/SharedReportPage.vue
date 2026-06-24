@@ -104,6 +104,38 @@
         </div>
       </section>
 
+      <section v-if="report.dashboard.duplicateProfile?.duplicateCommentCount" class="duplicate-noise-panel">
+        <div class="settings-section-head">
+          <div>
+            <div class="panel-label">Noise Control</div>
+            <div class="settings-section-title">重复/相似评论聚合</div>
+          </div>
+        </div>
+        <div class="duplicate-summary-strip">
+          <div>
+            <strong>{{ report.dashboard.duplicateProfile.duplicateRate }}%</strong>
+            <span>重复评论占比</span>
+          </div>
+          <div>
+            <strong>{{ report.dashboard.duplicateProfile.duplicateGroupCount }}</strong>
+            <span>重复评论簇</span>
+          </div>
+          <div>
+            <strong>{{ report.dashboard.duplicateProfile.largestGroupPercent }}%</strong>
+            <span>最大重复簇占比</span>
+          </div>
+        </div>
+        <div class="duplicate-group-grid">
+          <article v-for="group in report.dashboard.duplicateProfile.topGroups" :key="group.sampleText" class="duplicate-group-card">
+            <div class="duplicate-group-head">
+              <a-tag :color="sentimentColor(group.sentiment)">{{ sentimentText(group.sentiment) }}</a-tag>
+              <span>{{ group.count }} 条 · {{ group.percent }}%</span>
+            </div>
+            <p>{{ truncate(group.sampleText, 120) }}</p>
+          </article>
+        </div>
+      </section>
+
       <section v-if="report.dashboard.insightClusters?.length" class="insight-clusters-panel">
         <div class="settings-section-head">
           <div>
@@ -252,6 +284,16 @@ function sentimentText(sentiment: Sentiment) {
     return "负向";
   }
   return "中性";
+}
+
+function sentimentColor(sentiment: Sentiment) {
+  if (sentiment === "positive") {
+    return "green";
+  }
+  if (sentiment === "negative") {
+    return "red";
+  }
+  return "blue";
 }
 
 function qualityAlertType(level: SharedReportDTO["dashboard"]["qualityAlerts"][number]["level"]) {

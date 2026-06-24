@@ -33,6 +33,11 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const issue = searchParams.get("issue");
   const intent = searchParams.get("intent");
   const tag = searchParams.get("tag");
+  const reviewIds = searchParams
+    .get("reviewIds")
+    ?.split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
   const needsAttention = searchParams.get("needsAttention");
   const ratingStar = Number(searchParams.get("ratingStar") || 0);
   const keyword = searchParams.get("keyword");
@@ -58,6 +63,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const reviews = await prisma.review.findMany({
     where: {
       taskId,
+      ...(reviewIds?.length ? { id: { in: reviewIds } } : {}),
       ...(ratingStar ? { ratingStar } : {}),
       ...(variant ? { modelName: variant } : {}),
       ...(hasMedia !== null && hasMedia !== "" ? { hasMedia: hasMedia === "true" } : {}),

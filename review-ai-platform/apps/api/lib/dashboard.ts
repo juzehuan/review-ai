@@ -68,6 +68,13 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
         lowValueCommentRate: 0
       },
       dynamicContentTags: [],
+      duplicateProfile: {
+        duplicateGroupCount: 0,
+        duplicateCommentCount: 0,
+        duplicateRate: 0,
+        largestGroupPercent: 0,
+        topGroups: []
+      },
       wordCloud: [],
       issues: [],
       representativeReviews: { positive: [], negative: [] },
@@ -103,6 +110,13 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
         lowValueCommentRate: 0
       },
       dynamicContentTags: [],
+      duplicateProfile: {
+        duplicateGroupCount: 0,
+        duplicateCommentCount: 0,
+        duplicateRate: 0,
+        largestGroupPercent: 0,
+        topGroups: []
+      },
       ...snapshot
     } as DashboardDTO;
   }
