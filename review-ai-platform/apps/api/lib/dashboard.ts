@@ -67,6 +67,7 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
         lowValueCommentCount: 0,
         lowValueCommentRate: 0
       },
+      dynamicContentTags: [],
       wordCloud: [],
       issues: [],
       representativeReviews: { positive: [], negative: [] },
@@ -101,6 +102,7 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
         lowValueCommentCount: 0,
         lowValueCommentRate: 0
       },
+      dynamicContentTags: [],
       ...snapshot
     } as DashboardDTO;
   }

@@ -85,6 +85,25 @@
         <EChartCard title="用户声音词云" :option="wordCloudOption" />
       </div>
 
+      <section v-if="report.dashboard.dynamicContentTags?.length" class="dynamic-tags-panel">
+        <div class="settings-section-head">
+          <div>
+            <div class="panel-label">Dynamic Topics</div>
+            <div class="settings-section-title">动态内容标签</div>
+          </div>
+        </div>
+        <div class="dynamic-tag-grid">
+          <article v-for="tag in report.dashboard.dynamicContentTags.slice(0, 12)" :key="tag.label" class="dynamic-tag-card">
+            <div class="dynamic-tag-head">
+              <a-tag :color="dynamicTagColor(tag.kind)">{{ dynamicTagKindText(tag.kind) }}</a-tag>
+              <span>{{ tag.count }} 条 · {{ tag.percent }}%</span>
+            </div>
+            <div class="dynamic-tag-title">{{ tag.label }}</div>
+            <div class="dynamic-tag-meta">{{ sentimentText(tag.sentiment) }}为主 · {{ tag.sampleReviewIds.length }} 条证据</div>
+          </article>
+        </div>
+      </section>
+
       <section v-if="report.dashboard.insightClusters?.length" class="insight-clusters-panel">
         <div class="settings-section-head">
           <div>
@@ -243,6 +262,30 @@ function qualityAlertType(level: SharedReportDTO["dashboard"]["qualityAlerts"][n
     return "warning";
   }
   return "info";
+}
+
+function dynamicTagKindText(kind: SharedReportDTO["dashboard"]["dynamicContentTags"][number]["kind"]) {
+  const labels: Record<SharedReportDTO["dashboard"]["dynamicContentTags"][number]["kind"], string> = {
+    topic: "话题",
+    entity: "实体",
+    stance: "立场",
+    question: "提问",
+    meme: "玩梗",
+    risk: "风险"
+  };
+  return labels[kind] || "话题";
+}
+
+function dynamicTagColor(kind: SharedReportDTO["dashboard"]["dynamicContentTags"][number]["kind"]) {
+  const colors: Record<SharedReportDTO["dashboard"]["dynamicContentTags"][number]["kind"], string> = {
+    topic: "blue",
+    entity: "purple",
+    stance: "green",
+    question: "cyan",
+    meme: "gold",
+    risk: "red"
+  };
+  return colors[kind] || "blue";
 }
 
 function truncate(value: string, max: number) {

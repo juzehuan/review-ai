@@ -649,6 +649,7 @@ export interface DashboardDTO {
   insightClusters: InsightClusterDTO[];
   qualityAlerts: DashboardQualityAlertDTO[];
   contentProfile: ContentProfileDTO;
+  dynamicContentTags: DynamicContentTagDTO[];
   wordCloud: WordCloudItemDTO[];
   issues: IssueStatDTO[];
   representativeReviews: { positive: RepresentativeReview[]; negative: RepresentativeReview[] };
@@ -787,6 +788,17 @@ export interface DashboardQualityAlertDTO {
   title: string;
   detail: string;
   recommendation: string;
+}
+
+export type DynamicContentTagKind = "topic" | "entity" | "stance" | "question" | "meme" | "risk";
+
+export interface DynamicContentTagDTO {
+  label: string;
+  kind: DynamicContentTagKind;
+  count: number;
+  percent: number;
+  sentiment: Sentiment;
+  sampleReviewIds: string[];
 }
 
 export interface ContentProfileDTO {
@@ -1095,7 +1107,172 @@ function buildContentProfile(analyses: DashboardReviewLike[], analysisType: Anal
   };
 }
 
-function topEntries(map: Map<string, number>, limit: number) {
+function normalizeDynamicTagLabel(label: string, analysisType: AnalysisType) {
+  const trimmed = label
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/[“”"‘’']/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[,，.。:：;；!！?？、\s]+|[,，.。:：;；!！?？、\s]+$/g, "")
+    .trim();
+  if (!trimmed) {
+    return "";
+  }
+  const genericNoise = new Set([
+    "评论",
+    "用户",
+    "用户声音",
+    "视频",
+    "视频评论",
+    "观众反馈",
+    "内容",
+    "观点",
+    "社媒评论",
+    "舆情反馈",
+    "商品",
+    "产品",
+    "质量",
+    "售后",
+    "物流",
+    "包装",
+    "价格",
+    "客服",
+    "good",
+    "great",
+    "nice",
+    "thanks",
+    "thank",
+    "video",
+    "comment",
+    "people",
+    "thing",
+    "really",
+    "just"
+  ]);
+  const taxonomy = new Set(getAnalysisPromptProfile(analysisType).taxonomy);
+  const compact = trimmed.replace(/\s+/g, "");
+  const lower = trimmed.toLowerCase();
+  if (genericNoise.has(compact) || genericNoise.has(lower) || taxonomy.has(trimmed)) {
+    return "";
+  }
+  if (compact.length < 2 || compact.length > 36 || /^\d+$/.test(compact)) {
+    return "";
+  }
+  if (/^[#＃@＠]?$/.test(compact)) {
+    return "";
+  }
+  return trimmed;
+}
+
+function extractDynamicTextTags(item: DashboardReviewLike) {
+  const text = `${item.review.commentTr || ""}\n${item.review.comment || ""}`;
+  const tags: string[] = [];
+  for (const match of text.matchAll(/[#＃][\p{L}\p{N}_-]{2,40}/gu)) {
+    tags.push(match[0]);
+  }
+  for (const match of text.matchAll(/[@＠][\p{L}\p{N}_-]{2,40}/gu)) {
+    tags.push(match[0]);
+  }
+  for (const match of text.matchAll(/[《「『“"]([^《》「」『』“”"]{2,24})[》」』”"]/gu)) {
+    tags.push(match[1]);
+  }
+  return tags;
+}
+
+function inferDynamicTagKind(label: string, item: DashboardReviewLike, analysisType: AnalysisType): DynamicContentTagKind {
+  const intents = item.intentLabels || [];
+  const text = normalizeCommentText(item);
+  if (/^[#＃@＠]/.test(label)) {
+    return "entity";
+  }
+  if (intents.some((intent) => /玩梗|调侃|讽刺/.test(intent)) || /\b(lol|haha|meme)\b/i.test(text) || /哈哈|笑死|梗/.test(text)) {
+    return "meme";
+  }
+  if (intents.some((intent) => /提问|求解|核查|事实补充|中立观望/.test(intent)) || /[?？]|为什么|怎么|请问|来源|证据|资料/.test(text)) {
+    return "question";
+  }
+  if (analysisType !== "product" && (item.sentiment === "negative" || intents.some((intent) => /质疑|反驳|纠错|风险|反对|批评|澄清/.test(intent)))) {
+    return "risk";
+  }
+  if (analysisType !== "product" && (item.sentiment === "positive" || intents.some((intent) => /赞同|夸奖|支持|扩散/.test(intent)))) {
+    return "stance";
+  }
+  return /^[A-Z][A-Za-z0-9_-]{2,}/.test(label) ? "entity" : "topic";
+}
+
+function buildDynamicContentTags(analyses: DashboardReviewLike[], analysisType: AnalysisType, totalBase = analyses.length): DynamicContentTagDTO[] {
+  const tags = new Map<
+    string,
+    {
+      label: string;
+      count: number;
+      samples: string[];
+      kindMap: Map<DynamicContentTagKind, number>;
+      sentimentMap: Map<Sentiment, number>;
+    }
+  >();
+
+  for (const analysis of analyses) {
+    const candidates: string[] = Array.from(new Set([...analysis.keywords, ...extractDynamicTextTags(analysis)]))
+      .map((label) => normalizeDynamicTagLabel(label, analysisType))
+      .filter((label): label is string => Boolean(label))
+      .slice(0, 8);
+    const seenInReview = new Set<string>();
+    for (const label of candidates) {
+      const key = label.toLowerCase();
+      if (seenInReview.has(key)) {
+        continue;
+      }
+      seenInReview.add(key);
+      const kind = inferDynamicTagKind(label, analysis, analysisType);
+      const entry =
+        tags.get(key) ||
+        ({
+          label,
+          count: 0,
+          samples: [],
+          kindMap: new Map<DynamicContentTagKind, number>(),
+          sentimentMap: new Map<Sentiment, number>()
+        } satisfies {
+          label: string;
+          count: number;
+          samples: string[];
+          kindMap: Map<DynamicContentTagKind, number>;
+          sentimentMap: Map<Sentiment, number>;
+        });
+      entry.count += 1;
+      if (entry.samples.length < 5) {
+        entry.samples.push(analysis.reviewId);
+      }
+      entry.kindMap.set(kind, (entry.kindMap.get(kind) || 0) + 1);
+      entry.sentimentMap.set(analysis.sentiment, (entry.sentimentMap.get(analysis.sentiment) || 0) + 1);
+      tags.set(key, entry);
+    }
+  }
+
+  const minCount = totalBase >= 100 ? 3 : totalBase >= 30 ? 2 : 1;
+  const mapped = [...tags.values()]
+    .filter((entry) => entry.count >= minCount)
+    .map((entry) => ({
+      label: entry.label,
+      kind: topEntries(entry.kindMap, 1)[0]?.[0] || "topic",
+      count: entry.count,
+      percent: totalBase ? round((entry.count / totalBase) * 100) : 0,
+      sentiment: topEntries(entry.sentimentMap, 1)[0]?.[0] || "neutral",
+      sampleReviewIds: entry.samples
+    }))
+    .sort((a, b) => b.count - a.count || b.percent - a.percent);
+
+  return (mapped.length ? mapped : [...tags.values()].map((entry) => ({
+    label: entry.label,
+    kind: topEntries(entry.kindMap, 1)[0]?.[0] || "topic",
+    count: entry.count,
+    percent: totalBase ? round((entry.count / totalBase) * 100) : 0,
+    sentiment: topEntries(entry.sentimentMap, 1)[0]?.[0] || "neutral",
+    sampleReviewIds: entry.samples
+  }))).slice(0, 18);
+}
+
+function topEntries<T extends string>(map: Map<T, number>, limit: number) {
   return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
 }
 
@@ -1244,8 +1421,9 @@ function buildQualityAlerts(params: {
   topicMap: Map<string, number>;
   intentMap: Map<string, number>;
   contentProfile: ContentProfileDTO;
+  dynamicContentTags: DynamicContentTagDTO[];
 }): DashboardQualityAlertDTO[] {
-  const { analyses, analysisType, positiveCount, neutralCount, negativeCount, nps, keywordMap, topicMap, intentMap, contentProfile } = params;
+  const { analyses, analysisType, positiveCount, neutralCount, negativeCount, nps, keywordMap, topicMap, intentMap, contentProfile, dynamicContentTags } = params;
   const total = analyses.length;
   if (!total) {
     return [];
@@ -1262,6 +1440,16 @@ function buildQualityAlerts(params: {
   const dominantMoodPercent = total ? round((dominantMoodCount / total) * 100) : 0;
   const topTopic = topEntries(topicMap, 1)[0];
   const topIntent = topEntries(intentMap, 1)[0];
+  const topDynamicTag = dynamicContentTags[0];
+  const neutralSignalCount =
+    analysisType === "product"
+      ? 0
+      : analyses.filter((item) => {
+          const intents = item.intentLabels || [];
+          const text = normalizeCommentText(item);
+          return intents.some((intent) => /提问|求解|事实|补充|核查|玩梗|调侃|期待|后续|中立|观望/.test(intent)) || /[?？]|为什么|怎么|请问|来源|资料|链接|下期|哈哈|笑死/.test(text);
+        }).length;
+  const neutralSignalPercent = total ? round((neutralSignalCount / total) * 100) : 0;
   const commerceNoiseWords = ["质量", "售后", "物流", "包装", "价格", "客服", "发货", "快递", "退换", "保修"];
   const commerceNoiseCount =
     analysisType === "product"
@@ -1269,6 +1457,26 @@ function buildQualityAlerts(params: {
       : analyses.filter((item) =>
           [...item.topicLabels, ...item.keywords].some((word) => commerceNoiseWords.some((noise) => word.includes(noise)))
         ).length;
+
+  if (analysisType !== "product" && total >= 30 && negativePercent >= 70 && neutralSignalPercent >= 20) {
+    alerts.push({
+      id: "neutral-signal-negative-anomaly",
+      level: "critical",
+      title: "中性互动可能被误判负向",
+      detail: `${negativePercent}% 的评论为负向，同时 ${neutralSignalPercent}% 评论包含提问、事实补充、玩梗或求后续信号。`,
+      recommendation: "建议抽样复核负向评论，重点检查普通提问和互动评论是否被错误归入争议。"
+    });
+  }
+
+  if (analysisType !== "product" && total >= 30 && positiveCount === 0 && neutralSignalCount > 0) {
+    alerts.push({
+      id: "positive-signal-missing",
+      level: "warning",
+      title: "正向信号缺失",
+      detail: "本次没有识别到正向评论，但样本中存在互动、求后续或补充信息等非负向信号。",
+      recommendation: "建议检查情绪提示词和模型输出，避免把非批评性评论统一判为负向。"
+    });
+  }
 
   if (total >= 20 && negativePercent >= 85) {
     alerts.push({
@@ -1316,6 +1524,26 @@ function buildQualityAlerts(params: {
     }
   }
 
+  if (analysisType !== "product" && total >= 50 && dynamicContentTags.length < 3) {
+    alerts.push({
+      id: "dynamic-tag-diversity-low",
+      level: "warning",
+      title: "动态话题识别不足",
+      detail: `本次仅形成 ${dynamicContentTags.length} 个动态内容标签，可能无法覆盖人物、事件、梗或观点阵营。`,
+      recommendation: "建议抽查 AI keywords 输出，确认是否过度使用泛化词，必要时重跑分析。"
+    });
+  }
+
+  if (topDynamicTag && total >= 50 && topDynamicTag.percent >= 70) {
+    alerts.push({
+      id: "dynamic-tag-concentration",
+      level: "info",
+      title: "动态话题过度集中",
+      detail: `「${topDynamicTag.label}」覆盖 ${topDynamicTag.percent}% 的有效讨论，其他话题信号较弱。`,
+      recommendation: "建议结合采集范围确认评论区是否集中讨论单一事件，或是否存在刷屏。"
+    });
+  }
+
   if (total >= 50 && keywordMap.size < 5) {
     alerts.push({
       id: "keyword-diversity-low",
@@ -1339,10 +1567,10 @@ function buildQualityAlerts(params: {
   if (total >= 30 && contentProfile.categoryDistribution.length <= 1 && analysisType !== "product") {
     alerts.push({
       id: "category-diversity-low",
-      level: "info",
+      level: dynamicContentTags.length >= 6 ? "warning" : "info",
       title: "内容类别较单一",
-      detail: `本次评论主要集中在「${contentProfile.primaryCategory}」。`,
-      recommendation: "如果视频本身跨多个议题，建议检查评论采样是否覆盖完整讨论区。"
+      detail: `本次评论主要集中在「${contentProfile.primaryCategory}」${dynamicContentTags.length >= 6 ? `，但动态标签已识别到 ${dynamicContentTags.length} 个细分话题` : ""}。`,
+      recommendation: dynamicContentTags.length >= 6 ? "建议优先查看动态内容标签和观点聚类，固定类别可能偏粗。" : "如果视频本身跨多个议题，建议检查评论采样是否覆盖完整讨论区。"
     });
   }
 
@@ -1366,7 +1594,12 @@ function buildQualityAlerts(params: {
     });
   }
 
-  return alerts.slice(0, 5);
+  const levelPriority: Record<AlertLevel, number> = { critical: 0, warning: 1, info: 2 };
+  return alerts
+    .map((alert, index) => ({ alert, index }))
+    .sort((a, b) => levelPriority[a.alert.level] - levelPriority[b.alert.level] || a.index - b.index)
+    .slice(0, 8)
+    .map((item) => item.alert);
 }
 
 export function buildDashboardSnapshot(taskId: string, analyses: DashboardReviewLike[], analysisType: AnalysisType = "product"): DashboardDTO {
@@ -1531,6 +1764,7 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
   const needsAttentionCount = analyses.filter((item) => item.needsAttention).length;
   const contentProfile = buildContentProfile(analyses, analysisType, lowValueReviewIds);
   const insightClusters = buildInsightClusters(analysesForInsights, analysisType, total);
+  const dynamicContentTags = buildDynamicContentTags(analysesForInsights, analysisType, total);
   const qualityAlerts = buildQualityAlerts({
     analyses,
     analysisType,
@@ -1541,7 +1775,8 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
     keywordMap,
     topicMap,
     intentMap,
-    contentProfile
+    contentProfile,
+    dynamicContentTags
   });
   const userProfile: UserProfileDTO = {
     mediaRate: total ? round((withMedia / total) * 100) : 0,
@@ -1591,6 +1826,7 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
     insightClusters,
     qualityAlerts,
     contentProfile,
+    dynamicContentTags,
     wordCloud: [...keywordMap.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 50)
