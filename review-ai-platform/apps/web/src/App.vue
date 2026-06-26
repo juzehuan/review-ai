@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isPublicRoute" :class="appDeviceClass">
+  <div v-if="isPublicRoute" class="public-route-shell" :class="appDeviceClass">
     <router-view />
   </div>
 
