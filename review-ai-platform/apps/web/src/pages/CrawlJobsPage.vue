@@ -147,13 +147,24 @@
                 <template #icon><PlayCircleOutlined /></template>
                 立即运行
               </a-button>
-              <a-button v-if="record.taskId" size="small" @click="openTaskById(record.taskId)">
-                <template #icon><FileSearchOutlined /></template>
-                查看分析
-              </a-button>
-              <a-button size="small" danger @click="removeMonitor(record)">
-                删除
-              </a-button>
+              <a-dropdown>
+                <a-button size="small" @click.stop>
+                  <template #icon><MoreOutlined /></template>
+                  更多
+                </a-button>
+                <template #overlay>
+                  <a-menu class="crawl-action-menu" @click.stop>
+                    <a-menu-item key="task" :disabled="!record.taskId" @click="record.taskId && openTaskById(record.taskId)">
+                      <FileSearchOutlined />
+                      查看分析
+                    </a-menu-item>
+                    <a-menu-divider />
+                    <a-menu-item key="delete" danger @click="removeMonitor(record)">
+                      删除
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </a-space>
           </template>
         </template>
@@ -207,6 +218,18 @@
           <template v-else-if="column.key === 'actions'">
             <a-space class="crawl-actions">
               <a-button
+                v-if="canRetry(record)"
+                size="small"
+                type="primary"
+                ghost
+                :loading="retryingId === record.id"
+                @click="retryJob(record)"
+              >
+                <template #icon><ReloadOutlined /></template>
+                重试
+              </a-button>
+              <a-button
+                v-else
                 size="small"
                 type="primary"
                 :disabled="!canStart(record)"
@@ -216,19 +239,23 @@
                 <template #icon><PlayCircleOutlined /></template>
                 开始分析
               </a-button>
-              <a-button v-if="canRetry(record)" size="small" :loading="retryingId === record.id" @click="retryJob(record)">
-                <template #icon><ReloadOutlined /></template>
-                重试
-              </a-button>
               <a-button v-if="record.taskId" size="small" @click="openTask(record)">
                 <template #icon><FileSearchOutlined /></template>
                 查看分析
               </a-button>
-              <a-popconfirm title="确定删除这条采集记录？已生成的分析任务不会被删除。" @confirm="removeJob(record)">
-                <a-button size="small" danger :disabled="!canDeleteJob(record)" :loading="deletingJobId === record.id">
-                  删除
+              <a-dropdown>
+                <a-button size="small" @click.stop>
+                  <template #icon><MoreOutlined /></template>
+                  更多
                 </a-button>
-              </a-popconfirm>
+                <template #overlay>
+                  <a-menu class="crawl-action-menu" @click.stop>
+                    <a-menu-item key="delete" danger :disabled="!canDeleteJob(record)" @click="confirmRemoveJob(record)">
+                      {{ deletingJobId === record.id ? "删除中" : "删除" }}
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </a-space>
           </template>
           <template v-else-if="column.key === 'error'">
@@ -336,6 +363,7 @@ import {
   DownloadOutlined,
   ExclamationCircleOutlined,
   FileSearchOutlined,
+  MoreOutlined,
   PlayCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -459,7 +487,7 @@ const columns = [
   { title: "来源", key: "meta", width: 160 },
   { title: "时间", key: "time", width: 170 },
   { title: "错误", key: "error" },
-  { title: "操作", key: "actions", width: 340 }
+  { title: "操作", key: "actions", width: 260 }
 ];
 
 const monitorColumns = [
@@ -469,7 +497,7 @@ const monitorColumns = [
   { title: "来源", key: "meta", width: 150 },
   { title: "最近运行", key: "last", width: 190 },
   { title: "错误", key: "error" },
-  { title: "操作", key: "actions", width: 300 }
+  { title: "操作", key: "actions", width: 220 }
 ];
 
 const hasActiveJobs = computed(() => jobs.value.some((job) => ["queued", "running"].includes(job.status)));
@@ -673,6 +701,16 @@ async function removeJob(job: CrawlJobDTO) {
     await loadJobs();
   } finally {
     deletingJobId.value = null;
+  }
+}
+
+async function confirmRemoveJob(job: CrawlJobDTO) {
+  if (!canDeleteJob(job) || deletingJobId.value === job.id) {
+    return;
+  }
+  const confirmed = window.confirm("确定删除这条采集记录？已生成的分析任务不会被删除。");
+  if (confirmed) {
+    await removeJob(job);
   }
 }
 
@@ -942,6 +980,15 @@ onUnmounted(() => {
 
 .crawl-actions :deep(.ant-btn) {
   white-space: nowrap;
+}
+
+:global(.crawl-action-menu) {
+  min-width: 132px;
+}
+
+:global(.crawl-action-menu .ant-dropdown-menu-item) {
+  gap: 8px;
+  min-height: 36px;
 }
 
 .schedule-cell strong {
