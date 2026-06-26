@@ -10,6 +10,10 @@
           <template #icon><DownloadOutlined /></template>
           下载操作手册
         </a-button>
+        <a-button @click="router.push('/help')">
+          <template #icon><QuestionCircleOutlined /></template>
+          帮助中心
+        </a-button>
         <a-button @click="refreshTasks" :loading="loadingTasks">
           <template #icon><ReloadOutlined /></template>
           刷新
@@ -107,7 +111,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { DownloadOutlined, ReloadOutlined, UnorderedListOutlined } from "@ant-design/icons-vue";
+import { DownloadOutlined, QuestionCircleOutlined, ReloadOutlined, UnorderedListOutlined } from "@ant-design/icons-vue";
 import type { TaskListItem } from "@review-ai/shared";
 import { useTaskStore } from "@/composables";
 

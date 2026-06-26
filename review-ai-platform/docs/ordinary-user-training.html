@@ -340,6 +340,44 @@
         border-bottom: 0;
       }
 
+      .faq-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .faq-note {
+        margin: 0 0 16px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .text-link {
+        color: var(--blue);
+        font-weight: 900;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      .qa-item {
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+      }
+
+      .qa-item strong {
+        display: block;
+        color: var(--ink);
+        font-size: 16px;
+        line-height: 1.45;
+      }
+
+      .qa-item p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        line-height: 1.75;
+      }
+
       .checklist {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -435,7 +473,7 @@
           <p class="kicker">ReviewIQ Training</p>
           <h1>普通用户培训演示</h1>
           <p>
-            这份演示面向日常业务用户，围绕评论采集、持续监听、AI 分析、报告阅读和评论复核展开。普通用户只需要完成业务操作，模型、提示词和抓取底层配置统一由管理员维护。
+            这份演示面向日常业务用户，围绕评论采集、持续监听、AI 分析、报告阅读和评论复核展开。新版 UI 增加了更多筛选、日志筛选、移动端卡片和删除确认，普通用户只需要完成业务操作，模型、提示词和抓取底层配置统一由管理员维护。
           </p>
           <div class="hero-actions">
             <a class="button primary" href="#flow">开始培训</a>
@@ -484,7 +522,7 @@
               <li>创建、暂停、立即运行监听任务</li>
               <li>发起 AI 分析并查看报告</li>
               <li>检索、筛选、导出和修正评论</li>
-              <li>删除不再需要的采集或分析记录</li>
+              <li>通过“更多”菜单重试或删除不再需要的记录</li>
             </ul>
           </article>
           <article class="card">
@@ -500,7 +538,7 @@
           <article class="card">
             <h3>遇到问题时</h3>
             <p>
-              普通用户先确认链接、来源渠道、分析类型和任务状态。涉及模型、抓取底层、登录接口或服务器日志的问题，交由管理员处理。
+              普通用户先确认链接、来源渠道、分析类型和任务状态。涉及模型、抓取底层、登录接口或服务器日志的问题，交由管理员处理；删除前务必阅读确认弹窗。
             </p>
           </article>
         </div>
@@ -587,7 +625,7 @@
               <li>选择来源渠道，例如 YouTube 或 TikTok。</li>
               <li>选择正确的分析类型，视频评论请选择“视频类评论”。</li>
               <li>设置最多采集条数后提交。</li>
-              <li>回到采集记录查看进度。</li>
+              <li>回到采集记录查看进度，失败时在“更多”菜单中重试或删除。</li>
             </ol>
             <div class="note warning" style="margin-top: 18px">
               <h3>重点提醒</h3>
@@ -659,7 +697,7 @@
               <tr>
                 <td>删除</td>
                 <td>监听对象已经结束或任务创建错误。</td>
-                <td>删除前确认任务名称和链接，避免误删。</td>
+                <td>删除前确认任务名称和链接，系统会弹出确认窗口提醒影响范围。</td>
               </tr>
             </tbody>
           </table>
@@ -671,7 +709,7 @@
           <p class="eyebrow">Module 06</p>
           <h2>发起 AI 分析并阅读报告</h2>
           <p>
-            采集完成后，普通用户可以从采集记录中发起 AI 分析，也可以在分析记录中查看进度。大批量评论分析需要等待，速度会受模型服务、网络、额度和服务器性能影响。
+            采集完成后，普通用户可以从采集记录中发起 AI 分析，也可以在分析记录中查看进度。新版分析记录支持按“全部 / 警告 / 错误”筛选日志；大批量评论分析需要等待，速度会受模型服务、网络、额度和服务器性能影响。
           </p>
         </div>
         <div class="two-col">
@@ -691,6 +729,7 @@
                 <li>查看用户声音、高频词和核心主题。</li>
                 <li>阅读痛点、机会点和行动建议。</li>
                 <li>回到评论明细抽查原文。</li>
+                <li>失败时先切到“错误”日志定位原因。</li>
               </ul>
             </div>
           </div>
@@ -707,11 +746,12 @@
             <p class="eyebrow">Module 07</p>
             <h2>评论明细复核</h2>
             <p>
-              评论明细是验证 AI 报告是否可靠的证据层。培训时建议演示一次关键词搜索、情绪筛选和导出流程。
+              评论明细是验证 AI 报告是否可靠的证据层。培训时建议演示一次关键词搜索、情绪筛选、“更多筛选”抽屉和导出流程。
             </p>
             <ul class="step-list">
               <li>按关键词查找评论。</li>
-              <li>按情绪、标签、评分、时间或来源筛选。</li>
+              <li>顶部使用情绪、意图和关键词等高频筛选。</li>
+              <li>在“更多筛选”中设置评分、媒体、来源渠道、分组和展示列。</li>
               <li>根据工作需要调整表格列。</li>
               <li>保存常用筛选视图。</li>
               <li>导出当前筛选结果。</li>
@@ -720,7 +760,7 @@
           </div>
           <figure class="shot">
             <img src="assets/user-manual/07-reviews.png" alt="评论明细页面" />
-            <p class="caption">评论明细：查看原始评论和 AI 标注，支持筛选、导出和修正。</p>
+            <p class="caption">评论明细：查看原始评论和 AI 标注，支持常用筛选、更多筛选、导出和修正。</p>
           </figure>
         </div>
       </section>
@@ -736,7 +776,7 @@
             <ol class="step-list">
               <li>从分析报告定位主要问题。</li>
               <li>进入增长运营查看机会点和行动建议。</li>
-              <li>拆分负责人、优先级和处理状态。</li>
+              <li>进入行动项看板，拆分负责人、优先级、截止日期和处理状态。</li>
               <li>定期复盘后续评论变化。</li>
             </ol>
           </div>
@@ -759,9 +799,10 @@
               <h3>移动端建议</h3>
               <ul>
                 <li>复杂筛选和大量表格复核优先使用 PC。</li>
+                <li>评论明细在手机上会以卡片和分页展示，适合快速核对。</li>
                 <li>创建任务时复制完整链接，减少手动输入。</li>
                 <li>删除、重试等操作前仔细确认任务名称。</li>
-                <li>表格内容较多时可以横向滚动查看。</li>
+                <li>表格内容较多时可以横向滚动查看，右侧阴影表示还有内容。</li>
               </ul>
             </div>
           </div>
@@ -778,48 +819,136 @@
           <h2>普通用户常见问题</h2>
           <p>这些问题适合培训最后统一讲，也适合做内部答疑口径。</p>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>问题</th>
-                <th>普通用户先做什么</th>
-                <th>何时找管理员</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>登录失败</td>
-                <td>确认账号密码，刷新页面后重试。</td>
-                <td>多次失败、账号被禁用、接口返回异常。</td>
-              </tr>
-              <tr>
-                <td>未采集到评论</td>
-                <td>打开链接确认评论区可见，检查来源渠道是否正确。</td>
-                <td>公开评论仍无法采集，或多个链接都失败。</td>
-              </tr>
-              <tr>
-                <td>只采集到少量评论</td>
-                <td>提高最多采集条数，或改用持续监听分批采集。</td>
-                <td>明显少于页面可见数量，且多次重试无改善。</td>
-              </tr>
-              <tr>
-                <td>分析速度慢</td>
-                <td>等待任务完成，避免重复创建大量分析任务。</td>
-                <td>长时间无进度、队列卡住或所有任务都变慢。</td>
-              </tr>
-              <tr>
-                <td>视频报告像商品报告</td>
-                <td>确认任务是否选择“视频类评论”。</td>
-                <td>类型正确但仍持续出现电商词汇或 NPS 异常。</td>
-              </tr>
-              <tr>
-                <td>误删任务</td>
-                <td>立即停止重复操作，记录任务名称和时间。</td>
-                <td>需要管理员检查备份或数据库记录。</td>
-              </tr>
-            </tbody>
-          </table>
+        <p class="faq-note">完整问答已保存为 <a class="text-link" href="training-faq.md">training-faq.md</a>，培训后可以直接发给普通用户作为答疑资料。</p>
+        <div class="faq-list">
+          <article class="qa-item">
+            <strong>1. 普通用户为什么看不到模型设置、抓取设置？</strong>
+            <p>这是正常的。普通用户只负责采集、分析、查看报告和复核评论；模型、提示词、抓取参数由超管统一配置，避免不同用户配置不一致导致结果混乱。</p>
+          </article>
+          <article class="qa-item">
+            <strong>2. 我能不能自己改 AI 分析规则？</strong>
+            <p>普通用户不能直接修改。如果发现分析结果明显不符合业务，比如视频评论被当成商品评论分析，需要把任务名称、链接和截图反馈给管理员，由管理员统一调整提示词或模型配置。</p>
+          </article>
+          <article class="qa-item">
+            <strong>3. 首页的评论额度和分析次数是什么意思？</strong>
+            <p>评论额度表示当前周期内可以采集或处理的评论数量，分析次数表示可以发起 AI 分析的次数。额度不足时需要联系管理员调整。</p>
+          </article>
+          <article class="qa-item">
+            <strong>4. 我看到的数据是不是所有人的数据？</strong>
+            <p>通常只看到当前账号或当前工作区的数据。不同工作区之间的数据会隔离，具体范围由管理员配置。</p>
+          </article>
+          <article class="qa-item">
+            <strong>5. 一次性采集和持续监听有什么区别？</strong>
+            <p>一次性采集适合临时分析某条视频或链接；持续监听适合长期跟踪同一条视频的新评论，比如新品发布、投放视频、舆情内容。</p>
+          </article>
+          <article class="qa-item">
+            <strong>6. 最多采集条数填多少合适？</strong>
+            <p>培训或测试建议先填 100 到 300 条，确认链接和分析类型没问题后再加大。填 0 通常表示不限制，但实际数量仍受平台加载、网络、超时和抓取策略影响。</p>
+          </article>
+          <article class="qa-item">
+            <strong>7. 为什么视频明明有很多评论，只采集到一部分？</strong>
+            <p>常见原因是平台分页加载、评论排序、网络超时、评论需要登录、单次采集上限过低，或者平台限制。可以提高采集条数、重试，或用持续监听分批采集。</p>
+          </article>
+          <article class="qa-item">
+            <strong>8. 提示“未采集到评论”怎么办？</strong>
+            <p>先用浏览器打开链接，确认评论区公开可见、链接没有填错、来源渠道选择正确。如果页面能看到评论但系统仍采不到，再让管理员看抓取日志和服务器网络。</p>
+          </article>
+          <article class="qa-item">
+            <strong>9. 采集任务一直排队怎么办？</strong>
+            <p>可能是前面还有任务、Worker 没启动、服务器繁忙或抓取服务异常。普通用户先不要重复创建太多任务，超过几分钟没变化就联系管理员。</p>
+          </article>
+          <article class="qa-item">
+            <strong>10. 采集失败后应该重试还是删除？</strong>
+            <p>网络波动、临时超时、平台加载失败适合重试；链接填错、任务建错、内容不再需要适合删除。删除前要看确认弹窗，确认任务名称和影响范围。</p>
+          </article>
+          <article class="qa-item">
+            <strong>11. 监听任务创建后切换页面再回来还在吗？</strong>
+            <p>应该还在。监听任务是保存到系统里的，不应该因为切换页面消失。如果刷新后仍看不到，要联系管理员检查接口或数据库记录。</p>
+          </article>
+          <article class="qa-item">
+            <strong>12. 监听任务会不会自动分析？</strong>
+            <p>看创建时是否开启“自动分析”。开启后每次采集完成会自动进入分析流程；关闭时需要人工确认评论数量后再手动分析。</p>
+          </article>
+          <article class="qa-item">
+            <strong>13. 监听频率怎么设置比较合适？</strong>
+            <p>热点内容可以更频繁，比如每 1 到 6 小时；普通内容可以每天或每几天一次。频率太高会消耗额度，也可能增加平台访问压力。</p>
+          </article>
+          <article class="qa-item">
+            <strong>14. 删除监听任务会删除历史分析吗？</strong>
+            <p>通常删除的是监听配置，不一定删除历史采集记录和分析任务。实际以删除确认弹窗提示为准。</p>
+          </article>
+          <article class="qa-item">
+            <strong>15. 为什么 AI 分析比较慢？</strong>
+            <p>评论越多，分析越耗时。几千到几万条评论会受模型服务、并发额度、网络和服务器性能影响。建议先小样本验证，再分批处理大任务。</p>
+          </article>
+          <article class="qa-item">
+            <strong>16. 评论很多时怎么提高效率？</strong>
+            <p>先采集一小批看方向是否正确，再扩大数量；大任务尽量分批，不要重复创建多个相同分析；持续监听适合长期增量采集。</p>
+          </article>
+          <article class="qa-item">
+            <strong>17. 为什么 YouTube 视频评论分析结果像商品评论？</strong>
+            <p>通常是分析类型选错，或者提示词配置偏商品评论。视频类评论要选择“视频类评论”，重点看观点、态度、争议点、内容反馈和传播效果，不是物流、包装、售后这些电商维度。</p>
+          </article>
+          <article class="qa-item">
+            <strong>18. 为什么结果全是负向，NPS 一直是 0？</strong>
+            <p>可能是样本本身偏负向，也可能是分析规则过度把争议、调侃、中性讨论判成负向。先抽查原始评论，再检查分析类型和提示词配置。</p>
+          </article>
+          <article class="qa-item">
+            <strong>19. AI 分析结果能不能完全直接用？</strong>
+            <p>不建议完全不复核。AI 报告适合快速发现趋势和重点，但对外汇报前要回到评论明细抽查原文，确认结论有评论证据支撑。</p>
+          </article>
+          <article class="qa-item">
+            <strong>20. 分析失败怎么看原因？</strong>
+            <p>进入分析记录，看日志筛选。先切到“错误”，再看是否是模型返回异常、额度不足、评论数据异常或网络问题。</p>
+          </article>
+          <article class="qa-item">
+            <strong>21. 报告里的 NPS 应该怎么理解？</strong>
+            <p>NPS 是整体推荐或态度倾向指标。商品评论偏购买推荐，视频评论更偏内容认可、观看体验和态度倾向，不能机械套用电商口径。</p>
+          </article>
+          <article class="qa-item">
+            <strong>22. 用户声音是什么？</strong>
+            <p>用户声音是评论里反复出现的观点、需求、痛点、关注点或争议点。它不是单纯关键词堆砌，而是帮助判断用户真正关心什么。</p>
+          </article>
+          <article class="qa-item">
+            <strong>23. 报告结论不准怎么办？</strong>
+            <p>先到评论明细抽查原文，看是样本问题、采集不完整、分析类型错误，还是提示词需要调整。确认后把任务和截图反馈给管理员。</p>
+          </article>
+          <article class="qa-item">
+            <strong>24. 找不到评分、媒体、来源这些筛选条件？</strong>
+            <p>新版界面把低频筛选放进“更多筛选”抽屉。评论明细页点击“更多筛选”，可以看到评分、是否含媒体、来源渠道、分组和展示列等条件。</p>
+          </article>
+          <article class="qa-item">
+            <strong>25. 评论可以导出吗？</strong>
+            <p>可以按当前筛选结果导出，用于报告证据、人工复核或二次分析。对外分享前要注意敏感内容和隐私信息。</p>
+          </article>
+          <article class="qa-item">
+            <strong>26. 手机端和电脑端为什么界面不一样？</strong>
+            <p>系统会识别当前设备。电脑端适合复杂操作和大表格，手机端更适合查看状态、刷新任务、快速看报告和轻量复核。</p>
+          </article>
+          <article class="qa-item">
+            <strong>27. 手机端能不能完成所有操作？</strong>
+            <p>大部分轻量操作可以完成，但复杂筛选、大量评论复核、批量导出和后台管理更建议在电脑端操作。</p>
+          </article>
+          <article class="qa-item">
+            <strong>28. 手机端评论为什么变成卡片？</strong>
+            <p>这是为了适配小屏幕。评论明细在手机上用卡片和分页展示，避免宽表格横向拖动太多。</p>
+          </article>
+          <article class="qa-item">
+            <strong>29. 删除任务后能恢复吗？</strong>
+            <p>通常不能恢复。删除采集记录、监听任务或分析任务前一定要看确认弹窗，确认不再需要后再删除。</p>
+          </article>
+          <article class="qa-item">
+            <strong>30. 对外汇报能直接截图系统报告吗？</strong>
+            <p>可以，但建议先检查是否包含敏感评论、用户信息、内部任务名称或未确认结论。重要报告最好先做人工复核。</p>
+          </article>
+          <article class="qa-item">
+            <strong>31. 同一个链接能不能多次分析？</strong>
+            <p>可以，但不建议无意义重复。重复分析会消耗额度，也可能让列表里出现多个相似任务。需要对比不同时间段时，建议用清晰的任务名称区分。</p>
+          </article>
+          <article class="qa-item">
+            <strong>32. 培训现场最重要的提醒是什么？</strong>
+            <p>三句话：链接要公开可访问；分析类型一定要选对；报告结论要回到评论原文抽查验证。</p>
+          </article>
         </div>
       </section>
 
@@ -862,14 +991,14 @@
             <span class="box"></span>
             <div>
               <strong>演示复核</strong>
-              <span>至少演示一次评论搜索、筛选、导出和原文抽查。</span>
+              <span>至少演示一次评论搜索、更多筛选、导出和原文抽查。</span>
             </div>
           </div>
           <div class="check">
             <span class="box"></span>
             <div>
               <strong>说明风险</strong>
-              <span>删除、重试、分析类型选择和大批量任务都要重点提醒。</span>
+              <span>删除确认、重试、分析类型选择、日志筛选和大批量任务都要重点提醒。</span>
             </div>
           </div>
         </div>

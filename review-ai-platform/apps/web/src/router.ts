@@ -13,6 +13,7 @@ const LoginPage = () => import("./pages/LoginPage.vue");
 const RegisterPage = () => import("./pages/RegisterPage.vue");
 const SharedReportPage = () => import("./pages/SharedReportPage.vue");
 const WorkspaceSettingsPage = () => import("./pages/WorkspaceSettingsPage.vue");
+const HelpCenterPage = () => import("./pages/HelpCenterPage.vue");
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -31,6 +32,7 @@ export const router = createRouter({
     { path: "/reviews", component: ReviewsPage },
     { path: "/analysis-runs", component: AnalysisRunsPage },
     { path: "/crawl-jobs", component: CrawlJobsPage },
+    { path: "/help", component: HelpCenterPage },
     { path: "/users", redirect: "/admin" },
     { path: "/settings", redirect: "/settings/ai" },
     { path: "/settings/workspace", redirect: "/settings/ai" },

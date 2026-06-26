@@ -64,6 +64,12 @@
         </div>
 
         <div class="topbar-actions">
+          <a-button class="topbar-help-button" @click="router.push('/help')">
+            <template #icon>
+              <QuestionCircleOutlined />
+            </template>
+            帮助
+          </a-button>
           <a-dropdown>
             <button type="button" class="account-chip">
               <span class="account-avatar">{{ accountInitial }}</span>
@@ -127,6 +133,7 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  QuestionCircleOutlined,
   SettingOutlined,
   TeamOutlined
 } from "@ant-design/icons-vue";
@@ -161,7 +168,8 @@ const navSections = computed<NavSection[]>(() => [
       { path: "/dashboard", label: "任务看板", disabled: false },
       { path: "/growth", label: "增长运营", disabled: false },
       { path: "/crawl-jobs", label: "评论采集", disabled: false },
-      { path: "/analysis-runs", label: "分析记录", disabled: false }
+      { path: "/analysis-runs", label: "分析记录", disabled: false },
+      { path: "/help", label: "帮助中心", disabled: false }
     ]
   },
   ...(currentUser.value?.isSuperAdmin
@@ -232,6 +240,9 @@ const pageTitle = computed(() => {
   }
   if (route.path.includes("/runs") || route.path === "/analysis-runs") {
     return "分析记录";
+  }
+  if (route.path === "/help") {
+    return "帮助中心";
   }
   return "用户后台";
 });

@@ -113,7 +113,7 @@ def add_cover(doc: Document) -> None:
     run.font.color.rgb = RGBColor(71, 85, 105)
 
     meta = doc.add_paragraph()
-    run = meta.add_run("版本：2026-06-23\n适用对象：普通业务用户、运营人员、内容分析人员")
+    run = meta.add_run("版本：2026-06-26\n适用对象：普通业务用户、运营人员、内容分析人员")
     set_run_font(run)
     run.font.size = Pt(10)
     run.font.color.rgb = RGBColor(71, 85, 105)

@@ -420,6 +420,12 @@ select {
   flex-wrap: wrap;
 }
 
+.topbar-help-button {
+  height: 34px;
+  border-radius: 999px;
+  font-weight: 780;
+}
+
 .task-select {
   width: 320px;
 }
@@ -2984,6 +2990,16 @@ body.app-device-mobile .topbar-title {
 body.app-device-mobile .topbar-actions {
   width: auto;
   flex: 0 0 auto;
+}
+
+body.app-device-mobile .topbar-help-button {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+body.app-device-mobile .topbar-help-button > span:not(.ant-btn-icon) {
+  display: none;
 }
 
 body.app-device-mobile .account-chip {
