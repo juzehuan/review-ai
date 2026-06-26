@@ -2719,6 +2719,8 @@ body {
 
   .table-shell {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: inset -18px 0 18px -22px rgba(15, 23, 42, 0.5), var(--shadow-md);
   }
 
   .ant-table-wrapper .ant-table {
