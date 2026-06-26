@@ -1125,6 +1125,55 @@ select {
   overscroll-behavior: contain;
 }
 
+.review-mobile-list {
+  display: none;
+}
+
+.review-mobile-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(116, 139, 174, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.review-mobile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.review-mobile-title {
+  color: #111827;
+  font-weight: 900;
+}
+
+.review-mobile-meta {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.review-mobile-comment {
+  color: #25324a;
+  line-height: 1.55;
+}
+
+.review-mobile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.review-mobile-pagination {
+  justify-content: center;
+  margin-top: 2px;
+}
+
 .ant-modal {
   max-width: calc(100vw - 32px);
 }
@@ -2707,6 +2756,15 @@ body {
   .advanced-filter-grid,
   .column-menu-inline .ant-checkbox-group {
     grid-template-columns: 1fr;
+  }
+
+  .review-page > .table-shell {
+    display: none;
+  }
+
+  .review-mobile-list {
+    display: grid;
+    gap: 10px;
   }
 
   .view-strip {

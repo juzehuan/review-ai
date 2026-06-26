@@ -234,6 +234,33 @@
       </a-table>
     </div>
 
+    <div v-if="viewMode === 'table'" class="review-mobile-list">
+      <article v-for="row in rows" :key="row.id" class="review-mobile-card" @click="selectedRow = row">
+        <div class="review-mobile-head">
+          <div>
+            <div class="review-mobile-title">{{ row.productName || row.sourceChannel || "评论" }}</div>
+            <div class="review-mobile-meta">{{ row.commentTime || "-" }} · {{ row.sourceChannel }}</div>
+          </div>
+          <a-tag :color="sentimentColor(row.sentiment)">{{ sentimentLabel(row.sentiment) }}</a-tag>
+        </div>
+        <div class="review-mobile-comment">{{ row.summary || truncate(row.comment, 110) }}</div>
+        <div class="review-mobile-tags">
+          <a-rate :value="row.ratingStar" disabled />
+          <a-tag v-if="row.hasMedia" color="blue">有媒体</a-tag>
+          <a-tag v-for="tag in row.analysisTags.slice(0, 2)" :key="tag">{{ tag }}</a-tag>
+        </div>
+      </article>
+      <a-pagination
+        v-if="pagination.total && pagination.total > (pagination.pageSize || 10)"
+        size="small"
+        class="review-mobile-pagination"
+        :current="pagination.current"
+        :page-size="pagination.pageSize"
+        :total="pagination.total"
+        @change="handleMobilePageChange"
+      />
+    </div>
+
     <div v-else class="group-list">
       <div v-for="group in groupedRows" :key="group.key" class="group-card">
         <div class="group-header">
@@ -1029,6 +1056,12 @@ function handleTableChange(next: PaginationConfig, _: unknown, sorter: SorterCon
   }
 
   clearActiveView();
+  loadReviews();
+}
+
+function handleMobilePageChange(page: number, pageSize: number) {
+  pagination.current = page;
+  pagination.pageSize = pageSize;
   loadReviews();
 }
 
