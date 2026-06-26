@@ -8,14 +8,37 @@
   </div>
 
   <div v-else class="dashboard-grid">
-    <div class="page-toolbar dashboard-toolbar">
+    <div class="page-toolbar dashboard-toolbar report-toolbar">
       <div class="toolbar-title-block">
         <div class="toolbar-title">分析报告</div>
         <div class="toolbar-subtitle">
-          基于当前任务评论与 AI 分析结果生成的洞察报告。
+          面向业务复盘和对外汇报的评论洞察报告，支持导出、分享和证据追溯。
         </div>
       </div>
       <a-space wrap>
+        <a-dropdown :trigger="['click']">
+          <a-button :disabled="!dashboard?.runId">
+            <template #icon><DownloadOutlined /></template>
+            导出报告
+          </a-button>
+          <template #overlay>
+            <a-menu @click="handleExportMenu">
+              <a-menu-item key="markdown">
+                <FileMarkdownOutlined />
+                导出 Markdown
+              </a-menu-item>
+              <a-menu-item key="html">
+                <FileTextOutlined />
+                导出 HTML
+              </a-menu-item>
+              <a-menu-divider />
+              <a-menu-item key="print">
+                <PrinterOutlined />
+                打印 / 保存 PDF
+              </a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
         <a-button @click="load" :loading="loading">
           <template #icon><ReloadOutlined /></template>
           刷新报告
@@ -81,11 +104,16 @@
       </div>
     </a-modal>
 
-    <div class="overview-band">
+    <section class="report-hero">
       <div class="overview-copy">
-        <div class="overview-kicker">当前项目</div>
-        <h2>{{ selectedTask.productName }}</h2>
+        <div class="overview-kicker">当前报告</div>
+        <h2>{{ reportTitle }}</h2>
         <p>{{ selectedTask.name }} · {{ selectedTask.sourceChannel }} · {{ analysisTypeLabel(selectedTask.analysisType) }} · {{ selectedTask.status }}</p>
+        <div class="report-meta-row">
+          <a-tag :color="dashboard?.runId ? 'green' : 'default'">{{ dashboard?.runId ? "已生成分析结果" : "等待首次分析" }}</a-tag>
+          <span>生成时间 {{ exportedAt }}</span>
+          <span v-if="dashboard?.runId">Run {{ dashboard.runId.slice(0, 8) }}</span>
+        </div>
       </div>
       <div class="pipeline-strip">
         <div v-for="step in pipelineSteps" :key="step.label" class="pipeline-step" :class="{ active: step.active }">
@@ -93,7 +121,22 @@
           <span>{{ step.label }}</span>
         </div>
       </div>
-    </div>
+    </section>
+
+    <section class="report-executive-panel">
+      <div class="report-executive-main">
+        <div class="panel-label">Executive Summary</div>
+        <h3>{{ executiveHeadline }}</h3>
+        <p>{{ dashboard?.aiSummary || emptySummaryText }}</p>
+      </div>
+      <div class="report-snapshot-grid">
+        <article v-for="item in reportSnapshots" :key="item.label" class="report-snapshot-card" :class="item.tone">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+          <small>{{ item.note }}</small>
+        </article>
+      </div>
+    </section>
 
     <section v-if="dashboard?.aiSummary" class="ai-summary-card">
       <div class="panel-label">AI 总结</div>
@@ -362,6 +405,10 @@ import {
   CloudUploadOutlined,
   CopyOutlined,
   DatabaseOutlined,
+  DownloadOutlined,
+  FileMarkdownOutlined,
+  FileTextOutlined,
+  PrinterOutlined,
   ReloadOutlined,
   RobotOutlined,
   ShareAltOutlined
@@ -397,6 +444,8 @@ const gaugeRef = ref<HTMLDivElement | null>(null);
 let timer: ReturnType<typeof setInterval> | null = null;
 let gaugeChart: echarts.ECharts | null = null;
 
+type ExportFormat = "markdown" | "html" | "print";
+
 type ChartClickParams = {
   name?: string | number;
   seriesName?: string;
@@ -425,6 +474,7 @@ const pipelineSteps = computed(() => [
   { label: "洞察", icon: CheckCircleOutlined, active: Boolean(dashboard.value?.reviewCount) }
 ]);
 
+const reportTitle = computed(() => selectedTask.value?.productName || selectedTask.value?.name || "评论分析报告");
 const issueCount = computed(() => dashboard.value?.issues?.length || 0);
 const insightReportTitle = computed(() => {
   if (selectedTask.value?.analysisType === "video") {
@@ -461,6 +511,45 @@ const negativeMetricLabel = computed(() => (isVideoTask.value ? "负向/争议�
 const negativeMetricNote = computed(() =>
   isVideoTask.value ? "需要澄清或复盘的观众反馈" : isTweetTask.value ? "需要回应或降风险的讨论" : "需要运营跟进的低分反馈"
 );
+const exportedAt = computed(() => new Date().toLocaleString());
+const emptySummaryText = computed(() => (dashboard.value?.runId ? "暂无 AI 总结，请查看下方图表和证据模块。" : "当前任务还没有生成分析结果。"));
+const executiveHeadline = computed(() => {
+  if (!dashboard.value?.reviewCount) {
+    return "等待评论样本和分析结果";
+  }
+  const sentiment = dashboard.value.sentimentDistribution.find((item) => item.count > 0);
+  const topIssue = dashboard.value.issues[0]?.issueName;
+  if (topIssue) {
+    return `${sentiment ? sentimentText(sentiment.sentiment) : "整体"}反馈中，${topIssue} 是当前最需要关注的问题`;
+  }
+  return `${scoreLabel.value} 为 ${dashboard.value.nps}，共纳入 ${dashboard.value.reviewCount} 条评论`;
+});
+const reportSnapshots = computed(() => [
+  {
+    label: "评论样本",
+    value: String(dashboard.value?.reviewCount || 0),
+    note: "纳入本次报告",
+    tone: "primary"
+  },
+  {
+    label: "正向占比",
+    value: `${positivePercent.value}%`,
+    note: "可放大的认可反馈",
+    tone: "success"
+  },
+  {
+    label: negativeMetricLabel.value,
+    value: String(dashboard.value?.negativeCount || 0),
+    note: negativeMetricNote.value,
+    tone: "warning"
+  },
+  {
+    label: scoreLabel.value,
+    value: String(dashboard.value?.nps || 0),
+    note: scoreDescription.value,
+    tone: "ink"
+  }
+]);
 const showRatingCharts = computed(() => selectedTask.value?.analysisType === "product" && (dashboard.value?.ratingDistribution || []).some((item) => item.count > 0));
 const productInsightSections = computed(() => {
   const insights = dashboard.value?.productInsights;
@@ -804,6 +893,311 @@ async function createShareLink() {
 async function copyShareLink(shareUrl: string) {
   await navigator.clipboard.writeText(shareUrl);
   message.success("分享链接已复制。");
+}
+
+function handleExportMenu(info: { key: string | number }) {
+  const key = String(info.key);
+  if (key === "markdown" || key === "html" || key === "print") {
+    exportReport(key);
+  }
+}
+
+function exportReport(format: ExportFormat) {
+  if (!selectedTask.value || !dashboard.value?.runId) {
+    message.warning("当前报告还没有生成分析结果，暂时无法导出。");
+    return;
+  }
+
+  if (format === "print") {
+    window.print();
+    return;
+  }
+
+  const fileBaseName = sanitizeFileName(`${reportTitle.value}-分析报告-${formatDateForFile(new Date())}`);
+  if (format === "markdown") {
+    downloadTextFile(`${fileBaseName}.md`, buildMarkdownReport(), "text/markdown;charset=utf-8");
+    message.success("Markdown 报告已导出。");
+    return;
+  }
+
+  downloadTextFile(`${fileBaseName}.html`, buildHtmlReport(), "text/html;charset=utf-8");
+  message.success("HTML 报告已导出。");
+}
+
+function buildMarkdownReport() {
+  const task = selectedTask.value;
+  const data = dashboard.value;
+  if (!task || !data) {
+    return "";
+  }
+
+  const lines = [
+    `# ${reportTitle.value} 分析报告`,
+    "",
+    `- 任务名称：${task.name}`,
+    `- 来源渠道：${task.sourceChannel}`,
+    `- 分析类型：${analysisTypeLabel(task.analysisType)}`,
+    `- 导出时间：${new Date().toLocaleString()}`,
+    `- 评论样本：${data.reviewCount}`,
+    `- ${scoreLabel.value}：${data.nps}`,
+    "",
+    "## 执行摘要",
+    "",
+    executiveHeadline.value,
+    "",
+    normalizeExportText(data.aiSummary || emptySummaryText.value),
+    "",
+    "## 核心指标",
+    "",
+    ...reportSnapshots.value.map((item) => `- ${item.label}：${item.value}（${item.note}）`),
+    "",
+    "## 情感分布",
+    "",
+    ...data.sentimentDistribution.map((item) => `- ${sentimentText(item.sentiment)}：${item.count} 条，占比 ${item.percent}%`),
+    "",
+    "## 评论意图",
+    "",
+    ...(data.intentDistribution.length ? data.intentDistribution.map((item) => `- ${item.label}：${item.count} 条，占比 ${item.percent}%`) : ["- 暂无意图分布数据"]),
+    "",
+    "## 高频问题",
+    "",
+    ...(data.issues.length ? data.issues.slice(0, 10).map((item) => `- ${item.issueName}：${item.count} 条相关评论`) : ["- 暂无高频问题"]),
+    "",
+    "## 动态内容标签",
+    "",
+    ...(data.dynamicContentTags.length
+      ? data.dynamicContentTags.slice(0, 12).map((tag) => `- ${tag.label}：${dynamicTagKindText(tag.kind)}，${tag.count} 条，占比 ${tag.percent}%`)
+      : ["- 暂无动态内容标签"]),
+    "",
+    "## 观点聚类",
+    "",
+    ...(data.insightClusters.length
+      ? data.insightClusters.map((cluster) => `### ${cluster.title}\n\n${normalizeExportText(cluster.summary)}\n\n- 评论数：${cluster.count}，占比 ${cluster.percent}%\n- 情绪：${sentimentText(cluster.sentiment)}`)
+      : ["暂无观点聚类"]),
+    "",
+    `## ${insightReportTitle.value}`,
+    "",
+    ...(productInsightSections.value.length ? productInsightSections.value.map((item) => `### ${item.title}\n\n${normalizeExportText(item.content)}`) : ["暂无深度洞察"]),
+    "",
+    "## 分析质量提醒",
+    "",
+    ...(data.qualityAlerts.length
+      ? data.qualityAlerts.map((alert) => `- [${qualityAlertLevelText(alert.level)}] ${alert.title}：${normalizeExportText(`${alert.detail} ${alert.recommendation}`)}`)
+      : ["- 暂无质量提醒"]),
+    "",
+    "## 代表性评论",
+    "",
+    ...buildRepresentativeReviewMarkdown(data)
+  ];
+
+  return `${lines.join("\n")}\n`;
+}
+
+function buildHtmlReport() {
+  const task = selectedTask.value;
+  const data = dashboard.value;
+  if (!task || !data) {
+    return "";
+  }
+
+  const metrics = reportSnapshots.value
+    .map(
+      (item) => `
+        <article>
+          <span>${escapeHtml(item.label)}</span>
+          <strong>${escapeHtml(item.value)}</strong>
+          <small>${escapeHtml(item.note)}</small>
+        </article>`
+    )
+    .join("");
+  const sentimentRows = data.sentimentDistribution
+    .map((item) => `<tr><td>${escapeHtml(sentimentText(item.sentiment))}</td><td>${item.count}</td><td>${item.percent}%</td></tr>`)
+    .join("");
+  const intentRows = data.intentDistribution
+    .map((item) => `<tr><td>${escapeHtml(item.label)}</td><td>${item.count}</td><td>${item.percent}%</td></tr>`)
+    .join("");
+  const issueRows = data.issues
+    .slice(0, 10)
+    .map((item) => `<tr><td>${escapeHtml(item.issueName)}</td><td>${item.count}</td><td>${item.sampleReviewIds.length}</td></tr>`)
+    .join("");
+  const dynamicTags = data.dynamicContentTags
+    .slice(0, 12)
+    .map((tag) => `<li><strong>${escapeHtml(tag.label)}</strong><span>${escapeHtml(dynamicTagKindText(tag.kind))} · ${tag.count} 条 · ${tag.percent}%</span></li>`)
+    .join("");
+  const clusters = data.insightClusters
+    .map(
+      (cluster) => `
+        <article class="section-card">
+          <h3>${escapeHtml(cluster.title)}</h3>
+          <p>${escapeHtml(cluster.summary)}</p>
+          <div class="muted">${cluster.count} 条评论 · ${cluster.percent}% · ${escapeHtml(sentimentText(cluster.sentiment))}</div>
+        </article>`
+    )
+    .join("");
+  const insightCards = productInsightSections.value
+    .map(
+      (item) => `
+        <article class="section-card">
+          <h3>${escapeHtml(item.title)}</h3>
+          <p>${escapeHtml(item.content)}</p>
+        </article>`
+    )
+    .join("");
+  const alerts = data.qualityAlerts
+    .map((alert) => `<li><strong>${escapeHtml(alert.title)}</strong><span>${escapeHtml(`${alert.detail} ${alert.recommendation}`)}</span></li>`)
+    .join("");
+  const representativeReviews = buildRepresentativeReviewHtml(data);
+
+  return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(reportTitle.value)} 分析报告</title>
+    <style>
+      body { margin: 0; font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif; color: #172033; background: #f4f6fa; }
+      main { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 32px 0 42px; }
+      .hero, section { border: 1px solid #e4e7ee; border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+      .hero { padding: 30px; color: #fff; background: #172033; border-color: #172033; }
+      .kicker { color: #a9c3ff; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+      h1 { margin: 8px 0 12px; font-size: 34px; line-height: 1.2; }
+      h2 { margin: 0 0 14px; font-size: 22px; }
+      h3 { margin: 0 0 8px; font-size: 17px; }
+      p { line-height: 1.75; }
+      .hero p { color: #d4dae6; }
+      section { margin-top: 18px; padding: 22px; }
+      .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+      .metrics article, .section-card { padding: 16px; border: 1px solid #e4e7ee; border-radius: 10px; background: #f8fafc; }
+      .metrics span, .metrics small, .muted, li span { display: block; color: #64748b; font-size: 13px; }
+      .metrics strong { display: block; margin: 8px 0; font-size: 30px; color: #172033; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+      th, td { padding: 10px 12px; border-bottom: 1px solid #e4e7ee; text-align: left; vertical-align: top; }
+      th { background: #f8fafc; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      ul.clean { display: grid; gap: 10px; padding: 0; list-style: none; }
+      @media (max-width: 800px) { .metrics, .grid { grid-template-columns: 1fr; } main { width: calc(100% - 24px); padding: 18px 0; } }
+      @media print { body { background: #fff; } main { width: 100%; padding: 0; } .hero, section { box-shadow: none; break-inside: avoid; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <div class="kicker">ReviewIQ Report</div>
+        <h1>${escapeHtml(reportTitle.value)} 分析报告</h1>
+        <p>${escapeHtml(task.name)} · ${escapeHtml(task.sourceChannel)} · ${escapeHtml(analysisTypeLabel(task.analysisType))} · 导出时间 ${escapeHtml(new Date().toLocaleString())}</p>
+      </header>
+      <section>
+        <h2>执行摘要</h2>
+        <h3>${escapeHtml(executiveHeadline.value)}</h3>
+        <p>${escapeHtml(data.aiSummary || emptySummaryText.value)}</p>
+        <div class="metrics">${metrics}</div>
+      </section>
+      <section>
+        <h2>情感分布</h2>
+        <table><thead><tr><th>情感</th><th>数量</th><th>占比</th></tr></thead><tbody>${sentimentRows}</tbody></table>
+      </section>
+      <section>
+        <h2>评论意图</h2>
+        <table><thead><tr><th>意图</th><th>数量</th><th>占比</th></tr></thead><tbody>${intentRows || `<tr><td colspan="3">暂无意图分布数据</td></tr>`}</tbody></table>
+      </section>
+      <section>
+        <h2>高频问题</h2>
+        <table><thead><tr><th>问题</th><th>相关评论</th><th>证据样本</th></tr></thead><tbody>${issueRows || `<tr><td colspan="3">暂无高频问题</td></tr>`}</tbody></table>
+      </section>
+      <section>
+        <h2>动态内容标签</h2>
+        <ul class="clean">${dynamicTags || "<li>暂无动态内容标签</li>"}</ul>
+      </section>
+      <section>
+        <h2>观点聚类</h2>
+        <div class="grid">${clusters || "<p>暂无观点聚类</p>"}</div>
+      </section>
+      <section>
+        <h2>${escapeHtml(insightReportTitle.value)}</h2>
+        <div class="grid">${insightCards || "<p>暂无深度洞察</p>"}</div>
+      </section>
+      <section>
+        <h2>分析质量提醒</h2>
+        <ul class="clean">${alerts || "<li>暂无质量提醒</li>"}</ul>
+      </section>
+      <section>
+        <h2>代表性评论</h2>
+        ${representativeReviews}
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
+function buildRepresentativeReviewMarkdown(data: DashboardDTO) {
+  const positive = data.representativeReviews?.positive || [];
+  const negative = data.representativeReviews?.negative || [];
+  const lines: string[] = [];
+
+  lines.push("### 正向代表评论", "");
+  lines.push(...(positive.length ? positive.slice(0, 5).map((review) => `- ${normalizeExportText(review.summary || review.commentTr || review.comment)}`) : ["- 暂无正向代表评论"]));
+  lines.push("", "### 负向代表评论", "");
+  lines.push(...(negative.length ? negative.slice(0, 5).map((review) => `- ${normalizeExportText(review.summary || review.commentTr || review.comment)}`) : ["- 暂无负向代表评论"]));
+  return lines;
+}
+
+function buildRepresentativeReviewHtml(data: DashboardDTO) {
+  const renderList = (items: DashboardDTO["representativeReviews"]["positive"]) =>
+    items.length
+      ? `<ul>${items
+          .slice(0, 5)
+          .map((review) => `<li>${escapeHtml(review.summary || review.commentTr || review.comment)}</li>`)
+          .join("")}</ul>`
+      : "<p>暂无代表评论</p>";
+
+  return `<div class="grid">
+    <article class="section-card"><h3>正向代表评论</h3>${renderList(data.representativeReviews?.positive || [])}</article>
+    <article class="section-card"><h3>负向代表评论</h3>${renderList(data.representativeReviews?.negative || [])}</article>
+  </div>`;
+}
+
+function downloadTextFile(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function sanitizeFileName(value: string) {
+  return value.replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim() || "ReviewIQ-分析报告";
+}
+
+function formatDateForFile(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
+}
+
+function normalizeExportText(value?: string | null) {
+  return (value || "-").replace(/\r?\n{3,}/g, "\n\n").trim();
+}
+
+function escapeHtml(value?: string | number | null) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function qualityAlertLevelText(level: DashboardDTO["qualityAlerts"][number]["level"]) {
+  if (level === "critical") {
+    return "严重";
+  }
+  if (level === "warning") {
+    return "警告";
+  }
+  return "提示";
 }
 
 async function revokeShareLink(share: ReportShareDTO) {
@@ -1199,6 +1593,122 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.report-toolbar {
+  align-items: center;
+}
+
+.report-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  min-height: 150px;
+  padding: 28px 30px;
+  border: 1px solid #172033;
+  border-radius: 14px;
+  color: #ffffff;
+  background:
+    linear-gradient(135deg, rgba(23, 32, 51, 0.98), rgba(34, 54, 84, 0.94)),
+    #172033;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+}
+
+.report-hero .overview-copy h2 {
+  max-width: 920px;
+  color: #ffffff;
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1.18;
+}
+
+.report-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  color: rgba(226, 235, 248, 0.76);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.report-executive-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.72fr);
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid rgba(116, 139, 174, 0.22);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px);
+}
+
+.report-executive-main {
+  min-width: 0;
+}
+
+.report-executive-main h3 {
+  margin: 8px 0 10px;
+  color: #0f172a;
+  font-size: 22px;
+  line-height: 1.35;
+}
+
+.report-executive-main p {
+  margin: 0;
+  color: #4b5565;
+  font-size: 15px;
+  line-height: 1.85;
+}
+
+.report-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.report-snapshot-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e4e7ee;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.report-snapshot-card span,
+.report-snapshot-card small {
+  display: block;
+  color: #697386;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.report-snapshot-card strong {
+  display: block;
+  margin: 9px 0 8px;
+  color: #172033;
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.report-snapshot-card.primary {
+  border-top: 3px solid #1f5eff;
+}
+
+.report-snapshot-card.success {
+  border-top: 3px solid #16a34a;
+}
+
+.report-snapshot-card.warning {
+  border-top: 3px solid #e5484d;
+}
+
+.report-snapshot-card.ink {
+  border-top: 3px solid #697386;
+}
+
 .share-panel {
   display: grid;
   gap: 16px;
@@ -1242,11 +1752,74 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 960px) {
+  .report-hero,
+  .report-executive-panel {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .report-hero {
+    align-items: stretch;
+  }
+
+  .report-snapshot-grid {
+    grid-template-columns: 1fr;
+  }
+
   .share-panel-head,
   .share-link-card {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@media print {
+  :global(body) {
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  :global(.app-shell),
+  :global(.app-main),
+  :global(.app-content) {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  :global(.app-sidebar),
+  :global(.topbar),
+  .report-toolbar,
+  .quality-alerts-panel :deep(.ant-btn),
+  .dynamic-tag-card :deep(.ant-btn),
+  .duplicate-group-card :deep(.ant-btn),
+  .evidence-card :deep(.ant-space),
+  .insight-cluster-card :deep(.ant-btn) {
+    display: none !important;
+  }
+
+  .dashboard-grid {
+    width: 100% !important;
+    max-width: none !important;
+    gap: 14px !important;
+  }
+
+  .report-hero,
+  .report-executive-panel,
+  .ai-summary-card,
+  .quality-alerts-panel,
+  .chart-card,
+  .insight-panel,
+  .dynamic-tags-panel,
+  .duplicate-noise-panel,
+  .insight-clusters-panel,
+  .evidence-panel,
+  .product-insights-panel,
+  .product-insight-card {
+    break-inside: avoid;
+    box-shadow: none !important;
   }
 }
 </style>
