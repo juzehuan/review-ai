@@ -111,10 +111,6 @@
 
     <div class="page-toolbar review-controls">
       <a-space wrap>
-        <a-select v-model:value="filters.ratingStar" allow-clear placeholder="星级" class="filter-select-sm">
-          <a-select-option v-for="star in [1, 2, 3, 4, 5]" :key="star" :value="star">{{ star }} 星</a-select-option>
-        </a-select>
-
         <a-select v-model:value="filters.sentiment" allow-clear placeholder="情感" class="filter-select">
           <a-select-option value="positive">正向</a-select-option>
           <a-select-option value="neutral">中性</a-select-option>
@@ -125,57 +121,78 @@
           <a-select-option v-for="intent in intentOptions" :key="intent" :value="intent">{{ intent }}</a-select-option>
         </a-select>
 
-        <a-select v-model:value="filters.hasMedia" allow-clear placeholder="媒体" class="filter-select">
-          <a-select-option :value="true">有图/视频</a-select-option>
-          <a-select-option :value="false">纯文本</a-select-option>
-        </a-select>
-
-        <a-select v-model:value="filters.sourceChannel" allow-clear placeholder="来源" class="filter-select">
-          <a-select-option v-for="source in sourceChannelOptions" :key="source" :value="source">{{ source }}</a-select-option>
-        </a-select>
-
         <a-input v-model:value="filters.keyword" placeholder="关键词或标签" class="filter-input" allow-clear>
           <template #prefix><SearchOutlined /></template>
         </a-input>
 
-        <a-select v-model:value="groupBy" class="filter-select-lg">
-          <a-select-option value="sentiment">按情感分组</a-select-option>
-          <a-select-option value="ratingStar">按星级分组</a-select-option>
-          <a-select-option value="analysisTag">按 AI 标签分组</a-select-option>
-          <a-select-option value="intent">按评论意图分组</a-select-option>
-        </a-select>
-
-        <a-segmented v-model:value="viewMode" :options="viewOptions" />
-
-        <a-dropdown>
-          <a-button>
-            <template #icon><SettingOutlined /></template>
-            列
-          </a-button>
-          <template #overlay>
-            <div class="column-menu">
-              <a-checkbox-group v-model:value="visibleColumnKeys" :options="columnOptions" />
-            </div>
-          </template>
-        </a-dropdown>
-
         <a-button type="primary" ghost @click="loadReviews" :loading="loading">筛选</a-button>
         <a-button :disabled="!activeFilterCount" @click="resetFilters">重置</a-button>
         <a-tag v-if="activeFilterCount" color="blue">已启用 {{ activeFilterCount }} 个筛选</a-tag>
-        <a-button @click="saveCurrentView">
-          <template #icon><SaveOutlined /></template>
-          保存视图
-        </a-button>
-        <a-button @click="handleExport" :loading="exporting">
-          <template #icon><DownloadOutlined /></template>
-          导出当前结果
-        </a-button>
-        <a-button @click="setCurrentAsDefault" :disabled="!activeViewId">
-          <template #icon><StarOutlined /></template>
-          设为默认
+        <a-button @click="advancedFiltersOpen = true">
+          <template #icon><SettingOutlined /></template>
+          更多筛选{{ advancedFilterCount ? `(${advancedFilterCount})` : "" }}
         </a-button>
       </a-space>
     </div>
+
+    <a-drawer :open="advancedFiltersOpen" width="min(420px, 100vw)" title="更多筛选与视图" @close="advancedFiltersOpen = false">
+      <div class="advanced-filter-drawer">
+        <section class="advanced-filter-section">
+          <div class="advanced-section-title">筛选条件</div>
+          <div class="advanced-filter-grid">
+            <a-select v-model:value="filters.ratingStar" allow-clear placeholder="星级">
+              <a-select-option v-for="star in [1, 2, 3, 4, 5]" :key="star" :value="star">{{ star }} 星</a-select-option>
+            </a-select>
+            <a-select v-model:value="filters.hasMedia" allow-clear placeholder="媒体">
+              <a-select-option :value="true">有图/视频</a-select-option>
+              <a-select-option :value="false">纯文本</a-select-option>
+            </a-select>
+            <a-select v-model:value="filters.sourceChannel" allow-clear placeholder="来源" class="advanced-filter-wide">
+              <a-select-option v-for="source in sourceChannelOptions" :key="source" :value="source">{{ source }}</a-select-option>
+            </a-select>
+          </div>
+        </section>
+
+        <section class="advanced-filter-section">
+          <div class="advanced-section-title">视图方式</div>
+          <a-space wrap>
+            <a-select v-model:value="groupBy" class="filter-select-lg">
+              <a-select-option value="sentiment">按情感分组</a-select-option>
+              <a-select-option value="ratingStar">按星级分组</a-select-option>
+              <a-select-option value="analysisTag">按 AI 标签分组</a-select-option>
+              <a-select-option value="intent">按评论意图分组</a-select-option>
+            </a-select>
+            <a-segmented v-model:value="viewMode" :options="viewOptions" />
+          </a-space>
+        </section>
+
+        <section class="advanced-filter-section">
+          <div class="advanced-section-title">显示列</div>
+          <div class="column-menu column-menu-inline">
+            <a-checkbox-group v-model:value="visibleColumnKeys" :options="columnOptions" />
+          </div>
+        </section>
+
+        <section class="advanced-filter-section">
+          <div class="advanced-section-title">视图操作</div>
+          <a-space wrap>
+            <a-button type="primary" ghost @click="loadReviews" :loading="loading">应用筛选</a-button>
+            <a-button @click="saveCurrentView">
+              <template #icon><SaveOutlined /></template>
+              保存视图
+            </a-button>
+            <a-button @click="handleExport" :loading="exporting">
+              <template #icon><DownloadOutlined /></template>
+              导出当前结果
+            </a-button>
+            <a-button @click="setCurrentAsDefault" :disabled="!activeViewId">
+              <template #icon><StarOutlined /></template>
+              设为默认
+            </a-button>
+          </a-space>
+        </section>
+      </div>
+    </a-drawer>
 
     <div v-if="viewMode === 'table'" class="table-shell">
       <a-table
@@ -374,6 +391,7 @@ const actionItems = ref<ReviewActionItemDTO[]>([]);
 const selectedRow = ref<ReviewRowDTO | null>(null);
 const exporting = ref(false);
 const saveViewModalOpen = ref(false);
+const advancedFiltersOpen = ref(false);
 const pendingViewName = ref("");
 const activeViewId = ref<string>("");
 const savedViews = ref<SavedView[]>([]);
@@ -434,6 +452,9 @@ const totalCount = computed(() => pagination.total || 0);
 const mediaCount = computed(() => rows.value.filter((item) => item.hasMedia).length);
 const negativeCount = computed(() => rows.value.filter((item) => item.sentiment === "negative").length);
 const visibleColumns = computed(() => allColumns.filter((column) => visibleColumnKeys.value.includes(column.key)));
+const advancedFilterCount = computed(() =>
+  [filters.ratingStar, filters.hasMedia, filters.sourceChannel].filter((value) => value !== undefined && value !== "").length
+);
 const activeFilterCount = computed(() =>
   [filters.ratingStar, filters.sentiment, filters.intent, filters.hasMedia, filters.sourceChannel, filters.keyword.trim()].filter((value) => value !== undefined && value !== "").length +
   (evidenceIssue.value || evidenceReviewIds.value.length ? 1 : 0)

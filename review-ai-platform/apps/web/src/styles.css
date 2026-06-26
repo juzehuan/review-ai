@@ -1082,6 +1082,43 @@ select {
   flex: 0 0 auto;
 }
 
+.advanced-filter-drawer {
+  display: grid;
+  gap: 20px;
+}
+
+.advanced-filter-section {
+  display: grid;
+  gap: 10px;
+}
+
+.advanced-section-title {
+  color: #25324a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.advanced-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.advanced-filter-wide {
+  grid-column: 1 / -1;
+}
+
+.column-menu-inline {
+  min-width: 0;
+  box-shadow: none;
+}
+
+.column-menu-inline .ant-checkbox-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+
 .table-shell {
   padding: 12px;
   overflow: auto;
@@ -2665,6 +2702,11 @@ body {
   .review-controls .ant-btn {
     grid-column: span 2;
     width: 100%;
+  }
+
+  .advanced-filter-grid,
+  .column-menu-inline .ant-checkbox-group {
+    grid-template-columns: 1fr;
   }
 
   .view-strip {
