@@ -166,9 +166,12 @@
             <div class="log-title">实时日志</div>
             <div class="muted">{{ selectedTask ? selectedTask.name : "未选择任务" }}</div>
           </div>
-          <a-tag v-if="selectedRun" :color="runStatusColor(selectedRun.status)">
-            {{ runStatusLabel(selectedRun.status) }}
-          </a-tag>
+          <div class="log-head-actions">
+            <a-segmented v-model:value="logLevelFilter" size="small" :options="logLevelOptions" />
+            <a-tag v-if="selectedRun" :color="runStatusColor(selectedRun.status)">
+              {{ runStatusLabel(selectedRun.status) }}
+            </a-tag>
+          </div>
         </div>
 
         <div v-if="selectedRun" class="run-summary">
@@ -201,7 +204,8 @@
           <div v-if="!selectedTask" class="logs-empty">选择任务后查看日志</div>
           <div v-else-if="!selectedRun" class="logs-empty">该任务暂无分析批次</div>
           <div v-else-if="!logs.length" class="logs-empty">暂无日志，等待 worker 写入</div>
-          <div v-for="log in logs" :key="log.id" class="log-line" :class="`log-${log.level}`">
+          <div v-else-if="!filteredLogs.length" class="logs-empty">当前筛选下暂无日志</div>
+          <div v-for="log in filteredLogs" :key="log.id" class="log-line" :class="`log-${log.level}`">
             <span class="log-time">{{ formatTime(log.createdAt) }}</span>
             <a-tag :color="logColor(log.level)" class="log-level">{{ log.level }}</a-tag>
             <span class="log-message">{{ log.message }}</span>
@@ -262,6 +266,7 @@ const loading = ref(false);
 const starting = ref(false);
 const deletingTaskId = ref<string | null>(null);
 const autoRefresh = ref(true);
+const logLevelFilter = ref<"all" | "warn" | "error">("all");
 const showImport = ref(false);
 const showAppendImport = ref(false);
 const appendTask = ref<TaskListItem | null>(null);
@@ -300,7 +305,16 @@ const runColumns = [
   { title: "操作", key: "action", width: 130 }
 ];
 
+const logLevelOptions = [
+  { label: "全部", value: "all" },
+  { label: "警告", value: "warn" },
+  { label: "错误", value: "error" }
+];
+
 const hasWorkerLog = computed(() => logs.value.some((log) => log.message.includes("Worker picked up")));
+const filteredLogs = computed(() =>
+  logLevelFilter.value === "all" ? logs.value : logs.value.filter((log) => log.level === logLevelFilter.value)
+);
 
 function canCancel(run: AnalysisRunDTO) {
   return ["queued", "running"].includes(run.status);
@@ -728,6 +742,13 @@ onUnmounted(stopPolling);
 .log-title {
   font-size: 16px;
   font-weight: 700;
+}
+
+.log-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .muted,
