@@ -6,8 +6,14 @@
         <div class="toolbar-subtitle">管理当前工作空间的成员、角色和访问权限。</div>
       </div>
       <a-space wrap>
-        <a-button @click="load" :loading="loading">刷新</a-button>
-        <a-button type="primary" @click="openCreate">邀请成员</a-button>
+        <a-button @click="load" :loading="loading">
+          <template #icon><ReloadOutlined /></template>
+          刷新
+        </a-button>
+        <a-button type="primary" @click="openCreate">
+          <template #icon><UserAddOutlined /></template>
+          邀请成员
+        </a-button>
       </a-space>
     </div>
 
@@ -75,6 +81,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
 import { message } from "ant-design-vue";
+import { ReloadOutlined, UserAddOutlined } from "@ant-design/icons-vue";
 import type { MemberRole, WorkspaceMemberDTO } from "@review-ai/shared";
 import {
   createWorkspaceMember,

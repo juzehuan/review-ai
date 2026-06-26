@@ -6,9 +6,18 @@
         <div class="toolbar-subtitle">{{ pageSubtitle }}</div>
       </div>
       <a-space wrap>
-        <a-button @click="reloadCurrentSection" :loading="loading">刷新</a-button>
-        <a-button v-if="activeSection === 'workspace'" :disabled="!canManageMembers" @click="openMemberModal">添加成员</a-button>
-        <a-button v-if="activeSection === 'workspace'" type="primary" @click="modalOpen = true">新建空间</a-button>
+        <a-button @click="reloadCurrentSection" :loading="loading">
+          <template #icon><ReloadOutlined /></template>
+          刷新
+        </a-button>
+        <a-button v-if="activeSection === 'workspace'" :disabled="!canManageMembers" @click="openMemberModal">
+          <template #icon><UserAddOutlined /></template>
+          添加成员
+        </a-button>
+        <a-button v-if="activeSection === 'workspace'" type="primary" @click="modalOpen = true">
+          <template #icon><PlusOutlined /></template>
+          新建空间
+        </a-button>
       </a-space>
     </div>
 
@@ -145,8 +154,14 @@
             <div class="settings-section-title">{{ activePromptProfile?.label || "评论" }}提示词</div>
           </div>
           <a-space>
-            <a-button :disabled="!canEditAi" @click="resetDefaultPrompts">恢复默认提示词</a-button>
-            <a-button type="primary" :disabled="!canEditAi" :loading="savingAi" @click="saveAiSettings">保存设置</a-button>
+            <a-button :disabled="!canEditAi" @click="resetDefaultPrompts">
+              <template #icon><UndoOutlined /></template>
+              恢复默认提示词
+            </a-button>
+            <a-button type="primary" :disabled="!canEditAi" :loading="savingAi" @click="saveAiSettings">
+              <template #icon><SaveOutlined /></template>
+              保存设置
+            </a-button>
           </a-space>
         </div>
         <a-form layout="vertical" class="settings-form">
@@ -304,7 +319,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { message } from "ant-design-vue";
-import { DownloadOutlined } from "@ant-design/icons-vue";
+import { DownloadOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, UndoOutlined, UserAddOutlined } from "@ant-design/icons-vue";
 import {
   ANALYSIS_TYPE_PRESETS,
   AI_PROVIDER_PRESETS,

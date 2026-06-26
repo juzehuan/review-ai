@@ -3,7 +3,10 @@
     <div class="table-shell">
       <a-result status="403" title="需要超管权限" sub-title="当前账号没有平台超管权限。">
         <template #extra>
-          <a-button type="primary" @click="$router.push('/dashboard')">返回用户后台</a-button>
+          <a-button type="primary" @click="$router.push('/dashboard')">
+            <template #icon><ArrowLeftOutlined /></template>
+            返回用户后台
+          </a-button>
         </template>
       </a-result>
     </div>
@@ -16,9 +19,18 @@
         <div class="toolbar-subtitle">管理平台注册入口、普通用户配额和超管账号。普通用户后台只保留分析任务与个人设置。</div>
       </div>
       <a-space wrap>
-        <a-button @click="load" :loading="loading">刷新</a-button>
-        <a-button type="primary" @click="openInviteModal">生成邀请码</a-button>
-        <a-button @click="openUserModal">新建账号</a-button>
+        <a-button @click="load" :loading="loading">
+          <template #icon><ReloadOutlined /></template>
+          刷新
+        </a-button>
+        <a-button type="primary" @click="openInviteModal">
+          <template #icon><KeyOutlined /></template>
+          生成邀请码
+        </a-button>
+        <a-button @click="openUserModal">
+          <template #icon><UserAddOutlined /></template>
+          新建账号
+        </a-button>
       </a-space>
     </div>
 
@@ -181,6 +193,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
 import { message } from "ant-design-vue";
+import { ArrowLeftOutlined, KeyOutlined, ReloadOutlined, UserAddOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
 import type { Dayjs } from "dayjs";
 import type { AdminOverviewDTO, AdminUserDTO, InviteCodeDTO } from "@review-ai/shared";
