@@ -36,6 +36,12 @@ import type {
   CrawlerChannel
 } from "@review-ai/shared";
 
+declare module "axios" {
+  export interface AxiosRequestConfig {
+    skipAuthRedirect?: boolean;
+  }
+}
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api"
 });
@@ -58,7 +64,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401) {
+    const skipAuthRedirect =
+      Boolean(error?.config?.skipAuthRedirect) || window.location.pathname.startsWith("/share/");
+    if (error?.response?.status === 401 && !skipAuthRedirect) {
       window.localStorage.removeItem(AUTH_TOKEN_KEY);
       if (!window.location.pathname.startsWith("/login") && !window.location.pathname.startsWith("/register")) {
         window.location.href = "/login";
@@ -87,6 +95,17 @@ export function setWorkspaceSlug(slug: string) {
 
 export function getWorkspaceSlug() {
   return window.localStorage.getItem(WORKSPACE_SLUG_KEY);
+}
+
+function buildFrontendShareUrl(token: string) {
+  return `${window.location.origin.replace(/\/$/, "")}/share/${encodeURIComponent(token)}`;
+}
+
+function normalizeReportShare(share: ReportShareDTO): ReportShareDTO {
+  return {
+    ...share,
+    shareUrl: buildFrontendShareUrl(share.token)
+  };
 }
 
 export async function login(payload: { email: string; password: string }) {
@@ -396,21 +415,23 @@ export async function evaluatePrompts(payload?: {
 
 export async function fetchTaskReportShares(taskId: string) {
   const { data } = await api.get<ReportShareDTO[]>(`/tasks/${taskId}/shares`);
-  return data;
+  return data.map(normalizeReportShare);
 }
 
 export async function createTaskReportShare(taskId: string, payload?: { title?: string; expiresAt?: string | null }) {
   const { data } = await api.post<ReportShareDTO>(`/tasks/${taskId}/shares`, payload || {});
-  return data;
+  return normalizeReportShare(data);
 }
 
 export async function revokeTaskReportShare(taskId: string, shareId: string) {
   const { data } = await api.delete<ReportShareDTO>(`/tasks/${taskId}/shares/${shareId}`);
-  return data;
+  return normalizeReportShare(data);
 }
 
 export async function fetchSharedReport(token: string) {
-  const { data } = await api.get<SharedReportDTO>(`/public/reports/${token}`);
+  const { data } = await api.get<SharedReportDTO>(`/public/reports/${encodeURIComponent(token)}`, {
+    skipAuthRedirect: true
+  });
   return data;
 }
 
