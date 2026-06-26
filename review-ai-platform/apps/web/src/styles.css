@@ -62,8 +62,8 @@ select {
 
 .app-sidebar-collapsed .brand-copy,
 .app-sidebar-collapsed .workspace-card,
-.app-sidebar-collapsed .side-nav-group span,
-.app-sidebar-collapsed .side-nav-subitem span {
+.app-sidebar-collapsed .side-nav-group-label,
+.app-sidebar-collapsed .side-nav-label {
   display: none;
 }
 
@@ -73,13 +73,22 @@ select {
 }
 
 .app-sidebar-collapsed .side-nav-subitem {
+  width: 52px;
   min-height: 42px;
   justify-content: center;
   padding: 0;
+  margin: 0 auto;
+}
+
+.app-sidebar-collapsed .side-nav-icon {
+  flex-basis: auto;
+  width: 20px;
+  height: 20px;
+  font-size: 18px;
 }
 
 .app-sidebar-collapsed .side-nav-subitem::before {
-  margin-right: 0;
+  left: 3px;
 }
 
 .app-sidebar .ant-layout-sider-children {
@@ -279,6 +288,7 @@ select {
   min-height: 38px;
   display: flex;
   align-items: center;
+  gap: 10px;
   padding: 0 12px 0 34px;
   border: 0;
   border-radius: 8px;
@@ -288,6 +298,17 @@ select {
   font-size: 14px;
   font-weight: 760;
   text-align: left;
+}
+
+.side-nav-icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  font-size: 16px;
 }
 
 .side-nav-subitem:hover {
@@ -1801,6 +1822,7 @@ body {
 .side-nav-subitem {
   position: relative;
   min-height: 42px;
+  gap: 11px;
   padding-left: 18px;
   border: 1px solid transparent;
   color: rgba(238, 244, 255, 0.78);
@@ -1809,11 +1831,21 @@ body {
 
 .side-nav-subitem::before {
   content: "";
+  position: absolute;
+  left: 7px;
+  top: 50%;
   width: 4px;
-  height: 4px;
-  margin-right: 12px;
+  height: 20px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.28);
+  background: linear-gradient(180deg, var(--cyan), var(--green));
+  box-shadow: 0 0 16px rgba(0, 191, 216, 0.48);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 160ms ease;
+}
+
+.side-nav-icon {
+  color: rgba(140, 239, 255, 0.88);
 }
 
 .side-nav-subitem:hover {
@@ -1831,11 +1863,11 @@ body {
 }
 
 .side-nav-subitem.active::before {
-  width: 6px;
-  height: 18px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--cyan), var(--green));
-  box-shadow: 0 0 16px rgba(0, 191, 216, 0.72);
+  opacity: 1;
+}
+
+.side-nav-subitem.active .side-nav-icon {
+  color: #ffffff;
 }
 
 .side-nav-subitem.disabled {
@@ -2412,8 +2444,8 @@ body {
 
   .app-sidebar-collapsed .brand-copy,
   .app-sidebar-collapsed .workspace-card,
-  .app-sidebar-collapsed .side-nav-group span,
-  .app-sidebar-collapsed .side-nav-subitem span {
+  .app-sidebar-collapsed .side-nav-group-label,
+  .app-sidebar-collapsed .side-nav-label {
     display: block;
   }
 
@@ -2424,11 +2456,19 @@ body {
   }
 
   .app-sidebar-collapsed .side-nav-subitem {
+    width: 100%;
     padding: 0 12px 0 18px;
+    margin: 0;
   }
 
   .app-sidebar-collapsed .side-nav-subitem::before {
-    margin-right: 12px;
+    left: 7px;
+  }
+
+  .app-sidebar-collapsed .side-nav-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 16px;
   }
 
   .topbar {
@@ -2569,7 +2609,7 @@ body {
     display: none;
   }
 
-  .app-sidebar-collapsed .side-nav-subitem span {
+  .app-sidebar-collapsed .side-nav-label {
     display: block;
   }
 
@@ -3098,8 +3138,8 @@ body.app-device-mobile .page-toolbar {
 
   body.app-device-desktop .app-sidebar-collapsed .brand-copy,
   body.app-device-desktop .app-sidebar-collapsed .workspace-card,
-  body.app-device-desktop .app-sidebar-collapsed .side-nav-group span,
-  body.app-device-desktop .app-sidebar-collapsed .side-nav-subitem span {
+  body.app-device-desktop .app-sidebar-collapsed .side-nav-group-label,
+  body.app-device-desktop .app-sidebar-collapsed .side-nav-label {
     display: none;
   }
 
@@ -3123,8 +3163,25 @@ body.app-device-mobile .page-toolbar {
     padding: 0 12px 0 18px;
   }
 
+  body.app-device-desktop .app-sidebar-collapsed .side-nav-subitem {
+    width: 52px;
+    justify-content: center;
+    padding: 0;
+    margin: 0 auto;
+  }
+
+  body.app-device-desktop .app-sidebar-collapsed .side-nav-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 18px;
+  }
+
   body.app-device-desktop .side-nav-subitem::before {
     display: block;
+  }
+
+  body.app-device-desktop .app-sidebar-collapsed .side-nav-subitem::before {
+    left: 3px;
   }
 
   body.app-device-desktop .app-main {

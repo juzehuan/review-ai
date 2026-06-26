@@ -30,7 +30,7 @@
         <div v-for="section in navSections" :key="section.label" class="side-nav-section">
           <div class="side-nav-group" :class="{ active: sectionActive(section) }">
             <component :is="section.icon" />
-            <span>{{ section.label }}</span>
+            <span class="side-nav-group-label">{{ section.label }}</span>
           </div>
           <div class="side-nav-children">
             <button
@@ -41,9 +41,11 @@
               :class="{ active: itemActive(item), disabled: item.disabled }"
               :disabled="item.disabled"
               :title="item.label"
+              :aria-label="item.label"
               @click="router.push(item.path)"
             >
-              <span>{{ item.label }}</span>
+              <component :is="item.icon" class="side-nav-icon" aria-hidden="true" />
+              <span class="side-nav-label">{{ item.label }}</span>
             </button>
           </div>
         </div>
@@ -127,15 +129,23 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router";
 import { message } from "ant-design-vue";
 import {
+  ApiOutlined,
+  CloudDownloadOutlined,
   DatabaseOutlined,
+  DashboardOutlined,
+  ExperimentOutlined,
+  FileSearchOutlined,
   FolderOpenOutlined,
   LockOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   QuestionCircleOutlined,
+  RiseOutlined,
+  SafetyCertificateOutlined,
   SettingOutlined,
-  TeamOutlined
+  TeamOutlined,
+  UnorderedListOutlined
 } from "@ant-design/icons-vue";
 import { changePassword, clearAuthToken, getAuthToken, logout } from "@/api";
 import { useTaskStore } from "@/composables";
@@ -157,7 +167,7 @@ const passwordForm = reactive({
   confirmPassword: ""
 });
 
-type NavItem = { path: string; label: string; disabled: boolean };
+type NavItem = { path: string; label: string; disabled: boolean; icon: unknown };
 type NavSection = { label: string; icon: unknown; items: NavItem[] };
 
 const navSections = computed<NavSection[]>(() => [
@@ -165,11 +175,11 @@ const navSections = computed<NavSection[]>(() => [
     label: "用户后台",
     icon: FolderOpenOutlined,
     items: [
-      { path: "/dashboard", label: "任务看板", disabled: false },
-      { path: "/growth", label: "增长运营", disabled: false },
-      { path: "/crawl-jobs", label: "评论采集", disabled: false },
-      { path: "/analysis-runs", label: "分析记录", disabled: false },
-      { path: "/help", label: "帮助中心", disabled: false }
+      { path: "/dashboard", label: "任务看板", disabled: false, icon: DashboardOutlined },
+      { path: "/growth", label: "增长运营", disabled: false, icon: RiseOutlined },
+      { path: "/crawl-jobs", label: "评论采集", disabled: false, icon: CloudDownloadOutlined },
+      { path: "/analysis-runs", label: "分析记录", disabled: false, icon: UnorderedListOutlined },
+      { path: "/help", label: "帮助中心", disabled: false, icon: QuestionCircleOutlined }
     ]
   },
   ...(currentUser.value?.isSuperAdmin
@@ -178,8 +188,8 @@ const navSections = computed<NavSection[]>(() => [
           label: "模型与抓取",
           icon: SettingOutlined,
           items: [
-            { path: "/settings/ai", label: "提示词与模型", disabled: false },
-            { path: "/settings/crawler", label: "抓取设置", disabled: false }
+            { path: "/settings/ai", label: "提示词与模型", disabled: false, icon: ExperimentOutlined },
+            { path: "/settings/crawler", label: "抓取设置", disabled: false, icon: ApiOutlined }
           ]
         }
       ]
@@ -187,12 +197,12 @@ const navSections = computed<NavSection[]>(() => [
   {
     label: "平台管理",
     icon: TeamOutlined,
-    items: currentUser.value?.isSuperAdmin ? [{ path: "/admin", label: "超管后台", disabled: false }] : []
+    items: currentUser.value?.isSuperAdmin ? [{ path: "/admin", label: "超管后台", disabled: false, icon: SafetyCertificateOutlined }] : []
   },
   {
     label: "数据",
     icon: DatabaseOutlined,
-    items: [{ path: "/reviews", label: "评论明细", disabled: !workspace.value }]
+    items: [{ path: "/reviews", label: "评论明细", disabled: !workspace.value, icon: FileSearchOutlined }]
   }
 ].filter((section) => section.items.length));
 
