@@ -3,7 +3,7 @@
     <div class="page-toolbar help-hero">
       <div class="toolbar-title-block">
         <div class="toolbar-title">帮助中心</div>
-        <div class="toolbar-subtitle">培训常见问题、操作口径和排错建议。适合新用户自查，也适合讲师培训时直接讲解。</div>
+        <div class="toolbar-subtitle">真实使用中常见的问题、处理建议和排错口径。适合用户自查，也适合管理员统一回复。</div>
       </div>
       <a-space wrap>
         <a-button href="/downloads/ReviewIQ-ordinary-user-manual.docx" download="ReviewIQ-普通用户操作手册.docx">
@@ -23,7 +23,7 @@
 
     <section class="help-band">
       <div>
-        <div class="overview-kicker">培训现场三句话</div>
+        <div class="overview-kicker">使用前先确认</div>
         <h2>链接公开可访问，分析类型一定选对，报告结论回到评论原文抽查验证。</h2>
         <p>大多数用户问题都可以先按这三步判断：链接是否可采、任务类型是否匹配、AI 结论是否有原始评论证据。</p>
       </div>
@@ -115,7 +115,7 @@ const faqs: FaqItem[] = [
     id: 6,
     category: "评论采集",
     question: "最多采集条数填多少合适？",
-    answer: "培训或测试建议先填 100 到 300 条，确认链接和分析类型没问题后再加大。填 0 通常表示不限制，但实际数量仍受平台加载、网络、超时和抓取策略影响。"
+    answer: "首次使用或不确定链接质量时，建议先填 100 到 300 条，确认链接、来源渠道和分析类型都没问题后再加大。填 0 通常表示不限制，但实际数量仍受平台加载、网络、超时和抓取策略影响。"
   },
   {
     id: 7,
@@ -270,7 +270,7 @@ const faqs: FaqItem[] = [
   {
     id: 32,
     category: "数据安全",
-    question: "培训现场最重要的提醒是什么？",
+    question: "真实使用中最重要的注意事项是什么？",
     answer: "三句话：链接要公开可访问；分析类型一定要选对；报告结论要回到评论原文抽查验证。"
   }
 ];
