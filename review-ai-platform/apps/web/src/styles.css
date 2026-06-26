@@ -3009,6 +3009,7 @@ body.app-device-mobile .workspace-overview-page,
 body.app-device-mobile .dashboard-grid,
 body.app-device-mobile .review-page,
 body.app-device-mobile .runs-page,
+body.app-device-mobile .action-page,
 body.app-device-mobile .growth-page,
 body.app-device-mobile .crawler-page {
   width: 100%;
