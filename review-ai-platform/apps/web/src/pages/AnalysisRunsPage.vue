@@ -228,7 +228,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { message } from "ant-design-vue";
+import { Modal, message } from "ant-design-vue";
 import {
   CloudUploadOutlined,
   CheckSquareOutlined,
@@ -507,14 +507,20 @@ async function removeTask(task: TaskListItem) {
   }
 }
 
-async function confirmRemoveTask(task: TaskListItem) {
+function confirmRemoveTask(task: TaskListItem) {
   if (!canDeleteTask(task) || deletingTaskId.value === task.id) {
     return;
   }
-  const confirmed = window.confirm("确定删除该分析任务？评论、分析结果、报告分享和行动项都会被删除。");
-  if (confirmed) {
-    await removeTask(task);
-  }
+  Modal.confirm({
+    title: "删除分析任务",
+    content: "评论、分析结果、报告分享和行动项都会被删除。",
+    okText: "删除",
+    cancelText: "取消",
+    okButtonProps: { danger: true },
+    async onOk() {
+      await removeTask(task);
+    }
+  });
 }
 
 async function loadRuns() {

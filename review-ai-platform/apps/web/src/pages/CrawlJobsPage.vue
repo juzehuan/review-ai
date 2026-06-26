@@ -358,7 +358,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { message } from "ant-design-vue";
+import { Modal, message } from "ant-design-vue";
 import {
   DownloadOutlined,
   ExclamationCircleOutlined,
@@ -704,14 +704,20 @@ async function removeJob(job: CrawlJobDTO) {
   }
 }
 
-async function confirmRemoveJob(job: CrawlJobDTO) {
+function confirmRemoveJob(job: CrawlJobDTO) {
   if (!canDeleteJob(job) || deletingJobId.value === job.id) {
     return;
   }
-  const confirmed = window.confirm("确定删除这条采集记录？已生成的分析任务不会被删除。");
-  if (confirmed) {
-    await removeJob(job);
-  }
+  Modal.confirm({
+    title: "删除采集记录",
+    content: "已生成的分析任务不会被删除。",
+    okText: "删除",
+    cancelText: "取消",
+    okButtonProps: { danger: true },
+    async onOk() {
+      await removeJob(job);
+    }
+  });
 }
 
 function openTask(job: CrawlJobDTO) {
@@ -914,21 +920,29 @@ async function runMonitorNow(monitor: CrawlMonitorDTO) {
   }
 }
 
-async function removeMonitor(monitor: CrawlMonitorDTO) {
-  const confirmed = window.confirm(`确定删除监听任务「${monitor.name}」吗？历史采集记录和分析任务不会被删除。`);
-  if (!confirmed) {
+function removeMonitor(monitor: CrawlMonitorDTO) {
+  if (monitorActionId.value === monitor.id) {
     return;
   }
-  monitorActionId.value = monitor.id;
-  try {
-    await deleteCrawlMonitor(monitor.id);
-    monitors.value = monitors.value.filter((item) => item.id !== monitor.id);
-    writeWorkspaceCache("crawl-monitors", monitors.value);
-    message.success("监听任务已删除");
-    await loadMonitors();
-  } finally {
-    monitorActionId.value = null;
-  }
+  Modal.confirm({
+    title: "删除监听任务",
+    content: `确定删除监听任务「${monitor.name}」吗？历史采集记录和分析任务不会被删除。`,
+    okText: "删除",
+    cancelText: "取消",
+    okButtonProps: { danger: true },
+    async onOk() {
+      monitorActionId.value = monitor.id;
+      try {
+        await deleteCrawlMonitor(monitor.id);
+        monitors.value = monitors.value.filter((item) => item.id !== monitor.id);
+        writeWorkspaceCache("crawl-monitors", monitors.value);
+        message.success("监听任务已删除");
+        await loadMonitors();
+      } finally {
+        monitorActionId.value = null;
+      }
+    }
+  });
 }
 
 onMounted(() => {

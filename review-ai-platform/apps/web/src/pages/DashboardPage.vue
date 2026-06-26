@@ -353,7 +353,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { message } from "ant-design-vue";
+import { Modal, message } from "ant-design-vue";
 import type { EChartsOption } from "echarts";
 import * as echarts from "echarts/lib/echarts";
 import {
@@ -810,13 +810,21 @@ async function revokeShareLink(share: ReportShareDTO) {
   if (!selectedTask.value) {
     return;
   }
-  const confirmed = window.confirm("确定撤销这个分享链接吗？撤销后外部访问者将无法继续查看。");
-  if (!confirmed) {
-    return;
-  }
-  await revokeTaskReportShare(selectedTask.value.id, share.id);
-  message.success("分享链接已撤销。");
-  await loadShares();
+  Modal.confirm({
+    title: "撤销分享链接",
+    content: "撤销后外部访问者将无法继续查看。",
+    okText: "撤销",
+    cancelText: "取消",
+    okButtonProps: { danger: true },
+    async onOk() {
+      if (!selectedTask.value) {
+        return;
+      }
+      await revokeTaskReportShare(selectedTask.value.id, share.id);
+      message.success("分享链接已撤销。");
+      await loadShares();
+    }
+  });
 }
 
 function openActionBoard() {
