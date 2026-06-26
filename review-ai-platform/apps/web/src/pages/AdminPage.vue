@@ -205,6 +205,7 @@ import {
   fetchInviteCodes,
   updateAdminUser
 } from "@/api";
+import { copyTextToClipboard } from "@/utils/clipboard";
 
 const loading = ref(false);
 const saving = ref(false);
@@ -383,8 +384,12 @@ async function submitInvite() {
 }
 
 async function copyCode(code: string) {
-  await navigator.clipboard?.writeText(code);
-  message.success("邀请码已复制");
+  const copied = await copyTextToClipboard(code);
+  if (copied) {
+    message.success("邀请码已复制");
+  } else {
+    message.warning("浏览器未允许自动复制，请手动复制邀请码。");
+  }
 }
 
 function reviewPercent(record: AdminUserDTO) {

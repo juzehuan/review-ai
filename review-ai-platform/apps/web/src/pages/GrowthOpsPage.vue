@@ -225,6 +225,7 @@ import {
   fetchReviews
 } from "@/api";
 import { useTaskStore } from "@/composables";
+import { copyTextToClipboard } from "@/utils/clipboard";
 
 const router = useRouter();
 const { tasks, selectedTask, selectedTaskId, loadingTasks, refreshTasks, setSelectedTask } = useTaskStore();
@@ -419,8 +420,12 @@ async function copyShareUrl() {
   if (!shareUrl.value) {
     return;
   }
-  await navigator.clipboard.writeText(shareUrl.value);
-  message.success("交付链接已复制。");
+  const copied = await copyTextToClipboard(shareUrl.value);
+  if (copied) {
+    message.success("交付链接已复制。");
+  } else {
+    message.warning("浏览器未允许自动复制，请手动复制输入框中的链接。");
+  }
 }
 
 function openShareUrl() {

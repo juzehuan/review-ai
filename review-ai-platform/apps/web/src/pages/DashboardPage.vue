@@ -416,6 +416,7 @@ import {
 import EChartCard from "@/components/EChartCard.vue";
 import { createActionItem, createTaskReportShare, fetchDashboard, fetchTaskReportShares, revokeTaskReportShare } from "@/api";
 import { useTaskStore } from "@/composables";
+import { copyTextToClipboard } from "@/utils/clipboard";
 import type { DashboardDTO, ReportShareDTO, Sentiment } from "@review-ai/shared";
 import {
   CHART_COLORS,
@@ -883,16 +884,27 @@ async function createShareLink() {
       title: selectedTask.value.productName || selectedTask.value.name
     });
     await loadShares();
-    await copyShareLink(share.shareUrl);
-    message.success("分享链接已生成并复制。");
+    const copied = await copyShareLink(share.shareUrl, false);
+    if (copied) {
+      message.success("分享链接已生成并复制。");
+    } else {
+      message.warning("分享链接已生成，但浏览器未允许自动复制，请手动复制输入框中的链接。");
+    }
   } finally {
     shareCreating.value = false;
   }
 }
 
-async function copyShareLink(shareUrl: string) {
-  await navigator.clipboard.writeText(shareUrl);
-  message.success("分享链接已复制。");
+async function copyShareLink(shareUrl: string, showMessage = true) {
+  const copied = await copyTextToClipboard(shareUrl);
+  if (showMessage) {
+    if (copied) {
+      message.success("分享链接已复制。");
+    } else {
+      message.warning("浏览器未允许自动复制，请手动复制输入框中的链接。");
+    }
+  }
+  return copied;
 }
 
 function handleExportMenu(info: { key: string | number }) {
