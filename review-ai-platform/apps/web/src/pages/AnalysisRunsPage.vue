@@ -67,30 +67,33 @@
                 <template #icon><FileTextOutlined /></template>
                 分析报告
               </a-button>
-              <a-button size="small" @click.stop="openLogs(record)">
-                <template #icon><FileSearchOutlined /></template>
-                分析日志
-              </a-button>
-              <a-button size="small" @click.stop="openActions(record)">
-                <template #icon><CheckSquareOutlined /></template>
-                行动项
-              </a-button>
-              <a-button size="small" :disabled="!canWriteWorkspace" @click.stop="appendReviews(record)">
-                <template #icon><FileAddOutlined /></template>
-                追加评论
-              </a-button>
-              <a-popconfirm title="确定删除该分析任务？评论、分析结果、报告分享和行动项都会被删除。" @confirm="removeTask(record)">
-                <a-button
-                  size="small"
-                  danger
-                  :disabled="!canDeleteTask(record)"
-                  :loading="deletingTaskId === record.id"
-                  @click.stop
-                >
-                  <template #icon><DeleteOutlined /></template>
-                  删除
+              <a-dropdown>
+                <a-button size="small" @click.stop>
+                  更多
+                  <template #icon><MoreOutlined /></template>
                 </a-button>
-              </a-popconfirm>
+                <template #overlay>
+                  <a-menu class="task-action-menu" @click.stop>
+                    <a-menu-item key="logs" @click="openLogs(record)">
+                      <FileSearchOutlined />
+                      分析日志
+                    </a-menu-item>
+                    <a-menu-item key="actions" @click="openActions(record)">
+                      <CheckSquareOutlined />
+                      行动项
+                    </a-menu-item>
+                    <a-menu-item key="append" :disabled="!canWriteWorkspace" @click="appendReviews(record)">
+                      <FileAddOutlined />
+                      追加评论
+                    </a-menu-item>
+                    <a-menu-divider />
+                    <a-menu-item key="delete" danger :disabled="!canDeleteTask(record)" @click="confirmRemoveTask(record)">
+                      <DeleteOutlined />
+                      {{ deletingTaskId === record.id ? "删除中" : "删除" }}
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </a-space>
           </template>
         </template>
@@ -229,6 +232,7 @@ import {
   FileAddOutlined,
   FileSearchOutlined,
   FileTextOutlined,
+  MoreOutlined,
   ReloadOutlined,
   RobotOutlined,
   StopOutlined,
@@ -284,7 +288,7 @@ const taskColumns = [
   { title: "导入状态", key: "taskStatus", width: 120 },
   { title: "分析状态", key: "analysisStatus", width: 130 },
   { title: "创建时间", key: "createdAt", width: 180 },
-  { title: "操作", key: "actions", width: 520 }
+  { title: "操作", key: "actions", width: 280 }
 ];
 
 const runColumns = [
@@ -489,6 +493,16 @@ async function removeTask(task: TaskListItem) {
   }
 }
 
+async function confirmRemoveTask(task: TaskListItem) {
+  if (!canDeleteTask(task) || deletingTaskId.value === task.id) {
+    return;
+  }
+  const confirmed = window.confirm("确定删除该分析任务？评论、分析结果、报告分享和行动项都会被删除。");
+  if (confirmed) {
+    await removeTask(task);
+  }
+}
+
 async function loadRuns() {
   if (!selectedTask.value) {
     runs.value = [];
@@ -668,7 +682,7 @@ onUnmounted(stopPolling);
 }
 
 .task-actions {
-  gap: 8px 10px !important;
+  gap: 6px !important;
   flex-wrap: nowrap !important;
 }
 
@@ -676,6 +690,15 @@ onUnmounted(stopPolling);
   border-radius: 6px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+:global(.task-action-menu) {
+  min-width: 150px;
+}
+
+:global(.task-action-menu .ant-dropdown-menu-item) {
+  gap: 8px;
+  min-height: 36px;
 }
 
 .runs-layout {
