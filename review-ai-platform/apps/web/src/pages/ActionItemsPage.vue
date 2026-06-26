@@ -540,7 +540,7 @@ onMounted(load);
 
 @media (max-width: 1280px) {
   .action-summary-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -561,6 +561,10 @@ onMounted(load);
     gap: 14px;
   }
 
+  .action-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .action-column {
     min-height: auto;
     padding: 12px;
@@ -576,8 +580,13 @@ onMounted(load);
     box-shadow: 0 8px 18px rgba(12, 20, 36, 0.07);
   }
 
+  .action-card-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .action-card-actions :deep(.ant-btn) {
-    flex: 1 1 auto;
+    width: 100%;
   }
 
   .action-empty {
