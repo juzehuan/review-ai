@@ -13,6 +13,7 @@
     "mtop.lazada.review.item.getpcreviewlist",             // Lazada
     "/api/shop/pdp_desktop/get_product_reviews",           // TikTok Shop
     "/api/comment/list/",                                  // TikTok video comments
+    "/api/graphql/",                                       // Facebook comments
     "/youtubei/v1/next",                                   // YouTube comments
     "/youtubei/v1/browse"                                  // YouTube continuations
   ];
@@ -61,10 +62,15 @@
     return TARGET_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
   };
 
+  const parseJsonText = (text) => {
+    const normalized = String(text || "").replace(/^\s*for\s*\(;;\);\s*/, "");
+    return JSON.parse(normalized);
+  };
+
   const emitFetchResponse = async ({ url, method, response }) => {
     if (!isTargetRequest(url) || !response) return;
     try {
-      const data = await response.clone().json();
+      const data = parseJsonText(await response.clone().text());
       postPayload({
         channel: "fetch",
         method,
@@ -103,7 +109,7 @@
       const meta = this.__reviewExporterMeta;
       if (!meta?.url || !isTargetRequest(meta.url)) return;
       try {
-        const data = JSON.parse(this.responseText);
+        const data = parseJsonText(this.responseText);
         postPayload({
           channel: "xhr",
           method: meta.method || "GET",

@@ -18,8 +18,17 @@ interface ParseReviewOptions {
   sourceChannel?: string;
 }
 
+const MISSING_RATING_SOURCE_CHANNELS = ["youtube", "facebook", "tiktok video", "tiktok-video"];
+const MISSING_RATING_ROW_PLATFORMS = ["youtube", "facebook", "facebook-post", "youtube-video", "tiktok-video"];
+
 function allowsMissingRating(sourceChannel?: string) {
-  return String(sourceChannel || "").toLowerCase().includes("youtube");
+  const channel = String(sourceChannel || "").toLowerCase();
+  return MISSING_RATING_SOURCE_CHANNELS.some((source) => channel.includes(source));
+}
+
+function rowAllowsMissingRating(platform?: unknown) {
+  const platformText = String(platform || "").toLowerCase();
+  return MISSING_RATING_ROW_PLATFORMS.some((platform) => platformText.includes(platform));
 }
 
 function parseBoolean(value: unknown) {
@@ -76,10 +85,9 @@ function normalizeReviewRows(rows: Array<Record<string, unknown>>, options: Pars
   const normalized = rows
     .map<ParsedReviewInput | null>((row) => {
     const cmtId = String(row.cmtid || "").trim();
-    const rowPlatform = String(row.platform || "").toLowerCase();
-    const ratingText = String(row.rating_star || row.rating || "").trim();
+    const ratingText = String(row.rating_star || row.rateing_star || row.ratingStar || row.rating || "").trim();
     const ratingStar = Number(ratingText || 0);
-    const rowAllowsMissingRating = allowMissingRating || rowPlatform.includes("youtube");
+    const allowMissingRowRating = allowMissingRating || rowAllowsMissingRating(row.platform);
     const comment = String(row.comment || "").trim();
     const commentTr = String(row.comment_tr || "").trim() || null;
 
@@ -87,7 +95,7 @@ function normalizeReviewRows(rows: Array<Record<string, unknown>>, options: Pars
       throw new Error("CSV 缺少 cmtid");
     }
 
-    if (!ratingStar && !rowAllowsMissingRating) {
+    if (!ratingStar && !allowMissingRowRating) {
       throw new Error(`评论 ${cmtId} 缺少 rating_star`);
     }
 

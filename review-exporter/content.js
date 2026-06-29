@@ -224,6 +224,7 @@ const consumeApiResponse = ({ url, data }) => {
     currentSortMode: state.currentSortMode,
     captureIndex: state.captureIndex
   });
+  if (adapter.id === "facebook-post" && !parsed?.reviews?.length) return false;
   return consumeParsedReviews(parsed, { url });
 };
 
@@ -356,6 +357,7 @@ const runDomMode = async () => {
 };
 
 const reachedMaxItems = () => {
+  if (adapter?.id === "facebook-post") return false;
   const max = Number(state.settings.maxItems || 0);
   return max > 0 && state.reviewMap.size >= max;
 };
@@ -431,12 +433,20 @@ const runScrollableDomMode = async () => {
   const delay = computeEffectiveDelay("dom", state.settings, adapter);
   addLog(`[${adapter.label}] Pacing ${delay}ms while scrolling.`);
 
-  await adapter.scrollToReviewSection();
+  if (adapter.prepareDomCapture) {
+    const prepared = await adapter.prepareDomCapture({
+      settings: state.settings,
+      currentSortMode: state.currentSortMode,
+      reviewCount: state.reviewMap.size
+    });
+    if (prepared?.message) addLog(`[${adapter.label}] ${prepared.message}`);
+  } else {
+    await adapter.scrollToReviewSection();
+  }
   consumeDomSnapshot("initial");
   await sleep(900);
   consumeDomSnapshot("settled");
 
-  let idleRounds = 0;
   while (!state.stopRequested && !reachedMaxItems()) {
     const before = state.reviewMap.size;
     const click = await adapter.clickNextPage({
@@ -444,23 +454,19 @@ const runScrollableDomMode = async () => {
       currentSortMode: state.currentSortMode,
       reviewCount: state.reviewMap.size
     });
+    if (!click.clicked) {
+      consumeDomSnapshot("final");
+      addLog(`[${adapter.label}] Stopped loading: ${click.reason || "no more comments button"}.`);
+      break;
+    }
     await sleep(delay);
     consumeDomSnapshot("scroll");
 
     const added = state.reviewMap.size - before;
-    if (added <= 0) {
-      idleRounds += 1;
-    } else {
-      idleRounds = 0;
+    if (added > 0) {
       addLog(`[${adapter.label}] Added ${added} comments after scroll.`);
-    }
-
-    if (!click.clicked && idleRounds >= 1) {
-      addLog(`[${adapter.label}] Stopped scrolling: ${click.reason || "unknown"}.`);
-      break;
-    }
-    if (idleRounds >= 4) {
-      addLog(`[${adapter.label}] No new comments after repeated scrolls; done.`);
+    } else if (adapter.id !== "facebook-post") {
+      addLog(`[${adapter.label}] No new comments after scroll; done.`);
       break;
     }
   }

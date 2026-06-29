@@ -30,8 +30,8 @@
         <a-form-item v-if="!appendTask" label="项目名称">
           <a-input v-model:value="form.name" placeholder="例如：Shopee 泰国 Q7 评论分析" />
         </a-form-item>
-        <a-form-item v-if="!appendTask" label="商品名称">
-          <a-input v-model:value="form.productName" placeholder="例如：Roborock Q7 TF+" />
+        <a-form-item v-if="!appendTask" :label="contentNameMeta.label">
+          <a-input v-model:value="form.productName" :placeholder="contentNameMeta.placeholder" />
         </a-form-item>
         <a-form-item v-if="!appendTask" label="来源渠道">
           <a-select v-model:value="form.sourceChannel" :options="sourceChannelOptions" />
@@ -100,6 +100,25 @@ const analysisTypeOptions = ANALYSIS_TYPE_PRESETS.map((item) => ({
   label: item.label,
   value: item.value
 }));
+
+const contentNameMeta = computed(() => {
+  if (form.analysisType === "video") {
+    return {
+      label: "视频名称",
+      placeholder: "例如：YouTube 视频评论"
+    };
+  }
+  if (form.analysisType === "tweet") {
+    return {
+      label: "推文名称",
+      placeholder: "例如：Facebook 推文评论"
+    };
+  }
+  return {
+    label: "商品名称",
+    placeholder: "例如：Roborock Q7 TF+"
+  };
+});
 
 const currentAnalysisTypeDescription = computed(() => {
   return ANALYSIS_TYPE_PRESETS.find((item) => item.value === form.analysisType)?.description || "";
@@ -172,7 +191,7 @@ async function submit() {
   }
 
   if (!props.appendTask && !form.productName) {
-    message.error("请填写项目名称和商品名称。");
+    message.error(`请填写项目名称和${contentNameMeta.value.label}。`);
     return;
   }
 
