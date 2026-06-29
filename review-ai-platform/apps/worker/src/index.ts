@@ -2005,25 +2005,38 @@ function normalizeCrawlRow(row: Record<string, unknown>, fallback: { shopId: str
   };
 }
 
-async function autoImportAndAnalyzeFromMonitor(
-  crawlJob: NonNullable<Awaited<ReturnType<typeof prisma.crawlJob.findUnique>>> & {
-    monitor?: {
-      id: string;
-      workspaceId: string;
-      taskId: string | null;
-      name: string;
-      productName: string;
-      sourceChannel: string;
-      analysisType: string;
-      autoAnalyze: boolean;
-    } | null;
-  },
-  result: CrawlResult
+type AutoImportTarget = {
+  workspaceId: string;
+  taskId: string | null;
+  name: string;
+  productName: string;
+  sourceChannel: string;
+  analysisType: string;
+  autoAnalyze: boolean;
+  monitorId?: string | null;
+};
+
+async function autoImportAndAnalyzeCrawlResult(
+  crawlJob: NonNullable<Awaited<ReturnType<typeof prisma.crawlJob.findUnique>>>,
+  result: CrawlResult,
+  target: AutoImportTarget
 ) {
-  const monitor = crawlJob.monitor;
-  if (!monitor?.autoAnalyze) {
+  if (!target.autoAnalyze) {
     return;
   }
+
+  const markAutoImportError = async (jobMessage: string, monitorMessage = jobMessage) => {
+    await prisma.crawlJob.update({
+      where: { id: crawlJob.id },
+      data: { lastError: jobMessage }
+    });
+    if (target.monitorId) {
+      await prisma.crawlMonitor.update({
+        where: { id: target.monitorId },
+        data: { lastError: monitorMessage }
+      });
+    }
+  };
 
   const fallback = {
     shopId: result.shopId || crawlJob.platform,
@@ -2042,15 +2055,12 @@ async function autoImportAndAnalyzeFromMonitor(
     });
 
   if (!normalizedRows.length) {
-    await prisma.crawlMonitor.update({
-      where: { id: monitor.id },
-      data: { lastError: "本次采集没有可导入的新评论" }
-    });
+    await markAutoImportError("本次采集没有可导入的新评论");
     return;
   }
 
-  const existingTask = monitor.taskId
-    ? await prisma.task.findFirst({ where: { id: monitor.taskId, workspaceId: monitor.workspaceId } })
+  const existingTask = target.taskId
+    ? await prisma.task.findFirst({ where: { id: target.taskId, workspaceId: target.workspaceId } })
     : null;
   const existingIds = existingTask
     ? new Set(
@@ -2073,45 +2083,36 @@ async function autoImportAndAnalyzeFromMonitor(
       where: { id: crawlJob.id },
       data: { status: "imported", importedRows: 0, skippedDuplicate }
     });
-    await prisma.crawlMonitor.update({
-      where: { id: monitor.id },
-      data: { taskId: existingTask.id, lastError: null }
-    });
+    if (target.monitorId) {
+      await prisma.crawlMonitor.update({
+        where: { id: target.monitorId },
+        data: { taskId: existingTask.id, lastError: null }
+      });
+    }
     return;
   }
 
-  const subscription = await prisma.subscription.findUnique({ where: { workspaceId: monitor.workspaceId } });
+  const subscription = await prisma.subscription.findUnique({ where: { workspaceId: target.workspaceId } });
   if (subscription && subscription.currentPeriodReviewCount + rowsToCreate.length > subscription.monthlyReviewLimit) {
-    await prisma.crawlMonitor.update({
-      where: { id: monitor.id },
-      data: { lastError: "评论额度不足，监听任务已暂停自动导入" }
-    });
-    await prisma.crawlJob.update({
-      where: { id: crawlJob.id },
-      data: { lastError: "评论额度不足，无法自动导入" }
-    });
+    await markAutoImportError(
+      "评论额度不足，无法自动导入",
+      target.monitorId ? "评论额度不足，监听任务已暂停自动导入" : "评论额度不足，无法自动导入"
+    );
     return;
   }
   if (subscription && subscription.currentPeriodRunCount + 1 > subscription.monthlyRunLimit) {
-    await prisma.crawlMonitor.update({
-      where: { id: monitor.id },
-      data: { lastError: "分析次数额度不足，监听任务已暂停自动分析" }
-    });
-    await prisma.crawlJob.update({
-      where: { id: crawlJob.id },
-      data: { lastError: "分析次数额度不足，无法自动分析" }
-    });
+    await markAutoImportError(
+      "分析次数额度不足，无法自动分析",
+      target.monitorId ? "分析次数额度不足，监听任务已暂停自动分析" : "分析次数额度不足，无法自动分析"
+    );
     return;
   }
 
   const aiSetting = existingTask
     ? await loadAiSetting(existingTask.id)
-    : await loadAiSettingForWorkspace(monitor.workspaceId, monitor.analysisType as AnalysisType);
+    : await loadAiSettingForWorkspace(target.workspaceId, target.analysisType as AnalysisType);
   if (process.env.ENABLE_MOCK_AI !== "true" && !aiSetting.apiKey) {
-    await prisma.crawlMonitor.update({
-      where: { id: monitor.id },
-      data: { lastError: "AI API Key 未配置，无法自动分析" }
-    });
+    await markAutoImportError("AI API Key 未配置，无法自动分析");
     return;
   }
 
@@ -2120,13 +2121,13 @@ async function autoImportAndAnalyzeFromMonitor(
     if (!task) {
       task = await tx.task.create({
         data: {
-          workspaceId: monitor.workspaceId,
-          name: monitor.name,
-          productName: monitor.productName || result.productName || monitor.name,
+          workspaceId: target.workspaceId,
+          name: target.name,
+          productName: target.productName || result.productName || target.name,
           shopId: fallback.shopId,
           itemId: fallback.itemId,
-          sourceChannel: monitor.sourceChannel,
-          analysisType: monitor.analysisType,
+          sourceChannel: target.sourceChannel,
+          analysisType: target.analysisType,
           status: "imported"
         }
       });
@@ -2155,14 +2156,14 @@ async function autoImportAndAnalyzeFromMonitor(
         modelName: row.modelName,
         hasMedia: row.hasMedia,
         commentTime: row.commentTime,
-        sourceChannel: monitor.sourceChannel,
+        sourceChannel: target.sourceChannel,
         rawJson: row.rawJson as Prisma.InputJsonValue
       })),
       skipDuplicates: true
     });
 
     await tx.subscription.update({
-      where: { workspaceId: monitor.workspaceId },
+      where: { workspaceId: target.workspaceId },
       data: {
         currentPeriodReviewCount: { increment: inserted.count },
         currentPeriodRunCount: { increment: 1 }
@@ -2185,8 +2186,8 @@ async function autoImportAndAnalyzeFromMonitor(
       data: {
         runId: run.id,
         level: "info",
-        message: "Analysis run queued from crawl monitor",
-        meta: { crawlJobId: crawlJob.id, monitorId: monitor.id, insertedRows: inserted.count }
+        message: target.monitorId ? "Analysis run queued from crawl monitor" : "Analysis run queued from TikTok crawl job",
+        meta: { crawlJobId: crawlJob.id, monitorId: target.monitorId || null, insertedRows: inserted.count }
       }
     });
 
@@ -2205,14 +2206,16 @@ async function autoImportAndAnalyzeFromMonitor(
       }
     });
 
-    await tx.crawlMonitor.update({
-      where: { id: monitor.id },
-      data: {
-        taskId: task.id,
-        lastCrawlJobId: crawlJob.id,
-        lastError: null
-      }
-    });
+    if (target.monitorId) {
+      await tx.crawlMonitor.update({
+        where: { id: target.monitorId },
+        data: {
+          taskId: task.id,
+          lastCrawlJobId: crawlJob.id,
+          lastError: null
+        }
+      });
+    }
 
     return { run, taskId: task.id };
   });
@@ -2220,7 +2223,56 @@ async function autoImportAndAnalyzeFromMonitor(
   await analysisQueue.add("run-analysis", {
     runId: transactionResult.run.id,
     taskId: transactionResult.taskId,
-    workspaceId: monitor.workspaceId
+    workspaceId: target.workspaceId
+  });
+}
+
+async function autoImportAndAnalyzeFromMonitor(
+  crawlJob: NonNullable<Awaited<ReturnType<typeof prisma.crawlJob.findUnique>>> & {
+    monitor?: {
+      id: string;
+      workspaceId: string;
+      taskId: string | null;
+      name: string;
+      productName: string;
+      sourceChannel: string;
+      analysisType: string;
+      autoAnalyze: boolean;
+    } | null;
+  },
+  result: CrawlResult
+) {
+  const monitor = crawlJob.monitor;
+  if (!monitor) {
+    return;
+  }
+  await autoImportAndAnalyzeCrawlResult(crawlJob, result, {
+    workspaceId: monitor.workspaceId,
+    taskId: monitor.taskId,
+    name: monitor.name,
+    productName: monitor.productName,
+    sourceChannel: monitor.sourceChannel,
+    analysisType: monitor.analysisType,
+    autoAnalyze: monitor.autoAnalyze,
+    monitorId: monitor.id
+  });
+}
+
+async function autoImportAndAnalyzeFromTikTokCrawlJob(
+  crawlJob: NonNullable<Awaited<ReturnType<typeof prisma.crawlJob.findUnique>>>,
+  result: CrawlResult
+) {
+  if (crawlJob.platform !== "tiktok-video" || crawlJob.taskId) {
+    return;
+  }
+  await autoImportAndAnalyzeCrawlResult(crawlJob, result, {
+    workspaceId: crawlJob.workspaceId,
+    taskId: crawlJob.taskId,
+    name: crawlJob.name,
+    productName: crawlJob.productName,
+    sourceChannel: crawlJob.sourceChannel,
+    analysisType: crawlJob.analysisType,
+    autoAnalyze: true
   });
 }
 
@@ -2397,6 +2449,14 @@ const crawlWorker = new Worker(
             where: { id: crawlJob.monitorId! },
             data: { lastError: message }
           });
+          await prisma.crawlJob.update({
+            where: { id: crawlJob.id },
+            data: { lastError: message }
+          });
+        });
+      } else if (crawlJob.platform === "tiktok-video") {
+        await autoImportAndAnalyzeFromTikTokCrawlJob(crawlJob, result).catch(async (error) => {
+          const message = error instanceof Error ? error.message : String(error);
           await prisma.crawlJob.update({
             where: { id: crawlJob.id },
             data: { lastError: message }

@@ -1,21 +1,21 @@
 <template>
   <a-modal
     :open="open"
-    :title="appendTask ? '追加评论' : '新建分析项目'"
+    :title="appendTask ? t('import.appendTitle') : t('import.createTitle')"
     width="720px"
     :confirm-loading="loading"
-    :ok-text="appendTask ? '追加导入' : '导入并创建'"
-    cancel-text="取消"
+    :ok-text="appendTask ? t('import.appendOk') : t('import.createOk')"
+    :cancel-text="t('common.cancel')"
     @cancel="emit('close')"
     @ok="submit"
   >
     <div class="import-modal-layout">
       <div class="import-side-note">
-        <div class="import-note-title">支持格式</div>
+        <div class="import-note-title">{{ t("import.supportedFormats") }}</div>
         <div class="import-note-item">CSV</div>
         <div class="import-note-item">Excel .xls</div>
         <div class="import-note-item">Excel .xlsx</div>
-        <div class="import-note-copy">字段表头需包含 cmtid、rating_star、comment 或 comment_tr。</div>
+        <div class="import-note-copy">{{ t("import.fieldHint") }}</div>
       </div>
 
       <a-form layout="vertical" class="import-form">
@@ -24,23 +24,23 @@
           type="info"
           show-icon
           class="append-import-alert"
-          :message="`追加到：${appendTask.name}`"
-          description="已存在的评论 ID 会自动跳过，只会导入新增评论。追加后请重新发起分析以覆盖新增样本。"
+          :message="t('import.appendMessage', { name: appendTask.name })"
+          :description="t('import.appendDescription')"
         />
-        <a-form-item v-if="!appendTask" label="项目名称">
-          <a-input v-model:value="form.name" placeholder="例如：Shopee 泰国 Q7 评论分析" />
+        <a-form-item v-if="!appendTask" :label="t('import.projectName')">
+          <a-input v-model:value="form.name" :placeholder="t('import.projectPlaceholder')" />
         </a-form-item>
         <a-form-item v-if="!appendTask" :label="contentNameMeta.label">
           <a-input v-model:value="form.productName" :placeholder="contentNameMeta.placeholder" />
         </a-form-item>
-        <a-form-item v-if="!appendTask" label="来源渠道">
+        <a-form-item v-if="!appendTask" :label="t('import.sourceChannel')">
           <a-select v-model:value="form.sourceChannel" :options="sourceChannelOptions" />
         </a-form-item>
-        <a-form-item v-if="!appendTask" label="分析类型">
+        <a-form-item v-if="!appendTask" :label="t('import.analysisType')">
           <a-select v-model:value="form.analysisType" :options="analysisTypeOptions" />
           <div class="settings-help">{{ currentAnalysisTypeDescription }}</div>
         </a-form-item>
-        <a-form-item label="评论文件">
+        <a-form-item :label="t('import.reviewFile')">
           <a-upload-dragger
             name="file"
             :max-count="1"
@@ -53,8 +53,8 @@
             <p class="ant-upload-drag-icon">
               <InboxOutlined />
             </p>
-            <p class="ant-upload-text">拖拽文件到这里，或点击选择文件</p>
-            <p class="ant-upload-hint">支持 CSV、XLS、XLSX，单次上传 1 个文件。</p>
+            <p class="ant-upload-text">{{ t("import.uploadText") }}</p>
+            <p class="ant-upload-hint">{{ t("import.uploadHint") }}</p>
           </a-upload-dragger>
         </a-form-item>
       </a-form>
@@ -75,6 +75,7 @@ import {
   type AnalysisType,
   type TaskListItem
 } from "@review-ai/shared";
+import { useI18n } from "@/i18n";
 
 const props = defineProps<{ open: boolean; appendTask?: TaskListItem | null }>();
 const emit = defineEmits<{
@@ -84,6 +85,7 @@ const emit = defineEmits<{
 
 const loading = ref(false);
 const fileList = ref<UploadProps["fileList"]>([]);
+const { t } = useI18n();
 const form = reactive({
   name: "",
   productName: "",
@@ -96,32 +98,32 @@ const sourceChannelOptions = SOURCE_CHANNEL_PRESETS.map((channel) => ({
   label: channel.label,
   value: channel.value
 }));
-const analysisTypeOptions = ANALYSIS_TYPE_PRESETS.map((item) => ({
-  label: item.label,
+const analysisTypeOptions = computed(() => ANALYSIS_TYPE_PRESETS.map((item) => ({
+  label: t(`analysisType.${item.value}`),
   value: item.value
-}));
+})));
 
 const contentNameMeta = computed(() => {
   if (form.analysisType === "video") {
     return {
-      label: "视频名称",
-      placeholder: "例如：YouTube 视频评论"
+      label: t("import.contentName.video"),
+      placeholder: t("import.contentPlaceholder.video")
     };
   }
   if (form.analysisType === "tweet") {
     return {
-      label: "推文名称",
-      placeholder: "例如：Facebook 推文评论"
+      label: t("import.contentName.tweet"),
+      placeholder: t("import.contentPlaceholder.tweet")
     };
   }
   return {
-    label: "商品名称",
-    placeholder: "例如：Roborock Q7 TF+"
+    label: t("import.contentName.product"),
+    placeholder: t("import.contentPlaceholder.product")
   };
 });
 
 const currentAnalysisTypeDescription = computed(() => {
-  return ANALYSIS_TYPE_PRESETS.find((item) => item.value === form.analysisType)?.description || "";
+  return t(`analysisType.${form.analysisType}Description`);
 });
 
 function isSupportedFile(file: File) {
@@ -132,7 +134,7 @@ function isSupportedFile(file: File) {
 const beforeUpload: UploadProps["beforeUpload"] = (file) => {
   const rawFile = file as File;
   if (!isSupportedFile(rawFile)) {
-    message.error("仅支持 CSV、XLS、XLSX 文件。");
+    message.error(t("import.fileTypeError"));
     return false;
   }
 
@@ -181,17 +183,17 @@ watch(
 
 async function submit() {
   if (!form.file) {
-    message.error("请上传评论文件。");
+    message.error(t("import.fileRequired"));
     return;
   }
 
   if (!props.appendTask && !form.name) {
-    message.error("请填写项目名称。");
+    message.error(t("import.projectRequired"));
     return;
   }
 
   if (!props.appendTask && !form.productName) {
-    message.error(`请填写项目名称和${contentNameMeta.value.label}。`);
+    message.error(t("import.contentRequired", { label: contentNameMeta.value.label }));
     return;
   }
 
@@ -199,7 +201,7 @@ async function submit() {
   try {
     if (props.appendTask) {
       const result = await appendImport(props.appendTask.id, form.file!);
-      message.success(`追加完成：新增 ${result.newRows} 条，跳过 ${result.skippedRows} 条。`);
+      message.success(t("import.appendSuccess", { newRows: result.newRows, skippedRows: result.skippedRows }));
       emit("success", result.taskId);
     } else {
       const result = await importTask({
@@ -209,7 +211,7 @@ async function submit() {
         analysisType: form.analysisType,
         file: form.file!
       });
-      message.success(`导入成功，共 ${result.reviewCount} 条评论。`);
+      message.success(t("import.createSuccess", { reviewCount: result.reviewCount }));
       emit("success", result.taskId);
     }
     emit("close");
@@ -222,7 +224,7 @@ async function submit() {
       typeof (error as { response?: { data?: { message?: string; error?: string } } }).response?.data?.message ===
         "string"
         ? (error as { response?: { data?: { message?: string } } }).response!.data!.message!
-        : "导入失败，请检查文件格式或后端服务状态。";
+        : t("import.failed");
     message.error(messageText);
   } finally {
     loading.value = false;

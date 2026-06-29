@@ -6,6 +6,30 @@
 
   const API_PATTERNS = ["/api/comment/list/"];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const COMMENT_LIST_SELECTOR = [
+    "[data-e2e='comment-list']",
+    "[data-e2e='browse-comment']",
+    "[class*='DivCommentListContainer']",
+    "[class*='CommentList']"
+  ].join(",");
+  const COMMENT_PANEL_SELECTOR = [
+    COMMENT_LIST_SELECTOR,
+    "[class*='DivCommentMain']",
+    "[class*='RightPanelContainer']"
+  ].join(",");
+  const COMMENT_ITEM_SELECTOR = [
+    "[data-e2e='comment-item']",
+    "div[class*='DivCommentObjectWrapper']",
+    "div[class*='DivCommentItemWrapper']",
+    "div[class*='CommentItem']",
+    "[data-e2e='comment-level-1']"
+  ].join(",");
+  const COMMENT_TEXT_SELECTOR = [
+    "[data-e2e='comment-level-1'] .TUXText",
+    "[data-e2e='comment-level-1'] span",
+    "[data-e2e='comment-level-1'] p",
+    "[data-e2e='comment-level-1']"
+  ].join(",");
 
   const normalizeHasMore = (value) => {
     if (value === undefined || value === null) return null;
@@ -15,6 +39,69 @@
   };
 
   const textOf = (el) => (el?.textContent || "").replace(/\s+/g, " ").trim();
+
+  const isVisible = (el) => {
+    if (!el || typeof el.getBoundingClientRect !== "function") return false;
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+  };
+
+  const findCommentList = () => [...document.querySelectorAll(COMMENT_LIST_SELECTOR)].find(isVisible) || null;
+
+  const waitForCommentList = async (timeoutMs = 6000) => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const list = findCommentList();
+      if (list) return list;
+      await sleep(250);
+    }
+    return null;
+  };
+
+  const scoreCommentButton = (button) => {
+    if (!isVisible(button) || button.closest(COMMENT_PANEL_SELECTOR)) return -1000;
+    const rect = button.getBoundingClientRect();
+    const label = [
+      button.getAttribute("aria-label"),
+      button.getAttribute("title"),
+      button.getAttribute("data-e2e"),
+      button.getAttribute("data-testid"),
+      button.textContent
+    ].filter(Boolean).join(" ").toLowerCase();
+    const pathText = [...button.querySelectorAll("svg path")].map((path) => path.getAttribute("d") || "").join(" ");
+    let score = 0;
+
+    if (/comment|comments|评论|評論|留言/.test(label)) score += 120;
+    if (/reply|回复|回覆/.test(label)) score -= 60;
+    if (/tux-web-icon-button/.test(label)) score += 12;
+    if (/M2\s+21\.5|22\s+7\.78|14\s+25a3|34\s+25/i.test(pathText)) score += 90;
+    if (/M24\s+12\.62|m24\s+27\.76|M5\s+24a4/i.test(pathText)) score -= 45;
+    if (rect.left > window.innerWidth * 0.45) score += 8;
+    if (rect.width <= 72 && rect.height <= 72) score += 8;
+    return score;
+  };
+
+  const findCommentButton = () => {
+    const selectors = [
+      "button[data-e2e*='comment' i]",
+      "[role='button'][data-e2e*='comment' i]",
+      "button[aria-label*='comment' i]",
+      "button[aria-label*='评论']",
+      "button[aria-label*='評論']",
+      "button[data-testid='tux-web-icon-button']",
+      "button"
+    ].join(",");
+    return [...document.querySelectorAll(selectors)]
+      .map((button) => ({ button, score: scoreCommentButton(button) }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)[0]?.button || null;
+  };
+
+  const getCommentItemRoot = (node) =>
+    node.closest("div[class*='DivCommentObjectWrapper'], [data-e2e='comment-item'], div[class*='CommentItem']") ||
+    node.closest("div[class*='DivCommentItemWrapper']") ||
+    node;
 
   const parseCount = (value) => {
     if (value == null || value === "") return 0;
@@ -47,6 +134,13 @@
     return "";
   };
 
+  const getCommentImageUrls = (comment) => {
+    const images = Array.isArray(comment?.image_list) ? comment.image_list : [];
+    return images
+      .map((image) => getBestUrl(image?.origin_url) || getBestUrl(image?.crop_url) || getBestUrl(image))
+      .filter(Boolean);
+  };
+
   const buildAuthorUrl = (uniqueId) => {
     if (!uniqueId) return "";
     return `https://www.tiktok.com/@${String(uniqueId).replace(/^@/, "")}`;
@@ -57,7 +151,7 @@
     return match?.[1] || "";
   };
 
-  const normalizeBase = ({ product, rawId, userId, authorName, avatarUrl, text, likeCount, createTime, replyCount }) => {
+  const normalizeBase = ({ product, rawId, userId, authorName, avatarUrl, imageUrls = [], text, likeCount, createTime, replyCount }) => {
     const ts = Number(createTime || 0);
     const tsMs = Number.isFinite(ts) && ts > 0 ? (ts > 100000000000 ? ts : ts * 1000) : 0;
     const uniqueId = authorName || "";
@@ -83,10 +177,10 @@
       model_name: "",
       options: "",
       product_name: product?.title || "",
-      images: avatarUrl || "",
+      images: imageUrls.length ? imageUrls.join("|") : avatarUrl || "",
       video_urls: product?.url || "",
       video_covers: "",
-      has_media: Boolean(avatarUrl),
+      has_media: imageUrls.length > 0,
       region: "",
       review_type: "comment",
       product_quality: "",
@@ -107,13 +201,15 @@
   const normalizeApiComment = (comment, product) => {
     const user = comment?.user || {};
     const uniqueId = user.unique_id || user.uniqueId || user.sec_uid || user.nickname || "";
+    const imageUrls = getCommentImageUrls(comment);
     return normalizeBase({
       product,
       rawId: comment.cid || comment.comment_id || comment.id || "",
       userId: user.uid || user.id || "",
       authorName: uniqueId,
       avatarUrl: getBestUrl(user.avatar_thumb || user.avatarThumb || user.avatar_medium || user.avatarMedium),
-      text: comment.text || comment.comment || "",
+      imageUrls,
+      text: comment.text || comment.comment || (imageUrls.length ? "[image comment]" : ""),
       likeCount: comment.digg_count ?? comment.like_count ?? comment.diggCount,
       createTime: comment.create_time || comment.createTime,
       replyCount: comment.reply_comment_total ?? comment.reply_count ?? comment.replyCommentTotal
@@ -121,27 +217,32 @@
   };
 
   const normalizeDomComment = (el, product) => {
+    const root = getCommentItemRoot(el);
     const authorLink =
-      el.querySelector("a[href^='/@'], a[href*='tiktok.com/@']") ||
+      root.querySelector("a[href^='/@'], a[href*='tiktok.com/@']") ||
       el.closest("[data-e2e]")?.querySelector("a[href^='/@'], a[href*='tiktok.com/@']");
-    const uniqueId = textOf(authorLink).replace(/^@/, "");
+    const authorHref = authorLink?.getAttribute("href") || "";
+    const uniqueId = (authorHref.match(/\/@([^/?#]+)/)?.[1] || textOf(authorLink)).replace(/^@/, "");
     const textEl =
-      el.querySelector("[data-e2e*='comment-level-1'] p, [data-e2e*='comment'] p") ||
-      el.querySelector("p, span");
+      root.querySelector(COMMENT_TEXT_SELECTOR) ||
+      root.querySelector("[data-e2e*='comment'] p, [data-e2e*='comment'] span") ||
+      root.querySelector("p, span");
     const likeEl =
-      el.querySelector("[data-e2e*='comment-like-count'], [class*='like-count' i]") ||
-      el.querySelector("strong");
-    const avatar = el.querySelector("img");
+      root.querySelector("[data-e2e*='comment-like-count'], [class*='like-count' i], [class*='LikeContainer'] span") ||
+      root.querySelector("[aria-label*='like' i], [aria-label*='赞'], [aria-label*='讚']") ||
+      root.querySelector("strong");
+    const avatar = root.querySelector("img");
     const text = textOf(textEl);
+    const likeText = textOf(likeEl) || likeEl?.getAttribute("aria-label") || "";
 
     return normalizeBase({
       product,
-      rawId: el.getAttribute("data-id") || el.getAttribute("id") || "",
+      rawId: root.getAttribute("data-id") || root.getAttribute("id") || "",
       userId: "",
       authorName: uniqueId,
       avatarUrl: avatar?.src || "",
       text,
-      likeCount: textOf(likeEl),
+      likeCount: likeText,
       createTime: "",
       replyCount: ""
     });
@@ -153,7 +254,7 @@
     get itemLabel() { return "Video"; }
     get itemCountLabel() { return "Comments"; }
     get pageCountLabel() { return "Scroll loads"; }
-    get supportsDirectApi() { return true; }
+    get supportsDirectApi() { return false; }
     get directApiPageSize() { return 50; }
     get supportsReplies() { return false; }
 
@@ -189,11 +290,14 @@
           ? data.data.comments
           : [];
       const hasMore = data?.has_more ?? data?.data?.has_more ?? null;
+      const cursor = data?.cursor ?? data?.data?.cursor ?? null;
+      const totalItems = data?.total ?? data?.data?.total ?? null;
       return {
         reviews: rawComments.map((comment) => normalizeApiComment(comment, product)),
         paging: {
-          pageNo: context.captureIndex || null,
-          totalItems: data?.total || data?.data?.total || null
+          pageNo: cursor ?? context.captureIndex ?? null,
+          cursor,
+          totalItems
         },
         hasMore: normalizeHasMore(hasMore),
         summary: null
@@ -233,15 +337,39 @@
       return String(review?.cmtid || "");
     }
 
+    async openCommentPanel() {
+      const existing = findCommentList();
+      if (existing) return { opened: true, alreadyOpen: true };
+
+      const button = findCommentButton();
+      if (!button) {
+        return { opened: false, reason: "comment button not found" };
+      }
+
+      button.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+      await sleep(300);
+      button.click();
+      const list = await waitForCommentList(6500);
+      return list
+        ? { opened: true, alreadyOpen: false }
+        : { opened: false, reason: "comment panel did not open" };
+    }
+
+    async prepareDomCapture() {
+      const opened = await this.openCommentPanel();
+      return {
+        ...opened,
+        message: opened.opened
+          ? opened.alreadyOpen
+            ? "Comment panel already open."
+            : "Comment panel opened."
+          : `Could not open comment panel: ${opened.reason || "unknown"}.`
+      };
+    }
+
     collectDomReviews(context = {}) {
       const product = context.product || this.parseProductInfo();
-      const selectors = [
-        "[data-e2e='comment-item']",
-        "[data-e2e*='comment-level-1']",
-        "div[class*='CommentItem']",
-        "div[class*='DivCommentItem']"
-      ];
-      const nodes = [...document.querySelectorAll(selectors.join(","))];
+      const nodes = [...new Set([...document.querySelectorAll(COMMENT_ITEM_SELECTOR)].map(getCommentItemRoot))];
       const reviews = [];
       const seen = new Set();
       for (const node of nodes) {
@@ -260,9 +388,8 @@
     }
 
     async scrollToReviewSection() {
-      const commentPanel =
-        document.querySelector("[data-e2e='comment-list'], [class*='CommentList'], [class*='DivCommentList']") ||
-        document.querySelector("[data-e2e='browse-comment']");
+      await this.openCommentPanel();
+      const commentPanel = findCommentList();
       if (commentPanel) {
         commentPanel.scrollIntoView({ behavior: "smooth", block: "center" });
         await sleep(900);
@@ -274,14 +401,15 @@
 
     getCommentScrollTarget() {
       return (
-        document.querySelector("[data-e2e='comment-list'], [class*='CommentList'], [class*='DivCommentList']") ||
-        document.querySelector("[data-e2e='browse-comment']") ||
+        findCommentList() ||
+        [...document.querySelectorAll("[class*='DivCommentMain'], [class*='RightPanelContainer']")].find(isVisible) ||
         document.scrollingElement ||
         document.documentElement
       );
     }
 
     async clickNextPage() {
+      await this.openCommentPanel();
       const target = this.getCommentScrollTarget();
       const beforeTop = target.scrollTop || window.scrollY;
       const beforeHeight = target.scrollHeight || document.documentElement.scrollHeight;

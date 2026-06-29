@@ -1,39 +1,52 @@
 <template>
   <div class="auth-page">
+    <a-dropdown :trigger="['click']">
+      <button type="button" class="language-chip auth-language-chip" :aria-label="t('common.language')">
+        <GlobalOutlined />
+        <span>{{ currentLanguageLabel }}</span>
+      </button>
+      <template #overlay>
+        <a-menu :selected-keys="[locale]" @click="handleLocaleMenuClick">
+          <a-menu-item v-for="option in languageOptions" :key="option.value">
+            {{ option.nativeLabel }}
+          </a-menu-item>
+        </a-menu>
+      </template>
+    </a-dropdown>
     <div class="auth-panel">
       <div class="brand-block auth-brand">
         <div class="brand-mark">RI</div>
         <div>
           <div class="brand-title">ReviewIQ Cloud</div>
-          <div class="brand-subtitle">使用邀请码开通用户后台</div>
+          <div class="brand-subtitle">{{ t("auth.registerSubtitle") }}</div>
         </div>
       </div>
 
       <a-form layout="vertical" @submit.prevent="submit">
-        <a-form-item label="姓名">
-          <a-input v-model:value="form.name" placeholder="你的姓名" />
+        <a-form-item :label="t('auth.name')">
+          <a-input v-model:value="form.name" :placeholder="t('auth.namePlaceholder')" />
         </a-form-item>
-        <a-form-item label="邮箱">
-          <a-input v-model:value="form.email" placeholder="name@example.com" />
+        <a-form-item :label="t('auth.email')">
+          <a-input v-model:value="form.email" :placeholder="t('auth.emailPlaceholder')" />
         </a-form-item>
-        <a-form-item label="密码">
-          <a-input-password v-model:value="form.password" autocomplete="new-password" placeholder="至少 6 位" />
+        <a-form-item :label="t('auth.password')">
+          <a-input-password v-model:value="form.password" autocomplete="new-password" :placeholder="t('auth.passwordPlaceholder')" />
         </a-form-item>
-        <a-form-item label="邀请码">
-          <a-input v-model:value="form.inviteCode" placeholder="RI-XXXXXXXX-XXXXXX" />
+        <a-form-item :label="t('auth.inviteCode')">
+          <a-input v-model:value="form.inviteCode" :placeholder="t('auth.inviteCodePlaceholder')" />
         </a-form-item>
         <a-alert
           class="import-alert"
           type="info"
           show-icon
-          message="普通用户注册必须使用超管生成的邀请码；每个邀请码只能使用一次。"
+          :message="t('auth.inviteNotice')"
         />
-        <a-button type="primary" html-type="submit" size="large" block :loading="loading">注册并进入用户后台</a-button>
+        <a-button type="primary" html-type="submit" size="large" block :loading="loading">{{ t("auth.registerSubmit") }}</a-button>
       </a-form>
 
       <div class="auth-footer">
-        已有账号？
-        <router-link to="/login">去登录</router-link>
+        {{ t("auth.hasAccount") }}
+        <router-link to="/login">{{ t("auth.goLogin") }}</router-link>
       </div>
     </div>
   </div>
@@ -44,11 +57,14 @@ import { reactive, ref } from "vue";
 import axios from "axios";
 import { message } from "ant-design-vue";
 import { useRouter } from "vue-router";
+import { GlobalOutlined } from "@ant-design/icons-vue";
 import { register } from "@/api";
 import { useTaskStore } from "@/composables";
+import { type AppLocale, useI18n } from "@/i18n";
 
 const router = useRouter();
 const { setAuthState, refreshTasks } = useTaskStore();
+const { locale, languageOptions, currentLanguageLabel, setLocale, t } = useI18n();
 const loading = ref(false);
 const form = reactive({
   name: "",
@@ -57,9 +73,13 @@ const form = reactive({
   inviteCode: ""
 });
 
+function handleLocaleMenuClick(event: { key: string | number }) {
+  setLocale(String(event.key) as AppLocale);
+}
+
 async function submit() {
   if (!form.name || !form.email || form.password.length < 6 || !form.inviteCode) {
-    message.error("请完整填写注册信息，密码至少 6 位，并输入邀请码。");
+    message.error(t("auth.registerRequired"));
     return;
   }
 
@@ -72,11 +92,11 @@ async function submit() {
   } catch (error: unknown) {
     if (axios.isAxiosError(error)) {
       const messageText =
-        typeof error.response?.data?.message === "string" ? error.response.data.message : "注册失败，请检查填写内容。";
+        typeof error.response?.data?.message === "string" ? error.response.data.message : t("auth.registerFailed");
       message.error(messageText);
       return;
     }
-    message.error("注册失败，请稍后重试。");
+    message.error(t("auth.registerRetry"));
   } finally {
     loading.value = false;
   }

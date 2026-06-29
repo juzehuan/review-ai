@@ -431,6 +431,7 @@ const runYouTubeMode = async () => {
 
 const runScrollableDomMode = async () => {
   const delay = computeEffectiveDelay("dom", state.settings, adapter);
+  let idleRounds = 0;
   addLog(`[${adapter.label}] Pacing ${delay}ms while scrolling.`);
 
   if (adapter.prepareDomCapture) {
@@ -449,6 +450,8 @@ const runScrollableDomMode = async () => {
 
   while (!state.stopRequested && !reachedMaxItems()) {
     const before = state.reviewMap.size;
+    const previousCaptureTimestamp = state.lastCapturedAt;
+    const previousRequestTimestamp = state.lastMatchedRequestAt;
     const click = await adapter.clickNextPage({
       settings: state.settings,
       currentSortMode: state.currentSortMode,
@@ -462,11 +465,32 @@ const runScrollableDomMode = async () => {
     await sleep(delay);
     consumeDomSnapshot("scroll");
 
-    const added = state.reviewMap.size - before;
+    let added = state.reviewMap.size - before;
+    if (adapter.id === "tiktok-video" && added <= 0 && state.hasMore !== false) {
+      const captured = await waitForCondition(
+        () => state.lastCapturedAt > previousCaptureTimestamp || state.lastMatchedRequestAt > previousRequestTimestamp,
+        adapter.responseTimeoutMs
+      );
+      if (captured) {
+        await sleep(500);
+        consumeDomSnapshot("scroll-settled");
+        added = state.reviewMap.size - before;
+      }
+    }
+
     if (added > 0) {
+      idleRounds = 0;
       addLog(`[${adapter.label}] Added ${added} comments after scroll.`);
+    } else if (adapter.id === "tiktok-video" && state.hasMore !== false && idleRounds < 1) {
+      idleRounds += 1;
+      addLog(`[${adapter.label}] No new comments yet; retrying scroll once.`);
     } else if (adapter.id !== "facebook-post") {
       addLog(`[${adapter.label}] No new comments after scroll; done.`);
+      break;
+    }
+
+    if (adapter.id === "tiktok-video" && state.hasMore === false) {
+      addLog(`[${adapter.label}] hasMore=false, done.`);
       break;
     }
   }
@@ -496,7 +520,7 @@ const startScrape = async () => {
   await loadSettings();
 
   const requested = state.settings.paginationMode === "api" ? "api" : "dom";
-  const useApi = (adapter.id === "tiktok-video" && adapter.supportsDirectApi) || (requested === "api" && adapter.supportsDirectApi);
+  const useApi = requested === "api" && adapter.supportsDirectApi;
   if (requested === "api" && !adapter.supportsDirectApi) {
     addLog(`[${adapter.label}] Direct API is not supported by this adapter; falling back to DOM mode.`);
   }
@@ -510,10 +534,10 @@ const startScrape = async () => {
   try {
     if (adapter.id === "youtube-video") {
       await runYouTubeMode();
-    } else if (adapter.id === "facebook-post") {
-      await runScrollableDomMode();
     } else if (useApi) {
       await runApiMode();
+    } else if (adapter.id === "facebook-post" || adapter.id === "tiktok-video") {
+      await runScrollableDomMode();
     } else {
       await runDomMode();
     }

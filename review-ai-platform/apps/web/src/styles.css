@@ -1435,6 +1435,34 @@ select {
   cursor: pointer;
 }
 
+.language-chip {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid rgba(116, 139, 174, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #172033;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.language-chip:hover {
+  border-color: rgba(47, 107, 255, 0.42);
+  color: #1f5eff;
+}
+
+.auth-language-chip {
+  position: fixed;
+  top: 20px;
+  right: 22px;
+  z-index: 5;
+  box-shadow: 0 12px 28px rgba(11, 20, 35, 0.12);
+}
+
 .group-item:hover {
   border-color: #9dbbff;
   box-shadow: 0 8px 18px rgba(16, 24, 40, 0.08);
@@ -3063,6 +3091,17 @@ body.app-device-mobile .topbar-help-button {
 }
 
 body.app-device-mobile .topbar-help-button > span:not(.ant-btn-icon) {
+  display: none;
+}
+
+body.app-device-mobile .language-chip {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  justify-content: center;
+}
+
+body.app-device-mobile .language-chip span:not(.anticon) {
   display: none;
 }
 

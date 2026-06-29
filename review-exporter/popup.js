@@ -144,7 +144,7 @@ const renderSettings = (state, running) => {
   }
 
   if (apiUnsupportedNote) {
-    const showWarn = state?.platform && state.supportsDirectApi === false && !isYouTube && !isTikTokVideo && !isFacebookPost;
+    const showWarn = state?.platform && state.supportsDirectApi === false && !isYouTube && !isFacebookPost;
     apiUnsupportedNote.hidden = !showWarn;
   }
   setControlDisabled(running);

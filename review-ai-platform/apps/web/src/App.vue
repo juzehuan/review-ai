@@ -1,29 +1,30 @@
 <template>
-  <div v-if="isPublicRoute" class="public-route-shell" :class="appDeviceClass">
-    <router-view />
-  </div>
+  <a-config-provider :locale="antdLocale">
+    <div v-if="isPublicRoute" class="public-route-shell" :class="appDeviceClass">
+      <router-view />
+    </div>
 
-  <a-layout v-else class="app-shell" :class="appDeviceClass">
+    <a-layout v-else class="app-shell" :class="appDeviceClass">
     <a-layout-sider theme="light" width="288" class="app-sidebar" :class="{ 'app-sidebar-collapsed': sidebarCollapsed }">
       <div class="brand-block">
         <div class="brand-mark">RI</div>
         <div class="brand-copy">
           <div class="brand-title">ReviewIQ</div>
-          <div class="brand-subtitle">{{ currentUser?.isSuperAdmin ? "Admin Console" : "User Console" }}</div>
+          <div class="brand-subtitle">{{ currentUser?.isSuperAdmin ? t("shell.adminConsole") : t("shell.userConsole") }}</div>
         </div>
       </div>
 
       <div class="workspace-card">
         <div class="workspace-card-top">
-          <span>用户配额</span>
+          <span>{{ t("shell.userQuota") }}</span>
           <a-tag :color="currentUser?.isSuperAdmin ? 'purple' : 'blue'">
-            {{ currentUser?.isSuperAdmin ? "超管" : "用户" }}
+            {{ currentUser?.isSuperAdmin ? t("common.superAdmin") : t("common.user") }}
           </a-tag>
         </div>
-        <div class="quota-card-title">{{ currentUser?.name || "当前账号" }}</div>
-        <div class="workspace-card-meta">{{ usageText }} 评论额度已用</div>
+        <div class="quota-card-title">{{ currentUser?.name || t("common.currentAccount") }}</div>
+        <div class="workspace-card-meta">{{ usageText }} {{ t("shell.reviewQuotaUsed") }}</div>
         <a-progress :percent="usagePercent" :show-info="false" size="small" />
-        <div class="workspace-card-meta quota-card-secondary">{{ runUsageText }} 分析次数已用</div>
+        <div class="workspace-card-meta quota-card-secondary">{{ runUsageText }} {{ t("shell.runQuotaUsed") }}</div>
       </div>
 
       <nav class="side-nav">
@@ -61,7 +62,7 @@
           </template>
         </a-button>
         <div class="topbar-left">
-          <div class="topbar-eyebrow">{{ currentUser?.isSuperAdmin ? "Super Admin" : "User Backend" }}</div>
+          <div class="topbar-eyebrow">{{ currentUser?.isSuperAdmin ? t("shell.superAdmin") : t("shell.userBackend") }}</div>
           <div class="topbar-title">{{ pageTitle }}</div>
         </div>
 
@@ -70,12 +71,25 @@
             <template #icon>
               <QuestionCircleOutlined />
             </template>
-            帮助
+            {{ t("common.help") }}
           </a-button>
+          <a-dropdown :trigger="['click']">
+            <button type="button" class="language-chip" :aria-label="t('common.language')">
+              <GlobalOutlined />
+              <span>{{ currentLanguageLabel }}</span>
+            </button>
+            <template #overlay>
+              <a-menu :selected-keys="[locale]" @click="handleLocaleMenuClick">
+                <a-menu-item v-for="option in languageOptions" :key="option.value">
+                  {{ option.nativeLabel }}
+                </a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
           <a-dropdown>
             <button type="button" class="account-chip">
               <span class="account-avatar">{{ accountInitial }}</span>
-              <span class="account-name">{{ currentUser?.name || "账号" }}</span>
+              <span class="account-name">{{ currentUser?.name || t("common.account") }}</span>
             </button>
             <template #overlay>
               <a-menu>
@@ -83,11 +97,11 @@
                 <a-menu-divider />
                 <a-menu-item key="password" @click="openPasswordModal">
                   <LockOutlined />
-                  修改密码
+                  {{ t("shell.changePassword") }}
                 </a-menu-item>
                 <a-menu-item key="logout" @click="handleLogout">
                   <LogoutOutlined />
-                  退出登录
+                  {{ t("shell.logout") }}
                 </a-menu-item>
               </a-menu>
             </template>
@@ -99,35 +113,39 @@
         <router-view />
       </main>
     </a-layout>
-  </a-layout>
+    </a-layout>
 
-  <a-modal
-    v-model:open="passwordModalOpen"
-    title="修改密码"
-    ok-text="保存"
-    cancel-text="取消"
-    :confirm-loading="changingPassword"
-    @ok="submitPasswordChange"
-    @cancel="resetPasswordForm"
-  >
-    <a-form layout="vertical">
-      <a-form-item label="旧密码">
-        <a-input-password v-model:value="passwordForm.oldPassword" autocomplete="current-password" />
-      </a-form-item>
-      <a-form-item label="新密码">
-        <a-input-password v-model:value="passwordForm.newPassword" autocomplete="new-password" placeholder="至少 6 位" />
-      </a-form-item>
-      <a-form-item label="确认新密码">
-        <a-input-password v-model:value="passwordForm.confirmPassword" autocomplete="new-password" />
-      </a-form-item>
-    </a-form>
-  </a-modal>
+    <a-modal
+      v-model:open="passwordModalOpen"
+      :title="t('shell.changePassword')"
+      :ok-text="t('common.save')"
+      :cancel-text="t('common.cancel')"
+      :confirm-loading="changingPassword"
+      @ok="submitPasswordChange"
+      @cancel="resetPasswordForm"
+    >
+      <a-form layout="vertical">
+        <a-form-item :label="t('shell.oldPassword')">
+          <a-input-password v-model:value="passwordForm.oldPassword" autocomplete="current-password" />
+        </a-form-item>
+        <a-form-item :label="t('shell.newPassword')">
+          <a-input-password v-model:value="passwordForm.newPassword" autocomplete="new-password" :placeholder="t('shell.passwordPlaceholder')" />
+        </a-form-item>
+        <a-form-item :label="t('shell.confirmNewPassword')">
+          <a-input-password v-model:value="passwordForm.confirmPassword" autocomplete="new-password" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+  </a-config-provider>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { message } from "ant-design-vue";
+import enUS from "ant-design-vue/es/locale/en_US";
+import thTH from "ant-design-vue/es/locale/th_TH";
+import zhCN from "ant-design-vue/es/locale/zh_CN";
 import {
   ApiOutlined,
   CloudDownloadOutlined,
@@ -136,6 +154,7 @@ import {
   ExperimentOutlined,
   FileSearchOutlined,
   FolderOpenOutlined,
+  GlobalOutlined,
   LockOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
@@ -149,10 +168,12 @@ import {
 } from "@ant-design/icons-vue";
 import { changePassword, clearAuthToken, getAuthToken, logout } from "@/api";
 import { useTaskStore } from "@/composables";
+import { type AppLocale, useI18n } from "@/i18n";
 
 const router = useRouter();
 const route = useRoute();
 const { workspace, currentUser, bootstrapAuth, clearAuthState } = useTaskStore();
+const { locale, languageOptions, currentLanguageLabel, setLocale, t } = useI18n();
 const SIDEBAR_COLLAPSED_KEY = "reviewiq:sidebar-collapsed";
 const DEVICE_CLASS_NAMES = ["app-device-mobile", "app-device-desktop"] as const;
 const coarsePointerQuery = window.matchMedia("(pointer: coarse)");
@@ -169,40 +190,46 @@ const passwordForm = reactive({
 
 type NavItem = { path: string; label: string; disabled: boolean; icon: unknown };
 type NavSection = { label: string; icon: unknown; items: NavItem[] };
+const antdLocales = {
+  "zh-CN": zhCN,
+  "en-US": enUS,
+  "th-TH": thTH
+} as const;
+const antdLocale = computed(() => antdLocales[locale.value]);
 
 const navSections = computed<NavSection[]>(() => [
   {
-    label: "用户后台",
+    label: t("nav.userBackend"),
     icon: FolderOpenOutlined,
     items: [
-      { path: "/dashboard", label: "任务看板", disabled: false, icon: DashboardOutlined },
-      { path: "/growth", label: "增长运营", disabled: false, icon: RiseOutlined },
-      { path: "/crawl-jobs", label: "评论采集", disabled: false, icon: CloudDownloadOutlined },
-      { path: "/analysis-runs", label: "分析记录", disabled: false, icon: UnorderedListOutlined },
-      { path: "/help", label: "帮助中心", disabled: false, icon: QuestionCircleOutlined }
+      { path: "/dashboard", label: t("nav.taskBoard"), disabled: false, icon: DashboardOutlined },
+      { path: "/growth", label: t("nav.growthOps"), disabled: false, icon: RiseOutlined },
+      { path: "/crawl-jobs", label: t("nav.reviewCollection"), disabled: false, icon: CloudDownloadOutlined },
+      { path: "/analysis-runs", label: t("nav.analysisRuns"), disabled: false, icon: UnorderedListOutlined },
+      { path: "/help", label: t("nav.helpCenter"), disabled: false, icon: QuestionCircleOutlined }
     ]
   },
   ...(currentUser.value?.isSuperAdmin
     ? [
         {
-          label: "模型与抓取",
+          label: t("nav.modelCrawler"),
           icon: SettingOutlined,
           items: [
-            { path: "/settings/ai", label: "提示词与模型", disabled: false, icon: ExperimentOutlined },
-            { path: "/settings/crawler", label: "抓取设置", disabled: false, icon: ApiOutlined }
+            { path: "/settings/ai", label: t("nav.promptsModels"), disabled: false, icon: ExperimentOutlined },
+            { path: "/settings/crawler", label: t("nav.crawlerSettings"), disabled: false, icon: ApiOutlined }
           ]
         }
       ]
     : []),
   {
-    label: "平台管理",
+    label: t("nav.platformAdmin"),
     icon: TeamOutlined,
-    items: currentUser.value?.isSuperAdmin ? [{ path: "/admin", label: "超管后台", disabled: false, icon: SafetyCertificateOutlined }] : []
+    items: currentUser.value?.isSuperAdmin ? [{ path: "/admin", label: t("nav.adminConsole"), disabled: false, icon: SafetyCertificateOutlined }] : []
   },
   {
-    label: "数据",
+    label: t("nav.data"),
     icon: DatabaseOutlined,
-    items: [{ path: "/reviews", label: "评论明细", disabled: !workspace.value, icon: FileSearchOutlined }]
+    items: [{ path: "/reviews", label: t("nav.reviewDetails"), disabled: !workspace.value, icon: FileSearchOutlined }]
   }
 ].filter((section) => section.items.length));
 
@@ -231,30 +258,30 @@ const usagePercent = computed(() => {
 
 const pageTitle = computed(() => {
   if (route.path === "/admin") {
-    return "超管后台";
+    return t("nav.adminConsole");
   }
   if (route.path.startsWith("/settings/ai")) {
-    return "提示词与模型设置";
+    return t("page.promptsModelsSettings");
   }
   if (route.path.startsWith("/settings/crawler")) {
-    return "抓取设置";
+    return t("nav.crawlerSettings");
   }
   if (route.path === "/crawl-jobs") {
-    return "评论采集";
+    return t("nav.reviewCollection");
   }
   if (route.path === "/growth") {
-    return "增长运营";
+    return t("nav.growthOps");
   }
   if (route.path.includes("/reviews") || route.path === "/reviews") {
-    return "评论明细";
+    return t("nav.reviewDetails");
   }
   if (route.path.includes("/runs") || route.path === "/analysis-runs") {
-    return "分析记录";
+    return t("nav.analysisRuns");
   }
   if (route.path === "/help") {
-    return "帮助中心";
+    return t("nav.helpCenter");
   }
-  return "用户后台";
+  return t("nav.userBackend");
 });
 
 const accountInitial = computed(() => (currentUser.value?.name || currentUser.value?.email || "U").slice(0, 1).toUpperCase());
@@ -279,7 +306,7 @@ function applyDeviceClass() {
 }
 
 function sectionActive(section: NavSection) {
-  if (section.label === "用户后台" && route.path.startsWith("/tasks/")) {
+  if (section.items.some((item) => item.path === "/dashboard") && route.path.startsWith("/tasks/")) {
     return true;
   }
   return section.items.some((item) => item.path === route.path);
@@ -312,17 +339,21 @@ function openPasswordModal() {
   passwordModalOpen.value = true;
 }
 
+function handleLocaleMenuClick(event: { key: string | number }) {
+  setLocale(String(event.key) as AppLocale);
+}
+
 async function submitPasswordChange() {
   if (!passwordForm.oldPassword || !passwordForm.newPassword) {
-    message.error("请输入旧密码和新密码");
+    message.error(t("shell.passwordRequired"));
     return;
   }
   if (passwordForm.newPassword.length < 6) {
-    message.error("新密码至少需要 6 位");
+    message.error(t("shell.passwordTooShort"));
     return;
   }
   if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-    message.error("两次输入的新密码不一致");
+    message.error(t("shell.passwordMismatch"));
     return;
   }
 
@@ -332,14 +363,14 @@ async function submitPasswordChange() {
       oldPassword: passwordForm.oldPassword,
       newPassword: passwordForm.newPassword
     });
-    message.success("密码已修改，请重新登录");
+    message.success(t("shell.passwordChanged"));
     passwordModalOpen.value = false;
     resetPasswordForm();
     clearAuthToken();
     clearAuthState();
     router.push("/login");
   } catch (error: any) {
-    const text = typeof error?.response?.data?.message === "string" ? error.response.data.message : "密码修改失败";
+    const text = typeof error?.response?.data?.message === "string" ? error.response.data.message : t("shell.passwordChangeFailed");
     message.error(text);
   } finally {
     changingPassword.value = false;

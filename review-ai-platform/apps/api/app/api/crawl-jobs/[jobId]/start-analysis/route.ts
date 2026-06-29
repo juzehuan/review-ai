@@ -19,6 +19,44 @@ function parseCrawlResult(value: Prisma.JsonValue | null): CrawlResult | null {
   return value as unknown as CrawlResult;
 }
 
+function readString(row: Record<string, unknown>, key: string) {
+  return String(row[key] || "").trim();
+}
+
+function readBoolean(row: Record<string, unknown>, key: string, fallbackKey: string) {
+  const value = row[key] ?? row[fallbackKey];
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    return ["1", "true", "yes"].includes(value.trim().toLowerCase());
+  }
+  return Boolean(value);
+}
+
+function normalizeCrawlRow(row: Record<string, unknown>, fallback: { shopId: string; itemId: string }) {
+  const cmtId = readString(row, "cmtId") || readString(row, "cmtid");
+  const comment = readString(row, "comment");
+  const commentTr = readString(row, "commentTr") || readString(row, "comment_tr") || null;
+  const ratingStar = Number(row.ratingStar ?? row.rating_star ?? row.rating ?? 0);
+  if (!cmtId || (!comment && !commentTr)) {
+    return null;
+  }
+
+  return {
+    cmtId,
+    shopId: readString(row, "shopId") || readString(row, "shopid") || fallback.shopId,
+    itemId: readString(row, "itemId") || readString(row, "itemid") || fallback.itemId,
+    ratingStar: Number.isFinite(ratingStar) ? ratingStar : 0,
+    comment: comment || commentTr || "",
+    commentTr,
+    modelName: readString(row, "modelName") || readString(row, "model_name") || null,
+    hasMedia: readBoolean(row, "hasMedia", "has_media"),
+    commentTime: parseOptionalDate(readString(row, "commentTime") || readString(row, "ctime_iso")),
+    rawJson: row
+  };
+}
+
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await context.params;
   const workspaceContext = await getWorkspaceContext(request);
@@ -46,7 +84,29 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     return fail("爬取结果为空，不能开始分析", 400);
   }
 
-  const quotaResponse = job.taskId ? null : await assertReviewQuota(workspace.id, crawlResult.rows.length);
+  const fallback = {
+    shopId: crawlResult.shopId || job.platform,
+    itemId: crawlResult.itemId || job.normalizedUrl
+  };
+  const seen = new Set<string>();
+  let skippedDuplicate = 0;
+  const rowsToCreate = crawlResult.rows
+    .map((row) => normalizeCrawlRow(row as unknown as Record<string, unknown>, fallback))
+    .filter((row): row is NonNullable<ReturnType<typeof normalizeCrawlRow>> => Boolean(row))
+    .filter((row) => {
+      if (seen.has(row.cmtId)) {
+        skippedDuplicate += 1;
+        return false;
+      }
+      seen.add(row.cmtId);
+      return true;
+    });
+
+  if (!rowsToCreate.length && !job.taskId) {
+    return fail("爬取结果里没有可导入的评论，不能开始分析", 400);
+  }
+
+  const quotaResponse = job.taskId ? null : await assertReviewQuota(workspace.id, rowsToCreate.length);
   if (quotaResponse) {
     return quotaResponse;
   }
@@ -66,17 +126,6 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     return fail("AI 模型尚未配置 API Key，请先到提示词与模型设置中配置模型。", 400);
   }
 
-  const seen = new Set<string>();
-  let skippedDuplicate = 0;
-  const rowsToCreate = crawlResult.rows.filter((row) => {
-    if (seen.has(row.cmtId)) {
-      skippedDuplicate += 1;
-      return false;
-    }
-    seen.add(row.cmtId);
-    return true;
-  });
-
   const result = await prisma.$transaction(async (tx) => {
     let taskId = job.taskId;
     let importId: string | null = null;
@@ -89,8 +138,8 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
           workspaceId: workspace.id,
           name: job.name,
           productName: job.productName || crawlResult.productName || job.name,
-          shopId: crawlResult.shopId || first.shopId,
-          itemId: crawlResult.itemId || first.itemId,
+          shopId: crawlResult.shopId || first.shopId || fallback.shopId,
+          itemId: crawlResult.itemId || first.itemId || fallback.itemId,
           sourceChannel: job.sourceChannel,
           analysisType: job.analysisType,
           status: "imported"
@@ -117,11 +166,11 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
           shopId: row.shopId || task.shopId,
           itemId: row.itemId || task.itemId,
           ratingStar: row.ratingStar,
-          comment: row.comment || row.commentTr || "",
+          comment: row.comment,
           commentTr: row.commentTr,
           modelName: row.modelName,
           hasMedia: row.hasMedia,
-          commentTime: parseOptionalDate(row.commentTime),
+          commentTime: row.commentTime,
           sourceChannel: job.sourceChannel,
           rawJson: row.rawJson as Prisma.InputJsonValue
         })),

@@ -2,42 +2,42 @@
   <div class="workspace-overview-page">
     <div class="page-toolbar overview-hero">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">用户后台</div>
-        <div class="toolbar-subtitle">查看你的分析任务、评论额度和最近的处理进度。</div>
+        <div class="toolbar-title">{{ t("workspace.title") }}</div>
+        <div class="toolbar-subtitle">{{ t("workspace.subtitle") }}</div>
       </div>
       <a-space wrap>
-        <a-button href="/downloads/ReviewIQ-ordinary-user-manual.docx" download="ReviewIQ-普通用户操作手册.docx">
+        <a-button href="/downloads/ReviewIQ-ordinary-user-manual.docx" :download="t('workspace.manualFilename')">
           <template #icon><DownloadOutlined /></template>
-          下载操作手册
+          {{ t("workspace.downloadManual") }}
         </a-button>
         <a-button @click="router.push('/help')">
           <template #icon><QuestionCircleOutlined /></template>
-          帮助中心
+          {{ t("nav.helpCenter") }}
         </a-button>
         <a-button @click="refreshTasks" :loading="loadingTasks">
           <template #icon><ReloadOutlined /></template>
-          刷新
+          {{ t("common.refresh") }}
         </a-button>
         <a-button type="primary" @click="router.push('/analysis-runs')">
           <template #icon><UnorderedListOutlined /></template>
-          分析记录
+          {{ t("nav.analysisRuns") }}
         </a-button>
       </a-space>
     </div>
 
     <div class="overview-band workspace-band">
       <div class="overview-copy">
-        <div class="overview-kicker">当前账号</div>
-        <h2>{{ currentUser?.name || "ReviewIQ 用户" }}</h2>
+        <div class="overview-kicker">{{ t("common.currentAccount") }}</div>
+        <h2>{{ currentUser?.name || t("workspace.defaultUser") }}</h2>
         <p>{{ currentUser?.email || "-" }} · {{ workspace?.planTier || "pro" }}</p>
       </div>
       <div class="quota-strip">
         <div>
-          <span>评论额度</span>
+          <span>{{ t("workspace.reviewQuota") }}</span>
           <strong>{{ reviewUsage }}</strong>
         </div>
         <div>
-          <span>分析次数</span>
+          <span>{{ t("workspace.runQuota") }}</span>
           <strong>{{ runUsage }}</strong>
         </div>
       </div>
@@ -45,29 +45,29 @@
 
     <div class="summary-grid">
       <div class="stat-card stat-card-primary">
-        <div class="stat-label">任务总数</div>
+        <div class="stat-label">{{ t("workspace.totalTasks") }}</div>
         <div class="stat-value">{{ totalTasks }}</div>
-        <div class="stat-note">当前账号下的分析项目</div>
+        <div class="stat-note">{{ t("workspace.totalTasksNote") }}</div>
       </div>
       <div class="stat-card stat-card-success">
-        <div class="stat-label">已完成分析</div>
+        <div class="stat-label">{{ t("workspace.completedRuns") }}</div>
         <div class="stat-value">{{ completedRuns }}</div>
-        <div class="stat-note">最新批次完成的任务</div>
+        <div class="stat-note">{{ t("workspace.completedRunsNote") }}</div>
       </div>
       <div class="stat-card stat-card-accent">
-        <div class="stat-label">进行中</div>
+        <div class="stat-label">{{ t("workspace.activeRuns") }}</div>
         <div class="stat-value">{{ activeRuns }}</div>
-        <div class="stat-note">排队或分析中的任务</div>
+        <div class="stat-note">{{ t("workspace.activeRunsNote") }}</div>
       </div>
     </div>
 
     <section class="workspace-table-panel">
       <div class="panel-head">
         <div>
-          <div class="panel-label">Tasks</div>
-          <div class="settings-section-title">最近分析任务</div>
+          <div class="panel-label">{{ t("workspace.tasksKicker") }}</div>
+          <div class="settings-section-title">{{ t("workspace.recentTasks") }}</div>
         </div>
-        <a-button type="link" @click="router.push('/analysis-runs')">查看全部</a-button>
+        <a-button type="link" @click="router.push('/analysis-runs')">{{ t("common.viewAll") }}</a-button>
       </div>
 
       <a-table
@@ -100,7 +100,7 @@
             {{ formatTime(record.createdAt) }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button size="small" @click="openTask(record)">打开</a-button>
+            <a-button size="small" @click="openTask(record)">{{ t("common.open") }}</a-button>
           </template>
         </template>
       </a-table>
@@ -114,19 +114,21 @@ import { useRouter } from "vue-router";
 import { DownloadOutlined, QuestionCircleOutlined, ReloadOutlined, UnorderedListOutlined } from "@ant-design/icons-vue";
 import type { TaskListItem } from "@review-ai/shared";
 import { useTaskStore } from "@/composables";
+import { useI18n } from "@/i18n";
 
 const router = useRouter();
+const { locale, t } = useI18n();
 const { tasks, workspace, currentUser, loadingTasks, refreshTasks, setSelectedTask } = useTaskStore();
 
-const columns = [
-  { title: "任务", key: "name", width: 260 },
-  { title: "来源", dataIndex: "sourceChannel", key: "sourceChannel", width: 120 },
-  { title: "类型", key: "analysisType", width: 110 },
-  { title: "导入状态", key: "status", width: 120 },
-  { title: "分析状态", key: "run", width: 130 },
-  { title: "创建时间", key: "createdAt", width: 180 },
-  { title: "操作", key: "action", width: 90 }
-];
+const columns = computed(() => [
+  { title: t("table.task"), key: "name", width: 260 },
+  { title: t("table.source"), dataIndex: "sourceChannel", key: "sourceChannel", width: 120 },
+  { title: t("table.type"), key: "analysisType", width: 110 },
+  { title: t("table.importStatus"), key: "status", width: 120 },
+  { title: t("table.analysisStatus"), key: "run", width: 130 },
+  { title: t("table.createdAt"), key: "createdAt", width: 180 },
+  { title: t("table.actions"), key: "action", width: 90 }
+]);
 
 const totalTasks = computed(() => tasks.value.length);
 const completedRuns = computed(() => tasks.value.filter((task) => task.latestRunStatus === "completed").length);
@@ -153,24 +155,17 @@ function openTask(task: TaskListItem) {
 }
 
 function taskStatusLabel(status?: string | null) {
-  const labels: Record<string, string> = {
-    draft: "草稿",
-    imported: "已导入",
-    analyzing: "分析中",
-    completed: "已完成",
-    failed: "失败"
-  };
-  return status ? labels[status] || status : "未知";
+  return status ? t(`status.task.${status}`) || status : t("status.task.unknown");
 }
 
 function analysisTypeLabel(type?: string | null) {
   if (type === "video") {
-    return "视频评论";
+    return t("analysisType.video");
   }
   if (type === "tweet") {
-    return "社媒评论";
+    return t("analysisType.tweet");
   }
-  return "商品评论";
+  return t("analysisType.product");
 }
 
 function taskStatusColor(status?: string | null) {
@@ -187,14 +182,7 @@ function taskStatusColor(status?: string | null) {
 }
 
 function runStatusLabel(status?: string | null) {
-  const labels: Record<string, string> = {
-    queued: "排队中",
-    running: "分析中",
-    completed: "已完成",
-    partial_failed: "部分失败",
-    failed: "失败"
-  };
-  return status ? labels[status] || status : "未分析";
+  return status ? t(`status.run.${status}`) || status : t("status.run.notAnalyzed");
 }
 
 function runStatusColor(status?: string | null) {
@@ -211,7 +199,7 @@ function runStatusColor(status?: string | null) {
 }
 
 function formatTime(value: string) {
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleString(locale.value);
 }
 
 onMounted(refreshTasks);

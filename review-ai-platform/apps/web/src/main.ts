@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Checkbox,
+  ConfigProvider,
   DatePicker,
   Descriptions,
   Drawer,
@@ -35,6 +36,7 @@ import {
 import "ant-design-vue/dist/reset.css";
 import App from "./App.vue";
 import { router } from "./router";
+import { startStaticTextTranslator } from "./static-i18n";
 import "./styles.css";
 
 const app = createApp(App);
@@ -42,6 +44,7 @@ const app = createApp(App);
   Alert,
   Button,
   Checkbox,
+  ConfigProvider,
   DatePicker,
   Descriptions,
   Drawer,
@@ -73,3 +76,4 @@ const app = createApp(App);
 ].forEach((component) => app.use(component));
 
 app.use(router).mount("#app");
+startStaticTextTranslator();

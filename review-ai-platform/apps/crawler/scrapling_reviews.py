@@ -181,6 +181,31 @@ def stable_tiktok_comment_id(video_id: str, author: str, content: str, index: in
     return f"tt_{video_id}_{digest[:18]}"
 
 
+def tiktok_best_url(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, dict):
+        return ""
+    urls = value.get("url_list") or value.get("urls") or value.get("urlList")
+    if isinstance(urls, list) and urls:
+        return str(urls[0] or "")
+    return ""
+
+
+def tiktok_comment_image_urls(comment: dict[str, Any]) -> list[str]:
+    images = comment.get("image_list")
+    if not isinstance(images, list):
+        return []
+    urls: list[str] = []
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        url = tiktok_best_url(image.get("origin_url")) or tiktok_best_url(image.get("crop_url")) or tiktok_best_url(image)
+        if url:
+            urls.append(url)
+    return urls
+
+
 def stable_facebook_comment_id(post_id: str, author: str, content: str, index: int) -> str:
     digest = hashlib.sha1(f"{post_id}|{author}|{content}|{index}".encode("utf-8")).hexdigest()
     return f"fb_{post_id}_{digest[:18]}"
@@ -959,11 +984,13 @@ def collect_tiktok_api_comments(
     for index, comment in enumerate(comments):
         if not isinstance(comment, dict):
             continue
-        content = str(comment.get("text") or comment.get("comment") or "").strip()
+        image_urls = tiktok_comment_image_urls(comment)
+        content = str(comment.get("text") or comment.get("comment") or ("[image comment]" if image_urls else "")).strip()
         if not content:
             continue
         user = comment.get("user") if isinstance(comment.get("user"), dict) else {}
         author = str(user.get("unique_id") or user.get("uniqueId") or user.get("nickname") or "").strip()
+        author_nickname = str(user.get("nickname") or "").strip()
         comment_id = str(comment.get("cid") or comment.get("comment_id") or comment.get("id") or "").strip()
         if not comment_id:
             comment_id = stable_tiktok_comment_id(video_id, author, content, len(comments_by_id) + index)
@@ -987,15 +1014,20 @@ def collect_tiktok_api_comments(
             "comment": content,
             "commentTr": None,
             "modelName": author or None,
-            "hasMedia": False,
+            "hasMedia": bool(image_urls),
             "commentTime": comment_time,
             "rawJson": {
                 "platform": "TikTok Video",
                 "videoId": video_id,
                 "author": author,
+                "authorNickname": author_nickname,
                 "authorId": user.get("uid") or user.get("id") or "",
+                "authorSecUid": user.get("sec_uid") or "",
+                "commentLanguage": comment.get("comment_language") or "",
                 "likeCount": comment.get("digg_count") or comment.get("like_count") or 0,
                 "replyCount": comment.get("reply_comment_total") or comment.get("reply_count") or 0,
+                "imageUrls": image_urls,
+                "shareUrl": (comment.get("share_info") or {}).get("url") if isinstance(comment.get("share_info"), dict) else "",
                 "sourceUrl": source_url,
                 "source": "tiktok_comment_list",
             },
@@ -1039,6 +1071,7 @@ def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: 
     count = 50
     page_count = 0
     has_more = True
+    total_count: int | None = None
     deadline = time.time() + timeout
 
     while has_more and time.time() < deadline:
@@ -1054,6 +1087,10 @@ def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: 
         collect_tiktok_api_comments(payload, video_id, video_url, comments_by_id, max_reviews)
         parsed_has_more = parse_tiktok_has_more(payload.get("has_more"))
         has_more = False if parsed_has_more is False or not comments else bool(parsed_has_more)
+        try:
+            total_count = int(payload.get("total") or total_count or 0) or total_count
+        except Exception:
+            total_count = total_count
         try:
             next_cursor = int(payload.get("cursor") or 0)
         except Exception:
@@ -1078,6 +1115,8 @@ def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: 
         "nextRequests": page_count,
         "payloadComments": len(rows),
         "domCommentCount": 0,
+        "cursor": cursor,
+        "totalComments": total_count,
         "endReached": not has_more,
         "rows": rows,
     }
@@ -1102,6 +1141,8 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
         "dom_comment_count": 0,
         "title": "",
         "has_more": None,
+        "cursor": None,
+        "total_comments": None,
     }
 
     def page_action(page: Any) -> None:
@@ -1119,6 +1160,10 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
                     state["payload_comments"] = int(state.get("payload_comments") or 0) + added
                     if "has_more" in payload:
                         state["has_more"] = parse_tiktok_has_more(payload.get("has_more"))
+                    if "cursor" in payload:
+                        state["cursor"] = payload.get("cursor")
+                    if "total" in payload:
+                        state["total_comments"] = payload.get("total")
                 except Exception:
                     return
             except Exception:
@@ -1132,22 +1177,104 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
         except Exception:
             state["title"] = ""
 
+        def open_comment_panel() -> None:
+            try:
+                opened = page.evaluate(
+                    """async () => {
+                        const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+                        const listSelector = [
+                          "[data-e2e='comment-list']",
+                          "[data-e2e='browse-comment']",
+                          "[class*='DivCommentListContainer']",
+                          "[class*='CommentList']"
+                        ].join(",");
+                        const panelSelector = [
+                          listSelector,
+                          "[class*='DivCommentMain']",
+                          "[class*='RightPanelContainer']"
+                        ].join(",");
+                        const visible = (el) => {
+                          if (!el || !el.getBoundingClientRect) return false;
+                          const rect = el.getBoundingClientRect();
+                          const style = window.getComputedStyle(el);
+                          return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+                        };
+                        const hasPanel = () => Array.from(document.querySelectorAll(listSelector)).some(visible);
+                        if (hasPanel()) return true;
+                        const scoreButton = (button) => {
+                          if (!visible(button) || button.closest(panelSelector)) return -1000;
+                          const rect = button.getBoundingClientRect();
+                          const label = [
+                            button.getAttribute("aria-label"),
+                            button.getAttribute("title"),
+                            button.getAttribute("data-e2e"),
+                            button.getAttribute("data-testid"),
+                            button.textContent
+                          ].filter(Boolean).join(" ").toLowerCase();
+                          const pathText = Array.from(button.querySelectorAll("svg path")).map((path) => path.getAttribute("d") || "").join(" ");
+                          let score = 0;
+                          if (/comment|comments|评论|評論|留言/.test(label)) score += 120;
+                          if (/reply|回复|回覆/.test(label)) score -= 60;
+                          if (/tux-web-icon-button/.test(label)) score += 12;
+                          if (/M2\\s+21\\.5|22\\s+7\\.78|14\\s+25a3|34\\s+25/i.test(pathText)) score += 90;
+                          if (/M24\\s+12\\.62|m24\\s+27\\.76|M5\\s+24a4/i.test(pathText)) score -= 45;
+                          if (rect.left > window.innerWidth * 0.45) score += 8;
+                          if (rect.width <= 72 && rect.height <= 72) score += 8;
+                          return score;
+                        };
+                        const button = Array.from(document.querySelectorAll([
+                          "button[data-e2e*='comment' i]",
+                          "[role='button'][data-e2e*='comment' i]",
+                          "button[aria-label*='comment' i]",
+                          "button[aria-label*='评论']",
+                          "button[aria-label*='評論']",
+                          "button[data-testid='tux-web-icon-button']",
+                          "button"
+                        ].join(",")))
+                          .map((candidate) => ({ candidate, score: scoreButton(candidate) }))
+                          .filter((item) => item.score > 0)
+                          .sort((a, b) => b.score - a.score)[0]?.candidate;
+                        if (!button) return false;
+                        button.scrollIntoView({ block: "center", inline: "center" });
+                        await sleep(300);
+                        button.click();
+                        const startedAt = Date.now();
+                        while (Date.now() - startedAt < 6500) {
+                          if (hasPanel()) return true;
+                          await sleep(250);
+                        }
+                        return false;
+                    }"""
+                )
+                if opened:
+                    page.wait_for_timeout(1800)
+                else:
+                    page.wait_for_timeout(1200)
+            except Exception:
+                page.wait_for_timeout(1200)
+
         def extract_dom_comments() -> list[dict[str, Any]]:
             return page.evaluate(
                 """() => {
                     const clean = (value) => (value || "").replace(/\\s+/g, " ").trim();
-                    const nodes = Array.from(document.querySelectorAll(
-                      "[data-e2e='comment-item'], [data-e2e*='comment-level-1'], div[class*='CommentItem'], div[class*='DivCommentItem']"
-                    ));
+                    const rootOf = (node) =>
+                      node.closest("div[class*='DivCommentObjectWrapper'], [data-e2e='comment-item'], div[class*='CommentItem']") ||
+                      node.closest("div[class*='DivCommentItemWrapper']") ||
+                      node;
+                    const nodes = Array.from(new Set(Array.from(document.querySelectorAll(
+                      "[data-e2e='comment-item'], div[class*='DivCommentObjectWrapper'], div[class*='DivCommentItemWrapper'], div[class*='CommentItem'], [data-e2e='comment-level-1']"
+                    )).map(rootOf)));
                     return nodes.map((node, index) => {
                       const authorLink = node.querySelector("a[href^='/@'], a[href*='tiktok.com/@']");
-                      const author = clean(authorLink?.textContent).replace(/^@/, "");
+                      const authorHref = authorLink?.getAttribute("href") || "";
+                      const author = (authorHref.match(/\\/@([^/?#]+)/)?.[1] || clean(authorLink?.textContent)).replace(/^@/, "");
                       const textEl =
-                        node.querySelector("[data-e2e*='comment-level-1'] p, [data-e2e*='comment'] p") ||
+                        node.querySelector("[data-e2e='comment-level-1'] .TUXText, [data-e2e='comment-level-1'] span, [data-e2e='comment-level-1'] p, [data-e2e='comment-level-1']") ||
+                        node.querySelector("[data-e2e*='comment'] p, [data-e2e*='comment'] span") ||
                         node.querySelector("p, span");
                       const content = clean(textEl?.innerText || textEl?.textContent);
-                      const likeEl = node.querySelector("[data-e2e*='comment-like-count'], [class*='like-count' i], strong");
-                      const likeText = clean(likeEl?.textContent);
+                      const likeEl = node.querySelector("[data-e2e*='comment-like-count'], [class*='like-count' i], [class*='LikeContainer'] span, [aria-label*='like' i], [aria-label*='赞'], [aria-label*='讚'], strong");
+                      const likeText = clean(likeEl?.textContent) || likeEl?.getAttribute("aria-label") || "";
                       const commentId = node.getAttribute("data-id") || node.getAttribute("id") || "";
                       if (!content) return null;
                       return { index, author, content, likeText, commentId };
@@ -1159,8 +1286,8 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
             page.evaluate(
                 """() => {
                     const target =
-                      document.querySelector("[data-e2e='comment-list'], [class*='CommentList'], [class*='DivCommentList']") ||
-                      document.querySelector("[data-e2e='browse-comment']") ||
+                      document.querySelector("[data-e2e='comment-list'], [data-e2e='browse-comment'], [class*='DivCommentListContainer'], [class*='CommentList']") ||
+                      document.querySelector("[class*='DivCommentMain'], [class*='RightPanelContainer']") ||
                       document.scrollingElement ||
                       document.documentElement;
                     if (target && target !== document.documentElement && target !== document.body) {
@@ -1176,12 +1303,13 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
         last_requests = int(state.get("comment_requests") or 0)
         deadline = time.time() + timeout
 
+        open_comment_panel()
+
         try:
             page.evaluate(
                 """() => {
                     const comments =
-                      document.querySelector("[data-e2e='comment-list'], [class*='CommentList'], [class*='DivCommentList']") ||
-                      document.querySelector("[data-e2e='browse-comment']");
+                      document.querySelector("[data-e2e='comment-list'], [data-e2e='browse-comment'], [class*='DivCommentListContainer'], [class*='CommentList']");
                     if (comments) comments.scrollIntoView({ block: "center" });
                     else window.scrollBy(0, Math.max(700, Math.floor(window.innerHeight * 0.8)));
                 }"""
@@ -1282,6 +1410,8 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
         "nextRequests": state.get("comment_requests"),
         "payloadComments": state.get("payload_comments"),
         "domCommentCount": state.get("dom_comment_count"),
+        "cursor": state.get("cursor"),
+        "totalComments": state.get("total_comments"),
         "endReached": state.get("has_more") is False,
         "rows": rows,
     }

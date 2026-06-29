@@ -348,7 +348,7 @@
         </div>
         <a-form-item label="最多采集条数">
           <a-input-number v-model:value="form.maxReviews" :min="0" :max="5000" class="full-input" />
-          <div class="settings-help">填 0 表示不限；AI 链接抓取当前只支持 YouTube 视频和 TikTok 视频评论。</div>
+          <div class="settings-help">填 0 表示不限；TikTok 视频采集完成后会自动导入并启动 AI 分析。</div>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -854,7 +854,9 @@ async function submitCrawlJob() {
     });
     jobs.value = [job, ...jobs.value.filter((item) => item.id !== job.id)];
     writeWorkspaceCache("crawl-jobs", jobs.value);
-    message.success("评论采集任务已加入队列。");
+    message.success(
+      form.sourceChannel === "TikTok Video" ? "TikTok 评论采集已加入队列，完成后会自动开始 AI 分析。" : "评论采集任务已加入队列。"
+    );
     showCreateModal.value = false;
     await loadJobs();
   } finally {
