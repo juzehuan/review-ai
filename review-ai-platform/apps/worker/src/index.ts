@@ -295,6 +295,45 @@ function normalizeStringList(value: unknown) {
   return [];
 }
 
+function truncateText(value: string, maxLength?: number) {
+  if (!maxLength || value.length <= maxLength) {
+    return value;
+  }
+  const truncated = value.slice(0, maxLength);
+  const lastCode = truncated.charCodeAt(truncated.length - 1);
+  return lastCode >= 0xd800 && lastCode <= 0xdbff ? truncated.slice(0, -1) : truncated;
+}
+
+function sanitizeDbText(value: string, maxLength?: number) {
+  let output = "";
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const nextCode = value.charCodeAt(index + 1);
+      if (nextCode >= 0xdc00 && nextCode <= 0xdfff) {
+        output += value[index] + value[index + 1];
+        index += 1;
+      }
+      continue;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) {
+      continue;
+    }
+    if (code === 0 || (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) || code === 0x7f) {
+      continue;
+    }
+    output += value[index];
+  }
+  return truncateText(output, maxLength);
+}
+
+function sanitizeDbTextList(values: string[], maxItems: number, maxItemLength = 120) {
+  return values
+    .map((value) => sanitizeDbText(value, maxItemLength).trim())
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
 function normalizeBooleanValue(value: unknown) {
   if (typeof value === "boolean") {
     return value;
@@ -1367,18 +1406,29 @@ async function analyzeWithRetry(client: OpenAI | null, setting: ResolvedAiSettin
 }
 
 function buildAnalysisData(result: AnalysisResult) {
+  const safeResult: AnalysisResult = {
+    ...result,
+    topicLabels: sanitizeDbTextList(result.topicLabels, 6),
+    intentLabels: sanitizeDbTextList(result.intentLabels, 4),
+    keywords: sanitizeDbTextList(result.keywords, 12),
+    summary: sanitizeDbText(result.summary, 200),
+    painPoints: sanitizeDbTextList(result.painPoints, 5),
+    highlights: sanitizeDbTextList(result.highlights, 5),
+    suggestion: sanitizeDbText(result.suggestion, 160)
+  };
+
   return {
-    sentiment: result.sentiment,
-    sentimentScore: result.sentimentScore,
-    topicLabels: result.topicLabels,
-    intentLabels: result.intentLabels,
-    keywords: result.keywords,
-    summary: result.summary,
-    painPoints: result.painPoints,
-    highlights: result.highlights,
-    suggestion: result.suggestion,
-    needsAttention: result.needsAttention,
-    rawModelOutput: JSON.stringify(result)
+    sentiment: safeResult.sentiment,
+    sentimentScore: safeResult.sentimentScore,
+    topicLabels: safeResult.topicLabels,
+    intentLabels: safeResult.intentLabels,
+    keywords: safeResult.keywords,
+    summary: safeResult.summary,
+    painPoints: safeResult.painPoints,
+    highlights: safeResult.highlights,
+    suggestion: safeResult.suggestion,
+    needsAttention: safeResult.needsAttention,
+    rawModelOutput: sanitizeDbText(JSON.stringify(safeResult))
   };
 }
 
@@ -1762,7 +1812,9 @@ const worker = new Worker(
         for (let cursor = 0; cursor < batch.length; cursor += ANALYSIS_SINGLE_CONCURRENCY) {
           const slice = batch.slice(cursor, cursor + ANALYSIS_SINGLE_CONCURRENCY);
           const settled = await Promise.allSettled(slice.map((review) => processOne(review)));
-          for (const result of settled) {
+          for (let index = 0; index < settled.length; index += 1) {
+            const result = settled[index];
+            const review = slice[index];
             if (result.status === "fulfilled") {
               localSuccessCount += 1;
             } else {
@@ -1771,6 +1823,8 @@ const worker = new Worker(
               await addRunLog(runId, "error", "Single review analysis failed", {
                 batchStart,
                 batchEnd,
+                reviewId: review.id,
+                cmtId: review.cmtId,
                 error: localLastError
               });
             }
