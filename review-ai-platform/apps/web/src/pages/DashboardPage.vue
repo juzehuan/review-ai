@@ -398,7 +398,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { Modal, message } from "ant-design-vue";
 import type { EChartsOption } from "echarts";
-import * as echarts from "echarts/lib/echarts";
+import echarts from "@/utils/echarts";
 import {
   CheckSquareOutlined,
   CheckCircleOutlined,
@@ -795,23 +795,33 @@ function renderGauge() {
           type: "gauge",
           min: -100,
           max: 100,
+          radius: "82%",
+          center: ["50%", "56%"],
+          startAngle: 210,
+          endAngle: -30,
+          splitNumber: 4,
           progress: {
             show: true,
-            width: 18,
+            width: 16,
             roundCap: true,
             itemStyle: { color: progressColor }
           },
           axisLine: {
             roundCap: true,
             lineStyle: {
-              width: 18,
+              width: 16,
               color: [[1, "#e5e7eb"]]
             }
           },
           axisTick: { show: false },
-          splitLine: { length: 10, distance: -22, lineStyle: { color: "#cbd5e1", width: 2 } },
-          axisLabel: { distance: 14, color: "#6b7280", fontSize: 12 },
-          pointer: { width: 5, length: "56%", itemStyle: { color: progressColor } },
+          splitLine: { length: 8, distance: 8, lineStyle: { color: "#cbd5e1", width: 2 } },
+          axisLabel: {
+            distance: 20,
+            color: "#6b7280",
+            fontSize: 12,
+            formatter: (value: number) => (value % 50 === 0 ? `${value}` : "")
+          },
+          pointer: { width: 5, length: "52%", itemStyle: { color: progressColor } },
           detail: {
             fontSize: 40,
             fontWeight: 800,

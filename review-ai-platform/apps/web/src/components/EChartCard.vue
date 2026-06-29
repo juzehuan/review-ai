@@ -10,17 +10,8 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
-import type { EChartsOption } from "echarts";
-import type { EChartsType } from "echarts/core";
-import * as echarts from "echarts/lib/echarts";
-import "echarts/lib/chart/bar/install";
-import "echarts/lib/chart/gauge/install";
-import "echarts/lib/chart/pie/install";
-import "echarts/lib/component/grid/install";
-import "echarts/lib/component/legend/install";
-import "echarts/lib/component/tooltip/install";
-import "echarts/lib/renderer/installCanvasRenderer";
-import "echarts-wordcloud";
+import type { ECharts, EChartsOption } from "echarts";
+import echarts from "@/utils/echarts";
 
 const props = defineProps<{
   title: string;
@@ -35,7 +26,7 @@ const emit = defineEmits<{
 
 const container = ref<HTMLDivElement | null>(null);
 const hovering = ref(false);
-let chart: EChartsType | null = null;
+let chart: ECharts | null = null;
 
 function handleChartClick(params: unknown) {
   emit("chartClick", params);
