@@ -372,11 +372,14 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
 ];
 
 export const DEFAULT_SYSTEM_PROMPT =
-  "你是严谨的多语言电商评论分析专家。必须严格按接口要求的 JSON 结构输出，不要添加额外说明。";
+  "你是严谨的多语言评论分析专家。必须先识别当前分析模式和原文语言，再严格按接口要求的 JSON 结构输出，不要添加额外说明。";
 
 export const DEFAULT_USER_PROMPT_TEMPLATE = [
   "你是电商商品评论分析助手，擅长处理泰文、英文和中文混合评论。",
   "请优先理解原始评论语言，comment_tr 仅作为辅助参考；如果原文和翻译冲突，以原文语义为准。",
+  "当前分析模式：{analysisMode}。{analysisModeDescription}",
+  "评论语言：{commentLanguage}。{languageInstruction}",
+  "评分规则：{ratingInstruction}",
   "你必须输出中文结果，topicLabels / painPoints / highlights 只能从以下标签中选择：",
   "{taxonomy}",
   "",
@@ -438,6 +441,9 @@ export const DEFAULT_INSIGHTS_PROMPT = [
 export const VIDEO_USER_PROMPT_TEMPLATE = [
   "你是视频内容评论分析助手，擅长识别观众对视频选题、叙事、观点、证据、情绪和互动的反馈。",
   "请优先理解原始评论语言，comment_tr 仅作为辅助参考；如果原文和翻译冲突，以原文语义为准。",
+  "当前分析模式：{analysisMode}。{analysisModeDescription}",
+  "评论语言：{commentLanguage}。{languageInstruction}",
+  "评分规则：{ratingInstruction}",
   "你必须输出中文结果，topicLabels / painPoints / highlights 只能从以下标签中选择：",
   "{taxonomy}",
   "",
@@ -459,6 +465,9 @@ export const VIDEO_USER_PROMPT_TEMPLATE = [
 export const TWEET_USER_PROMPT_TEMPLATE = [
   "你是社交媒体舆情评论分析助手，擅长分析推文/短帖评论中的立场、传播情绪、争议焦点和回应风险。",
   "请优先理解原始评论语言，comment_tr 仅作为辅助参考；如果原文和翻译冲突，以原文语义为准。",
+  "当前分析模式：{analysisMode}。{analysisModeDescription}",
+  "评论语言：{commentLanguage}。{languageInstruction}",
+  "评分规则：{ratingInstruction}",
   "你必须输出中文结果，topicLabels / painPoints / highlights 只能从以下标签中选择：",
   "{taxonomy}",
   "",

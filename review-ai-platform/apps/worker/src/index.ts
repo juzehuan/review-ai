@@ -388,6 +388,11 @@ const batchAnalysisSchema = z.object({ analyses: z.array(analysisSchema) });
 
 type AnalysisResult = z.infer<typeof analysisSchema>;
 type BatchInput = { comment: string; commentTr: string | null; ratingStar: number };
+type DetectedCommentLanguage = {
+  label: string;
+  primary: "zh" | "th" | "en" | "ja" | "ko" | "mixed" | "unknown";
+  isNonChinese: boolean;
+};
 type ResolvedAiSetting = {
   provider: string;
   apiKey: string | null;
@@ -463,7 +468,16 @@ const AUDIENCE_POSITIVE_HINTS = [
   "感谢",
   "有道理",
   "精彩",
-  "认同"
+  "认同",
+  "ชอบ",
+  "รัก",
+  "ดีมาก",
+  "สุดยอด",
+  "เยี่ยม",
+  "ขอบคุณ",
+  "เห็นด้วย",
+  "สนับสนุน",
+  "น่ารัก"
 ];
 const AUDIENCE_NEGATIVE_HINTS = [
   "fake",
@@ -495,7 +509,17 @@ const AUDIENCE_NEGATIVE_HINTS = [
   "不喜欢",
   "无聊",
   "糟糕",
-  "什么鬼"
+  "什么鬼",
+  "ไม่ชอบ",
+  "แย่",
+  "โกหก",
+  "ปลอม",
+  "ผิด",
+  "ไม่จริง",
+  "มั่ว",
+  "หลอก",
+  "ผิดหวัง",
+  "น่าเบื่อ"
 ];
 const AUDIENCE_NEUTRAL_HINTS = [
   "?",
@@ -529,7 +553,16 @@ const AUDIENCE_NEUTRAL_HINTS = [
   "系列",
   "哈哈",
   "笑死",
-  "梗"
+  "梗",
+  "ทำไม",
+  "ยังไง",
+  "อะไร",
+  "เมื่อไหร่",
+  "ที่ไหน",
+  "แหล่งที่มา",
+  "ต่อ",
+  "555",
+  "มีม"
 ];
 
 const VIDEO_NEUTRAL_INTENTS = new Set(["提问求解", "事实补充", "建议选题", "期待后续", "玩梗互动"]);
@@ -981,6 +1014,125 @@ function renderTemplate(template: string, vars: Record<string, string | number |
     .replace(/\{([a-zA-Z0-9_]+)\}/g, (_, name) => String(vars[name] ?? ""));
 }
 
+function detectCommentLanguage(item?: BatchInput): DetectedCommentLanguage {
+  const text = (item?.comment || item?.commentTr || "").trim();
+  const counts = [
+    { key: "zh" as const, label: "中文", count: (text.match(/[\u3400-\u9fff]/g) || []).length },
+    { key: "th" as const, label: "泰文", count: (text.match(/[\u0e00-\u0e7f]/g) || []).length },
+    { key: "en" as const, label: "英文/拉丁字母", count: (text.match(/[a-z]/gi) || []).length },
+    { key: "ja" as const, label: "日文", count: (text.match(/[\u3040-\u30ff]/g) || []).length },
+    { key: "ko" as const, label: "韩文", count: (text.match(/[\uac00-\ud7af]/g) || []).length }
+  ]
+    .filter((entry) => entry.count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  if (!counts.length) {
+    return { label: "未知/表情符号", primary: "unknown", isNonChinese: false };
+  }
+
+  const primary = counts[0];
+  const secondary = counts[1];
+  if (secondary && secondary.count >= Math.max(2, primary.count * 0.25)) {
+    const labels = counts
+      .filter((entry) => entry.count >= Math.max(2, primary.count * 0.2))
+      .map((entry) => entry.label)
+      .join("+");
+    return { label: `混合语言（${labels}）`, primary: "mixed", isNonChinese: primary.key !== "zh" || counts.some((entry) => entry.key !== "zh") };
+  }
+
+  return { label: primary.label, primary: primary.key, isNonChinese: primary.key !== "zh" };
+}
+
+function getAnalysisModeLabel(analysisType: AnalysisType) {
+  if (analysisType === "video") {
+    return "视频评论模式";
+  }
+  if (analysisType === "tweet") {
+    return "社媒/推文舆情模式";
+  }
+  return "商品评论模式";
+}
+
+function getAnalysisModeDescription(analysisType: AnalysisType) {
+  if (analysisType === "video") {
+    return "按观众对视频内容、观点、证据、情绪、互动和创作者信任的反馈分析，不要套用商品物流、售后、价格等电商维度。";
+  }
+  if (analysisType === "tweet") {
+    return "按社交媒体舆情中的支持、反对、事实质疑、传播扩散、误解风险和回应诉求分析，不要套用商品评论维度。";
+  }
+  return "按商品体验、购买咨询、物流、售后、价格、质量和复购意愿分析。";
+}
+
+function getRatingInstruction(setting: ResolvedAiSetting, item?: BatchInput) {
+  if (setting.analysisType === "product") {
+    if (item && item.ratingStar <= 0) {
+      return "商品评论没有有效评分，rating_star=0 只表示缺失评分，请主要依据文本判断情绪。";
+    }
+    return "商品评论中 rating_star>0 可辅助判断情绪，1-2 星通常偏负向，4-5 星通常偏正向；如文本和评分冲突，以文本具体语义校正。";
+  }
+  return "视频/社媒评论通常没有星级，rating_star=0 表示无评分，不代表差评；必须根据原文立场、语气和上下文判断情绪。";
+}
+
+function getLanguageInstruction(item?: BatchInput) {
+  if (!item) {
+    return "请对每条评论单独识别原文语言；非中文评论先按原文语义理解，comment_translated 只作辅助，最终仍输出中文结构化结果。";
+  }
+  const language = detectCommentLanguage(item);
+  if (language.primary === "unknown") {
+    return "原文语言不明显，可能是表情、缩写或低信息评论；不要强行扩写含义，按可识别语义保守分析。";
+  }
+  if (!language.isNonChinese) {
+    return "原文主要为中文，直接按中文语义分析；如存在翻译字段，仅作辅助。";
+  }
+  return `原文主要为${language.label}，必须先按原文语义理解，comment_translated 只作辅助；输出仍用中文，但人物名、品牌名、话题标签、梗和专有名词可以保留原文，不要把外语短句硬套成商品标签。`;
+}
+
+function buildPromptVars(setting: ResolvedAiSetting, item?: BatchInput) {
+  const language = item ? detectCommentLanguage(item) : { label: "逐条识别", primary: "unknown" as const, isNonChinese: false };
+  return {
+    taxonomy: setting.taxonomy.join("、"),
+    intentTaxonomy: getIntentTaxonomy(setting.analysisType).join("、"),
+    analysisMode: getAnalysisModeLabel(setting.analysisType),
+    analysisType: setting.analysisType,
+    analysisModeDescription: getAnalysisModeDescription(setting.analysisType),
+    commentLanguage: language.label,
+    languageInstruction: getLanguageInstruction(item),
+    ratingInstruction: getRatingInstruction(setting, item),
+    ratingStar: item?.ratingStar ?? "",
+    rating_star: item?.ratingStar ?? "",
+    comment: item?.comment || "",
+    commentTr: item?.commentTr || "",
+    comment_original: item?.comment || "",
+    comment_translated: item?.commentTr || ""
+  };
+}
+
+function buildRuntimeAnalysisContext(setting: ResolvedAiSetting, item?: BatchInput) {
+  const vars = buildPromptVars(setting, item);
+  return [
+    "运行时分析上下文：",
+    `analysis_mode: ${vars.analysisMode}`,
+    `analysis_mode_description: ${vars.analysisModeDescription}`,
+    `comment_language: ${vars.commentLanguage}`,
+    `language_rule: ${vars.languageInstruction}`,
+    `rating_rule: ${vars.ratingInstruction}`
+  ].join("\n");
+}
+
+function formatBatchInputItem(setting: ResolvedAiSetting, item: BatchInput, index: number) {
+  const vars = buildPromptVars(setting, item);
+  return [
+    `[评论 ${index + 1}]`,
+    `analysis_mode: ${vars.analysisMode}`,
+    `comment_language: ${vars.commentLanguage}`,
+    `language_rule: ${vars.languageInstruction}`,
+    `rating_star: ${item.ratingStar}`,
+    `rating_rule: ${vars.ratingInstruction}`,
+    `comment_original: ${JSON.stringify(item.comment)}`,
+    `comment_translated: ${JSON.stringify(item.commentTr || "")}`
+  ].join("\n");
+}
+
 function stripJsonFence(content: string) {
   return content
     .replace(/^```json\s*/i, "")
@@ -1008,6 +1160,10 @@ function shouldUseResponsesApi(setting: ResolvedAiSetting) {
 }
 
 function buildSystemPrompt(setting: ResolvedAiSetting) {
+  const languageGuard = [
+    "This is a multilingual comment analysis task. Always understand the original comment language first; use translated text only as auxiliary context.",
+    "If the original comment is non-Chinese, still return the structured result in Chinese, but preserve names, hashtags, memes, brands, and domain terms in their original form when that is clearer."
+  ].join("\n");
   const domainGuard =
     setting.analysisType === "video"
       ? [
@@ -1021,10 +1177,11 @@ function buildSystemPrompt(setting: ResolvedAiSetting) {
         ? [
             "This is a social-media discussion analysis task, not necessarily an e-commerce or product-review task.",
             "Do not assume shopping topics unless the text explicitly mentions them.",
+            "Social-media comments usually have rating_star 0 or missing. Treat rating_star 0 as no rating, not as a negative rating.",
             "Classify sentiment from stance, support, opposition, skepticism, risk, and discussion context."
           ].join("\n")
-        : "";
-  return [setting.systemPrompt, domainGuard].filter(Boolean).join("\n\n");
+        : "This is a product-review analysis task. Use rating_star only when it is present and greater than 0; otherwise infer sentiment from the text.";
+  return [setting.systemPrompt, languageGuard, domainGuard].filter(Boolean).join("\n\n");
 }
 
 function sleep(ms: number) {
@@ -1263,36 +1420,14 @@ function mockAnalyze(comment: string, commentTr: string | null, ratingStar: numb
 }
 
 function buildSinglePrompt(setting: ResolvedAiSetting, item: BatchInput) {
-  return renderTemplate(setting.userPromptTemplate, {
-    taxonomy: setting.taxonomy.join("、"),
-    intentTaxonomy: getIntentTaxonomy(setting.analysisType).join("、"),
-    ratingStar: item.ratingStar,
-    rating_star: item.ratingStar,
-    comment: item.comment,
-    commentTr: item.commentTr || "",
-    comment_original: item.comment,
-    comment_translated: item.commentTr || ""
-  });
+  const rendered = renderTemplate(setting.userPromptTemplate, buildPromptVars(setting, item));
+  return `${buildRuntimeAnalysisContext(setting, item)}\n\n${rendered}`;
 }
 
 function buildBatchPrompt(setting: ResolvedAiSetting, items: BatchInput[]) {
-  const instructions = renderTemplate(setting.userPromptTemplate, {
-    taxonomy: setting.taxonomy.join("、"),
-    intentTaxonomy: getIntentTaxonomy(setting.analysisType).join("、"),
-    ratingStar: "",
-    rating_star: "",
-    comment: "",
-    commentTr: "",
-    comment_original: "",
-    comment_translated: ""
-  });
-  const list = items
-    .map(
-      (item, index) =>
-        `[评论 ${index + 1}]\nrating_star: ${item.ratingStar}\ncomment_original: ${JSON.stringify(item.comment)}\ncomment_translated: ${JSON.stringify(item.commentTr || "")}`
-    )
-    .join("\n\n");
-  return `${instructions}\n\n请一次分析 ${items.length} 条评论，严格按输入顺序输出 ${items.length} 个结果。\n返回 JSON：{"analyses":[...]}\n\n${list}`;
+  const instructions = renderTemplate(setting.userPromptTemplate, buildPromptVars(setting));
+  const list = items.map((item, index) => formatBatchInputItem(setting, item, index)).join("\n\n");
+  return `${buildRuntimeAnalysisContext(setting)}\n\n${instructions}\n\n请一次分析 ${items.length} 条评论，严格按输入顺序输出 ${items.length} 个结果。\n返回 JSON：{"analyses":[...]}\n\n${list}`;
 }
 
 async function analyzeOne(client: OpenAI | null, setting: ResolvedAiSetting, item: BatchInput): Promise<AnalysisResult> {
