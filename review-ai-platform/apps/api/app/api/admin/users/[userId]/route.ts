@@ -1,6 +1,7 @@
 import { prisma } from "@review-ai/db";
 import { fail, ok } from "@/lib/http";
 import { requireSuperAdmin } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit-log";
 import { ensurePersonalWorkspace } from "@/lib/personal-workspace";
 import { serializeAdminUser } from "@/lib/serializers";
 
@@ -71,6 +72,30 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
         monthlyRunLimit: toLimit(body.monthlyRunLimit, currentSubscription.monthlyRunLimit)
       }
     });
+  });
+  await writeAuditLog(request, {
+    workspaceId: workspace.id,
+    actor: auth.user,
+    action: "admin.user.update",
+    targetType: "user",
+    targetId: user.id,
+    targetLabel: `${user.name} <${user.email}>`,
+    metadata: {
+      before: {
+        name: user.name,
+        isActive: user.isActive,
+        isSuperAdmin: user.isSuperAdmin,
+        monthlyReviewLimit: currentSubscription.monthlyReviewLimit,
+        monthlyRunLimit: currentSubscription.monthlyRunLimit
+      },
+      after: {
+        name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : user.name,
+        isActive: nextIsActive,
+        isSuperAdmin: nextIsSuperAdmin,
+        monthlyReviewLimit: toLimit(body.monthlyReviewLimit, currentSubscription.monthlyReviewLimit),
+        monthlyRunLimit: toLimit(body.monthlyRunLimit, currentSubscription.monthlyRunLimit)
+      }
+    }
   });
 
   const updated = await prisma.user.findUniqueOrThrow({

@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeRun, serializeTask } from "@/lib/serializers";
 import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole, taskWorkspaceWhere } from "@/lib/workspace";
@@ -67,6 +68,19 @@ export async function DELETE(request: Request, context: { params: Promise<{ task
 
   await prisma.task.delete({
     where: { id: task.id }
+  });
+  await writeAuditLog(request, {
+    workspaceId: task.workspaceId || workspaceContext.workspace.id,
+    actor: workspaceContext.user,
+    action: "task.delete",
+    targetType: "task",
+    targetId: task.id,
+    targetLabel: task.name,
+    metadata: {
+      productName: task.productName,
+      sourceChannel: task.sourceChannel,
+      analysisType: task.analysisType
+    }
   });
 
   return ok({ deleted: true });

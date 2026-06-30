@@ -163,6 +163,36 @@
           </a-table>
         </div>
       </a-tab-pane>
+
+      <a-tab-pane key="audit" tab="操作日志">
+        <div class="table-shell">
+          <div class="table-title">最近操作</div>
+          <a-table :columns="auditColumns" :data-source="auditLogs" :loading="loading" row-key="id" :pagination="{ pageSize: 12 }" :scroll="{ x: 1120 }">
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'action'">
+                <a-tag color="blue">{{ actionLabel(record.action) }}</a-tag>
+                <div class="member-email">{{ record.action }}</div>
+              </template>
+              <template v-else-if="column.key === 'actor'">
+                <div>{{ record.actorName || "系统" }}</div>
+                <div class="member-email">{{ record.actorEmail || "-" }}</div>
+              </template>
+              <template v-else-if="column.key === 'target'">
+                <div>{{ targetTypeLabel(record.targetType) }}</div>
+                <div class="member-email">{{ record.targetLabel || record.targetId || "-" }}</div>
+              </template>
+              <template v-else-if="column.key === 'metadata'">
+                <a-tooltip :title="metadataText(record.metadata)">
+                  <span class="muted">{{ metadataSummary(record.metadata) }}</span>
+                </a-tooltip>
+              </template>
+              <template v-else-if="column.key === 'time'">
+                {{ formatTime(record.createdAt) }}
+              </template>
+            </template>
+          </a-table>
+        </div>
+      </a-tab-pane>
     </a-tabs>
 
     <a-modal
@@ -220,8 +250,9 @@ import { message } from "ant-design-vue";
 import { ArrowLeftOutlined, KeyOutlined, ReloadOutlined, UserAddOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
 import type { Dayjs } from "dayjs";
-import type { AdminOverviewDTO, AdminUserDTO, InviteCodeDTO } from "@review-ai/shared";
+import type { AdminOverviewDTO, AdminUserDTO, AuditLogDTO, InviteCodeDTO } from "@review-ai/shared";
 import {
+  fetchAdminAuditLogs,
   createAdminUser,
   createInviteCode,
   fetchAdminOverview,
@@ -241,6 +272,7 @@ const inviteModalOpen = ref(false);
 const overview = ref<AdminOverviewDTO | null>(null);
 const users = ref<AdminUserDTO[]>([]);
 const inviteCodes = ref<InviteCodeDTO[]>([]);
+const auditLogs = ref<AuditLogDTO[]>([]);
 const forbidden = ref(false);
 const savingUserId = ref("");
 const quotaDrafts = reactive<Record<string, { monthlyReviewLimit: number; monthlyRunLimit: number }>>({});
@@ -284,18 +316,33 @@ const inviteColumns = [
   { title: "创建时间", dataIndex: "createdAt", key: "createdAt", width: 210 }
 ];
 
+const auditColumns = [
+  { title: "时间", key: "time", width: 190 },
+  { title: "操作", key: "action", width: 210 },
+  { title: "操作人", key: "actor", width: 220 },
+  { title: "对象", key: "target", width: 260 },
+  { title: "IP", dataIndex: "ipAddress", key: "ipAddress", width: 150 },
+  { title: "详情", key: "metadata", width: 260 }
+];
+
+async function loadAuditLogs() {
+  auditLogs.value = await fetchAdminAuditLogs({ limit: 120 });
+}
+
 async function load() {
   loading.value = true;
   forbidden.value = false;
   try {
-    const [overviewResult, userResult, inviteResult] = await Promise.all([
+    const [overviewResult, userResult, inviteResult, auditResult] = await Promise.all([
       fetchAdminOverview(),
       fetchAdminUsers(),
-      fetchInviteCodes()
+      fetchInviteCodes(),
+      loadAuditLogs().then(() => auditLogs.value)
     ]);
     overview.value = overviewResult;
     users.value = userResult;
     inviteCodes.value = inviteResult;
+    auditLogs.value = auditResult;
     for (const user of userResult) {
       quotaDrafts[user.id] = {
         monthlyReviewLimit: user.monthlyReviewLimit,
@@ -347,11 +394,68 @@ function readErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function formatTime(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
+}
+
+function actionLabel(action: string) {
+  return (
+    {
+      "admin.user.upsert": "保存账号",
+      "admin.user.update": "更新用户",
+      "admin.user.reset_password": "重置密码",
+      "admin.invite_code.create": "生成邀请码",
+      "settings.ai.update": "更新 AI 设置",
+      "settings.crawler.update": "更新爬虫设置",
+      "task.delete": "删除任务",
+      "report_share.create": "创建分享",
+      "report_share.revoke": "撤销分享"
+    }[action] || action
+  );
+}
+
+function targetTypeLabel(type: string) {
+  return (
+    {
+      user: "用户",
+      invite_code: "邀请码",
+      workspace_ai_setting: "AI 设置",
+      workspace_crawler_setting: "爬虫设置",
+      task: "分析任务",
+      report_share: "报告分享"
+    }[type] || type
+  );
+}
+
+function metadataText(value: unknown) {
+  if (!value) {
+    return "-";
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function metadataSummary(value: unknown) {
+  const text = metadataText(value).replace(/\s+/g, " ").trim();
+  if (!text || text === "-") {
+    return "-";
+  }
+  return text.length > 48 ? `${text.slice(0, 48)}...` : text;
+}
+
 async function saveUser(record: AdminUserDTO, patch: { isSuperAdmin?: boolean; isActive?: boolean }, successMessage = "用户权限已更新") {
   savingUserId.value = record.id;
   try {
     const updated = await updateAdminUser(record.id, patch);
     users.value = users.value.map((item) => (item.id === updated.id ? updated : item));
+    await loadAuditLogs();
     message.success(successMessage);
   } catch (error) {
     message.error(readErrorMessage(error, "用户信息更新失败"));
@@ -364,6 +468,7 @@ async function resetPassword(record: AdminUserDTO) {
   savingUserId.value = record.id;
   try {
     const result = await resetAdminUserPassword(record.id);
+    await loadAuditLogs();
     message.success(`密码已重置为 ${result.password}`);
   } catch (error) {
     message.error(readErrorMessage(error, "密码重置失败"));
@@ -385,6 +490,7 @@ async function saveQuota(record: AdminUserDTO) {
       monthlyReviewLimit: updated.monthlyReviewLimit,
       monthlyRunLimit: updated.monthlyRunLimit
     };
+    await loadAuditLogs();
     message.success("用户配额已更新");
   } catch {
     message.error("用户配额更新失败");

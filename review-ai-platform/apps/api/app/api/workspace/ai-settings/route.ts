@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { defaultAiSetting, normalizeProviderBaseUrl, serializeAiSetting } from "@/lib/ai-settings";
 import { getPlatformAiSetting } from "@/lib/platform-settings";
@@ -103,6 +104,22 @@ export async function PATCH(request: Request) {
       tweetUserPromptTemplate,
       tweetSummaryPrompt,
       tweetInsightsPrompt,
+      temperature
+    }
+  });
+  await writeAuditLog(request, {
+    workspaceId: context.workspace.id,
+    actor: context.user,
+    action: "settings.ai.update",
+    targetType: "workspace_ai_setting",
+    targetId: setting.id,
+    targetLabel: context.workspace.name,
+    metadata: {
+      provider,
+      baseUrl,
+      modelName,
+      promptVersion,
+      apiKeyUpdated: apiKey !== undefined,
       temperature
     }
   });

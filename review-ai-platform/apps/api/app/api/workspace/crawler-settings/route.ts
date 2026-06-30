@@ -1,5 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { normalizeCrawlSourceChannel } from "@review-ai/shared";
+import { writeAuditLog } from "@/lib/audit-log";
 import { defaultCrawlerSetting, serializeCrawlerChannels, serializeCrawlerSetting } from "@/lib/crawler-settings";
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
@@ -72,6 +73,23 @@ export async function PATCH(request: Request) {
       pythonBin,
       proxyUrl,
       shopeeCookie,
+      crawlChannels,
+      defaultSourceChannel,
+      defaultMaxReviews,
+      requestTimeoutSec
+    }
+  });
+  await writeAuditLog(request, {
+    workspaceId: context.workspace.id,
+    actor: context.user,
+    action: "settings.crawler.update",
+    targetType: "workspace_crawler_setting",
+    targetId: setting.id,
+    targetLabel: context.workspace.name,
+    metadata: {
+      enabled,
+      pythonBin,
+      proxyConfigured: Boolean(proxyUrl),
       crawlChannels,
       defaultSourceChannel,
       defaultMaxReviews,

@@ -1,6 +1,7 @@
 import { prisma } from "@review-ai/db";
 import { fail, ok } from "@/lib/http";
 import { DEFAULT_RESET_PASSWORD, hashPassword, requireSuperAdmin } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit-log";
 import { ensurePersonalWorkspace } from "@/lib/personal-workspace";
 import { serializeAdminUser } from "@/lib/serializers";
 
@@ -48,7 +49,16 @@ export async function POST(request: Request) {
     update: { name, isSuperAdmin },
     create: { email, name, isSuperAdmin, isActive: true, passwordHash: hashPassword(DEFAULT_RESET_PASSWORD) }
   });
-  await ensurePersonalWorkspace(prisma, user);
+  const workspace = await ensurePersonalWorkspace(prisma, user);
+  await writeAuditLog(request, {
+    workspaceId: workspace.id,
+    actor: auth.user,
+    action: "admin.user.upsert",
+    targetType: "user",
+    targetId: user.id,
+    targetLabel: `${user.name} <${user.email}>`,
+    metadata: { email, name, isSuperAdmin }
+  });
 
   const withQuota = await prisma.user.findUniqueOrThrow({
     where: { id: user.id },

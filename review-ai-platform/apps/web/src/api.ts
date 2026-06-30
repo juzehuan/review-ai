@@ -3,6 +3,7 @@ import type {
   AdminOverviewDTO,
   AdminUserDTO,
   AdminWorkspaceDTO,
+  AuditLogDTO,
   AnalysisRunLogDTO,
   AnalysisRunDTO,
   AppendImportResponse,
@@ -240,6 +241,11 @@ export async function resetAdminUserPassword(userId: string) {
 
 export async function fetchInviteCodes() {
   const { data } = await api.get<InviteCodeDTO[]>("/admin/invite-codes");
+  return data;
+}
+
+export async function fetchAdminAuditLogs(params?: { limit?: number }) {
+  const { data } = await api.get<AuditLogDTO[]>("/admin/audit-logs", { params });
   return data;
 }
 

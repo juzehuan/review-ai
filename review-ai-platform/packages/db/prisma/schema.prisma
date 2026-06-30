@@ -72,6 +72,7 @@ model User {
   usedInviteCode      InviteCode?  @relation("InviteCodeUser")
   createdReportShares ReportShare[] @relation("ReportShareCreator")
   reviewCorrections   ReviewCorrection[] @relation("ReviewCorrectionCreator")
+  auditLogs           AuditLog[] @relation("AuditLogActor")
 
   @@map("user_account")
 }
@@ -122,6 +123,7 @@ model Workspace {
   crawlJobs      CrawlJob[]
   crawlMonitors  CrawlMonitor[]
   reportShares   ReportShare[]
+  auditLogs      AuditLog[]
 
   @@map("workspace")
 }
@@ -196,6 +198,29 @@ model Subscription {
   workspace                     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@map("subscription")
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  workspaceId String?    @map("workspace_id")
+  actorUserId String?    @map("actor_user_id")
+  actorEmail  String?    @map("actor_email")
+  actorName   String?    @map("actor_name")
+  action      String
+  targetType  String     @map("target_type")
+  targetId    String?    @map("target_id")
+  targetLabel String?    @map("target_label")
+  ipAddress   String?    @map("ip_address")
+  userAgent   String?    @map("user_agent")
+  metadata    Json?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  actor       User?      @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_log")
 }
 
 model Task {

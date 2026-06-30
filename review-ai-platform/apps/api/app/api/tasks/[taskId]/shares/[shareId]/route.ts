@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeReportShare } from "@/lib/serializers";
 import { buildPublicShareUrl } from "@/lib/share-url";
@@ -31,6 +32,15 @@ export async function DELETE(request: Request, context: { params: Promise<{ task
   const share = await prisma.reportShare.update({
     where: { id: existing.id },
     data: { enabled: false, revokedAt: new Date() }
+  });
+  await writeAuditLog(request, {
+    workspaceId: taskWorkspaceId,
+    actor: workspaceContext.user,
+    action: "report_share.revoke",
+    targetType: "report_share",
+    targetId: share.id,
+    targetLabel: share.title,
+    metadata: { taskId }
   });
 
   return ok(serializeReportShare(share, buildPublicShareUrl(request, share.token)));

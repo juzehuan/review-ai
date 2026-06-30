@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "@review-ai/db";
 import type { ReportShareDTO } from "@review-ai/shared";
+import { writeAuditLog } from "@/lib/audit-log";
 import { ok } from "@/lib/http";
 import { serializeReportShare } from "@/lib/serializers";
 import { buildPublicShareUrl } from "@/lib/share-url";
@@ -87,6 +88,20 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
         createdByUserId: workspaceContext.user.id
       }
     }));
+  if (!existing) {
+    await writeAuditLog(request, {
+      workspaceId: taskWorkspaceId,
+      actor: workspaceContext.user,
+      action: "report_share.create",
+      targetType: "report_share",
+      targetId: share.id,
+      targetLabel: title,
+      metadata: {
+        taskId,
+        expiresAt: share.expiresAt?.toISOString() || null
+      }
+    });
+  }
 
   return ok(serializeReportShare(share, buildPublicShareUrl(request, share.token)), existing ? 200 : 201);
 }

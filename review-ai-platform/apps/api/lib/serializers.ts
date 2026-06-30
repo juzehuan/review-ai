@@ -2,6 +2,7 @@ import type {
   AdminUserDTO,
   AdminWorkspaceDTO,
   AnalysisType,
+  AuditLogDTO,
   AnalysisRunLogDTO,
   AnalysisRunDTO,
   CrawlJobDTO,
@@ -20,6 +21,7 @@ import type {
 import type {
   AnalysisRun,
   AnalysisRunLog,
+  AuditLog,
   CrawlJob,
   CrawlMonitor,
   ReportShare,
@@ -88,6 +90,24 @@ export function serializeWorkspace(workspace: Workspace & { subscription?: Subsc
     monthlyRunLimit: subscription?.monthlyRunLimit || 0,
     currentPeriodReviewCount: subscription?.currentPeriodReviewCount || 0,
     currentPeriodRunCount: subscription?.currentPeriodRunCount || 0
+  };
+}
+
+export function serializeAuditLog(log: AuditLog): AuditLogDTO {
+  return {
+    id: log.id,
+    workspaceId: log.workspaceId,
+    actorUserId: log.actorUserId,
+    actorEmail: log.actorEmail,
+    actorName: log.actorName,
+    action: log.action,
+    targetType: log.targetType,
+    targetId: log.targetId,
+    targetLabel: log.targetLabel,
+    ipAddress: log.ipAddress,
+    userAgent: log.userAgent,
+    metadata: log.metadata,
+    createdAt: log.createdAt.toISOString()
   };
 }
 

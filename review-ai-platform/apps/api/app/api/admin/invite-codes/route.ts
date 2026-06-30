@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { requireSuperAdmin } from "@/lib/auth";
 import { serializeInviteCode } from "@/lib/serializers";
@@ -70,6 +71,19 @@ export async function POST(request: Request) {
     include: {
       createdBy: true,
       usedBy: true
+    }
+  });
+  await writeAuditLog(request, {
+    actor: auth.user,
+    action: "admin.invite_code.create",
+    targetType: "invite_code",
+    targetId: inviteCode.id,
+    targetLabel: inviteCode.code,
+    metadata: {
+      note,
+      monthlyReviewLimit,
+      monthlyRunLimit,
+      expiresAt: inviteCode.expiresAt?.toISOString() || null
     }
   });
 

@@ -102,6 +102,22 @@ export interface AdminOverviewDTO {
   availableInviteCodeCount: number;
 }
 
+export interface AuditLogDTO {
+  id: string;
+  workspaceId: string | null;
+  actorUserId: string | null;
+  actorEmail: string | null;
+  actorName: string | null;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  targetLabel: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  metadata: unknown;
+  createdAt: string;
+}
+
 export interface WorkspaceAiSettingDTO {
   provider: string;
   apiKey: string | null;

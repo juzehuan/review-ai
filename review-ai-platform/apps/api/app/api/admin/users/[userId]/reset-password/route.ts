@@ -1,5 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { DEFAULT_RESET_PASSWORD, hashPassword, requireSuperAdmin } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 
 export async function POST(request: Request, context: { params: Promise<{ userId: string }> }) {
@@ -21,6 +22,13 @@ export async function POST(request: Request, context: { params: Promise<{ userId
     }),
     prisma.authSession.deleteMany({ where: { userId } })
   ]);
+  await writeAuditLog(request, {
+    actor: auth.user,
+    action: "admin.user.reset_password",
+    targetType: "user",
+    targetId: user.id,
+    targetLabel: `${user.name} <${user.email}>`
+  });
 
   return ok({ password: DEFAULT_RESET_PASSWORD });
 }
