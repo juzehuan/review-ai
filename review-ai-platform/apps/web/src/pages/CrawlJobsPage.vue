@@ -61,6 +61,38 @@
       </div>
     </div>
 
+    <div class="crawler-health-strip" :class="{ 'crawler-health-strip-alert': stalledJobCount > 0 }">
+      <div class="crawler-health-head">
+        <div>
+          <div class="panel-label">Queue Health</div>
+          <div class="settings-section-title">采集运行观察</div>
+        </div>
+        <a-tag :color="crawlHealthStatusColor">{{ crawlHealthStatusLabel }}</a-tag>
+      </div>
+      <div class="crawler-health-metrics">
+        <div class="crawler-health-metric">
+          <span>疑似无更新</span>
+          <strong>{{ stalledJobCount }}</strong>
+          <small>{{ stalledJobSummary }}</small>
+        </div>
+        <div class="crawler-health-metric">
+          <span>活跃采集量</span>
+          <strong>{{ activeProgressText }}</strong>
+          <small>{{ activeProgressNote }}</small>
+        </div>
+        <div class="crawler-health-metric">
+          <span>当前速度</span>
+          <strong>{{ currentFetchRateText }}</strong>
+          <small>{{ fetchRateNote }}</small>
+        </div>
+        <div class="crawler-health-metric">
+          <span>最近活动</span>
+          <strong>{{ latestActivityText }}</strong>
+          <small>{{ latestActivityNote }}</small>
+        </div>
+      </div>
+    </div>
+
     <section class="task-list-panel monitor-list-panel">
       <div class="panel-head">
         <div>
@@ -517,13 +549,80 @@ const monitorColumns = [
   { title: "操作", key: "actions", width: 220 }
 ];
 
-const hasActiveJobs = computed(() => jobs.value.some((job) => ["queued", "running"].includes(job.status)));
-const activeJobCount = computed(() => jobs.value.filter((job) => ["queued", "running"].includes(job.status)).length);
+const activeJobs = computed(() => jobs.value.filter((job) => ["queued", "running"].includes(job.status)));
+const stalledJobs = computed(() => activeJobs.value.filter((job) => job.stalled));
+const hasActiveJobs = computed(() => activeJobs.value.length > 0);
+const activeJobCount = computed(() => activeJobs.value.length);
 const failedJobCount = computed(() => jobs.value.filter((job) => job.status === "failed").length);
 const fetchedRowCount = computed(() => jobs.value.reduce((total, job) => total + job.fetchedRows, 0));
 const enabledMonitorCount = computed(() => monitors.value.filter((monitor) => monitor.enabled).length);
 const failedMonitorCount = computed(() => monitors.value.filter((monitor) => Boolean(monitor.lastError)).length);
 const hasEnabledMonitor = computed(() => monitors.value.some((monitor) => monitor.enabled));
+const stalledJobCount = computed(() => stalledJobs.value.length);
+const longestStalledJob = computed(() => {
+  return [...stalledJobs.value].sort((a, b) => b.updatedAgoSeconds - a.updatedAgoSeconds)[0] || null;
+});
+const latestActivityJob = computed(() => {
+  return [...jobs.value].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0] || null;
+});
+const activeProgressText = computed(() => {
+  if (!activeJobs.value.length) {
+    return "暂无运行任务";
+  }
+  const fetched = activeJobs.value.reduce((total, job) => total + job.fetchedRows, 0);
+  if (activeJobs.value.some((job) => !job.maxReviews)) {
+    return `${fetched}/不限`;
+  }
+  const target = activeJobs.value.reduce((total, job) => total + job.maxReviews, 0);
+  return `${fetched}/${target}`;
+});
+const activeProgressNote = computed(() => {
+  return activeJobs.value.length ? `${activeJobs.value.length} 个任务正在排队或抓取` : "没有排队或抓取任务";
+});
+const activeFetchRates = computed(() => activeJobs.value.map((job) => job.fetchRatePerMinute).filter((value): value is number => value !== null));
+const currentFetchRateText = computed(() => {
+  if (!activeFetchRates.value.length) {
+    return "-";
+  }
+  const average = activeFetchRates.value.reduce((total, value) => total + value, 0) / activeFetchRates.value.length;
+  return `${Number(average.toFixed(1))}/分钟`;
+});
+const fetchRateNote = computed(() => {
+  return activeFetchRates.value.length ? `${activeFetchRates.value.length} 个任务有速度回传` : "等待采集器回传速度";
+});
+const crawlHealthStatusLabel = computed(() => {
+  if (stalledJobCount.value) {
+    return "需要检查";
+  }
+  if (activeJobCount.value) {
+    return "运行中";
+  }
+  return "空闲";
+});
+const crawlHealthStatusColor = computed(() => {
+  if (stalledJobCount.value) {
+    return "orange";
+  }
+  if (activeJobCount.value) {
+    return "blue";
+  }
+  return "green";
+});
+const stalledJobSummary = computed(() => {
+  if (!longestStalledJob.value) {
+    return activeJobCount.value ? "运行任务正常更新" : "暂无运行中的采集任务";
+  }
+  return `最长静默 ${durationLabel(longestStalledJob.value.updatedAgoSeconds)} · ${shortJobName(longestStalledJob.value)}`;
+});
+const latestActivityText = computed(() => {
+  if (!latestActivityJob.value) {
+    return "-";
+  }
+  return `${durationLabel(latestActivityJob.value.updatedAgoSeconds)}前`;
+});
+const latestActivityNote = computed(() => {
+  return latestActivityJob.value ? shortJobName(latestActivityJob.value) : "暂无采集记录";
+});
 
 function statusLabel(status: CrawlJobStatus) {
   return {
@@ -668,6 +767,11 @@ function stopReasonLabel(value?: string | null) {
     return "未发现评论";
   }
   return value || "-";
+}
+
+function shortJobName(job: CrawlJobDTO) {
+  const text = String(job.name || job.productName || job.normalizedUrl || job.id).trim();
+  return text.length > 28 ? `${text.slice(0, 28)}...` : text;
 }
 
 function crawlMetricSummary(job: CrawlJobDTO) {
@@ -1073,6 +1177,66 @@ onUnmounted(() => {
   border-color: rgba(0, 191, 216, 0.28);
 }
 
+.crawler-health-strip {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(18, 115, 209, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.crawler-health-strip-alert {
+  border-color: rgba(245, 158, 11, 0.38);
+  box-shadow: 0 12px 30px rgba(245, 158, 11, 0.12);
+}
+
+.crawler-health-head {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.crawler-health-metrics {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.crawler-health-metric {
+  border-left: 1px solid rgba(148, 163, 184, 0.24);
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 14px;
+}
+
+.crawler-health-metric:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.crawler-health-metric span,
+.crawler-health-metric small {
+  color: #64748b;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crawler-health-metric strong {
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .monitor-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1145,11 +1309,41 @@ onUnmounted(() => {
   .monitor-form-grid {
     grid-template-columns: 1fr;
   }
+
+  .crawler-health-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .crawler-health-metric:nth-child(odd) {
+    border-left: 0;
+    padding-left: 0;
+  }
 }
 
 @media (max-width: 760px) {
   .crawler-page {
     gap: 14px;
+  }
+
+  .crawler-health-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .crawler-health-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .crawler-health-metric {
+    border-left: 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.24);
+    padding-left: 0;
+    padding-top: 12px;
+  }
+
+  .crawler-health-metric:first-child {
+    border-top: 0;
+    padding-top: 0;
   }
 
   .crawl-actions {

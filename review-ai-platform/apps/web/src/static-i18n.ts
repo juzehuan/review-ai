@@ -90,6 +90,18 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "全部任务列表": "All tasks",
     "持续监听任务": "Continuous monitors",
     "采集记录": "Crawl records",
+    "采集运行观察": "Crawl runtime watch",
+    "疑似无更新": "Likely no update",
+    "活跃采集量": "Active crawl volume",
+    "当前速度": "Current speed",
+    "最近活动": "Latest activity",
+    "运行任务正常更新": "Running tasks are updating normally",
+    "暂无运行中的采集任务": "No running crawl tasks",
+    "暂无运行任务": "No running tasks",
+    "没有排队或抓取任务": "No queued or crawling tasks",
+    "等待采集器回传速度": "Waiting for crawler speed",
+    "暂无采集记录": "No crawl records yet",
+    "最长静默": "Longest silent",
     "监听任务": "Monitor tasks",
     "已采集评论": "Collected comments",
     "待处理异常": "Pending exceptions",
@@ -440,6 +452,18 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "全部任务列表": "รายการงานทั้งหมด",
     "持续监听任务": "งานติดตามต่อเนื่อง",
     "采集记录": "ประวัติการเก็บข้อมูล",
+    "采集运行观察": "ดูสถานะการเก็บข้อมูล",
+    "疑似无更新": "อาจไม่มีอัปเดต",
+    "活跃采集量": "ปริมาณที่กำลังเก็บ",
+    "当前速度": "ความเร็วปัจจุบัน",
+    "最近活动": "กิจกรรมล่าสุด",
+    "运行任务正常更新": "งานที่กำลังทำงานอัปเดตปกติ",
+    "暂无运行中的采集任务": "ไม่มีงานเก็บข้อมูลที่กำลังทำงาน",
+    "暂无运行任务": "ไม่มีงานที่กำลังทำงาน",
+    "没有排队或抓取任务": "ไม่มีงานรอคิวหรือกำลังเก็บ",
+    "等待采集器回传速度": "รอตัวเก็บข้อมูลส่งความเร็วกลับมา",
+    "暂无采集记录": "ยังไม่มีประวัติการเก็บข้อมูล",
+    "最长静默": "เงียบนานสุด",
     "监听任务": "งานติดตาม",
     "已采集评论": "คอมเมนต์ที่เก็บแล้ว",
     "待处理异常": "ปัญหาที่ต้องจัดการ",
@@ -764,6 +788,28 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const alertCount = value.match(/^(\d+)\s*条$/);
   if (alertCount) {
     return locale === "en-US" ? `${alertCount[1]} items` : `${alertCount[1]} รายการ`;
+  }
+  const activeCrawlJobs = value.match(/^(\d+)\s*个任务正在排队或抓取$/);
+  if (activeCrawlJobs) {
+    return locale === "en-US" ? `${activeCrawlJobs[1]} tasks queued or crawling` : `${activeCrawlJobs[1]} งานรอคิวหรือกำลังเก็บ`;
+  }
+  const speedReports = value.match(/^(\d+)\s*个任务有速度回传$/);
+  if (speedReports) {
+    return locale === "en-US" ? `${speedReports[1]} tasks reporting speed` : `${speedReports[1]} งานส่งความเร็วกลับมา`;
+  }
+  const ratePerMinute = value.match(/^([\d.]+)\/分钟$/);
+  if (ratePerMinute) {
+    return locale === "en-US" ? `${ratePerMinute[1]}/min` : `${ratePerMinute[1]}/นาที`;
+  }
+  const longestSilent = value.match(/^最长静默\s+(.+)\s+·\s+(.+)$/);
+  if (longestSilent) {
+    const duration = translateDuration(longestSilent[1]);
+    return locale === "en-US" ? `Longest silent ${duration} · ${longestSilent[2]}` : `เงียบนานสุด ${duration} · ${longestSilent[2]}`;
+  }
+  const durationAgo = value.match(/^(\d+\s*(?:秒|分钟|小时|天)(?:\s+\d+\s*(?:秒|分钟|小时|天))?)前$/);
+  if (durationAgo) {
+    const duration = translateDuration(durationAgo[1]);
+    return locale === "en-US" ? `${duration} ago` : `${duration}ที่แล้ว`;
   }
   const silentFor = value.match(/^已静默\s+(.+)$/);
   if (silentFor) {
