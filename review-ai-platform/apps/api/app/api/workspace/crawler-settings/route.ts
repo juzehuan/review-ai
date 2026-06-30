@@ -1,5 +1,6 @@
 import { prisma } from "@review-ai/db";
-import { defaultCrawlerSetting, serializeCrawlerSetting } from "@/lib/crawler-settings";
+import { normalizeCrawlSourceChannel } from "@review-ai/shared";
+import { defaultCrawlerSetting, serializeCrawlerChannels, serializeCrawlerSetting } from "@/lib/crawler-settings";
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { getWorkspaceContext } from "@/lib/workspace";
@@ -40,11 +41,14 @@ export async function PATCH(request: Request) {
   const pythonBin = String(body.pythonBin || defaults.pythonBin).trim();
   const proxyUrl =
     typeof body.proxyUrl === "string" ? body.proxyUrl.trim() || null : body.proxyUrl === null ? null : defaults.proxyUrl;
-  const defaultSourceChannel = "YouTube";
-  const defaultMaxReviews = Math.min(Math.max(Number(body.defaultMaxReviews ?? defaults.defaultMaxReviews), 0), 1000);
+  const defaultSourceChannel = normalizeCrawlSourceChannel(
+    body.defaultSourceChannel,
+    normalizeCrawlSourceChannel(defaults.defaultSourceChannel, "YouTube")
+  );
+  const defaultMaxReviews = Math.min(Math.max(Number(body.defaultMaxReviews ?? defaults.defaultMaxReviews), 0), 20000);
   const requestTimeoutSec = Math.min(Math.max(Number(body.requestTimeoutSec || defaults.requestTimeoutSec), 30), 900);
   const shopeeCookie = null;
-  const crawlChannels = "browser_intercept";
+  const crawlChannels = serializeCrawlerChannels(body.crawlChannels || defaults.crawlChannels);
 
   if (!pythonBin) {
     return fail("请填写 Python 命令");

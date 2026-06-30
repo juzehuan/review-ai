@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { inferAnalysisType, type CrawlerChannel } from "@review-ai/shared";
-import { defaultCrawlerSetting } from "@/lib/crawler-settings";
+import { inferAnalysisType, normalizeCrawlSourceChannel, type CrawlerChannel } from "@review-ai/shared";
+import { defaultCrawlerSetting, parseCrawlerChannels } from "@/lib/crawler-settings";
 
 export type CrawledReview = {
   cmtId: string;
@@ -52,6 +52,19 @@ function parseCrawlerOutput(stdout: string) {
 }
 
 const nestedUrlParamNames = ["url", "u", "q", "target", "redirect", "redirect_url"] as const;
+const supportedCrawlUrlMessage = "目前支持 Shopee 商品链接、YouTube 视频链接、TikTok 视频链接和 Facebook 帖子/图片/Reel 链接。";
+
+function isFacebookHost(host: string) {
+  return host === "facebook.com" || host.endsWith(".facebook.com");
+}
+
+function isFacebookCrawlTarget(pathname: string, searchParams: URLSearchParams) {
+  const path = pathname || "/";
+  if (searchParams.has("story_fbid") || searchParams.has("fbid") || searchParams.has("v")) {
+    return /\/(story\.php|permalink\.php|photo(?:\.php)?|watch|posts|videos|reel|share\/[pv])/i.test(path);
+  }
+  return /\/(?:groups\/[^/]+\/posts|posts|videos|reel|share\/[pv])\/[^/?#]+/i.test(path);
+}
 
 export function coerceCrawlUrl(value: string) {
   const url = value.trim();
@@ -98,6 +111,12 @@ export function detectCrawlerPlatform(url: string) {
     if ((host === "tiktok.com" || host.endsWith(".tiktok.com")) && /\/@[^/]+\/video\/\d+/i.test(parsed.pathname)) {
       return "tiktok-video";
     }
+    if (host.includes("shopee.")) {
+      return "shopee";
+    }
+    if (isFacebookHost(host) && isFacebookCrawlTarget(parsed.pathname, parsed.searchParams)) {
+      return "facebook-post";
+    }
   } catch {
     const text = normalizedUrl.toLowerCase();
     if (text.includes("youtube.com") || text.includes("youtu.be")) {
@@ -106,17 +125,30 @@ export function detectCrawlerPlatform(url: string) {
     if (text.includes("tiktok.") && /\/@[^/]+\/video\/\d+/i.test(text)) {
       return "tiktok-video";
     }
+    if (text.includes("shopee.")) {
+      return "shopee";
+    }
+    if (text.includes("facebook.") && /(story_fbid=|fbid=|[?&]v=|\/posts\/|\/videos\/|\/reel\/|\/photo\/|photo\.php|\/share\/[pv])/i.test(text)) {
+      return "facebook-post";
+    }
   }
   return "";
 }
 
 export function detectSourceChannelFromUrl(url: string) {
-  const text = normalizeCrawlUrl(url).toLowerCase();
-  if (text.includes("youtube.com") || text.includes("youtu.be")) {
+  const normalizedUrl = normalizeCrawlUrl(url);
+  const platform = detectCrawlerPlatform(normalizedUrl);
+  if (platform === "youtube") {
     return "YouTube";
   }
-  if (text.includes("tiktok.") && /\/@[^/]+\/video\/\d+/i.test(text)) {
+  if (platform === "tiktok-video") {
     return "TikTok Video";
+  }
+  if (platform === "shopee") {
+    return "Shopee";
+  }
+  if (platform === "facebook-post") {
+    return "Facebook";
   }
   return "";
 }
@@ -170,14 +202,14 @@ export function normalizeRequestedCrawlInput(body: Record<string, unknown>, defa
   const sourceChannel =
     crawlerPlatform && detectedSourceChannel
       ? detectedSourceChannel
-      : requestedSourceChannel || detectedSourceChannel || defaults.defaultSourceChannel;
+      : normalizeCrawlSourceChannel(requestedSourceChannel || detectedSourceChannel || defaults.defaultSourceChannel, "YouTube");
   const rawAnalysisType = String(body.analysisType || "").trim();
   const analysisType = ["product", "video", "tweet"].includes(rawAnalysisType)
     ? rawAnalysisType
     : inferAnalysisType(sourceChannel);
   const requestedMaxReviews = Number(body.maxReviews ?? defaults.defaultMaxReviews);
-  const maxReviews = requestedMaxReviews <= 0 ? 0 : Math.min(Math.max(requestedMaxReviews, 1), 5000);
-  const crawlChannels = ["browser_intercept"] as CrawlerChannel[];
+  const maxReviews = requestedMaxReviews <= 0 ? 0 : Math.min(Math.max(requestedMaxReviews, 1), 20000);
+  const crawlChannels = crawlerPlatform === "shopee" ? defaults.crawlChannels : (["browser_intercept"] as CrawlerChannel[]);
 
   return {
     productUrl,
@@ -292,9 +324,16 @@ export function resolvedCrawlerSettingFromRecord(
     pythonBin: resolveCrawlerPythonBin(storedCrawlerSetting?.pythonBin, defaultSetting.pythonBin),
     proxyUrl: storedCrawlerSetting?.proxyUrl || defaultSetting.proxyUrl,
     shopeeCookie: null,
-    crawlChannels: ["browser_intercept"],
-    defaultSourceChannel: storedCrawlerSetting?.defaultSourceChannel === "TikTok Video" ? "TikTok Video" : defaultSetting.defaultSourceChannel,
+    crawlChannels: parseCrawlerChannels(storedCrawlerSetting?.crawlChannels || defaultSetting.crawlChannels.join(",")),
+    defaultSourceChannel: normalizeCrawlSourceChannel(
+      storedCrawlerSetting?.defaultSourceChannel,
+      normalizeCrawlSourceChannel(defaultSetting.defaultSourceChannel, "YouTube")
+    ),
     defaultMaxReviews: storedCrawlerSetting?.defaultMaxReviews ?? defaultSetting.defaultMaxReviews,
     requestTimeoutSec: storedCrawlerSetting?.requestTimeoutSec || defaultSetting.requestTimeoutSec
   };
+}
+
+export function supportedCrawlUrlError(prefix = "暂不支持该链接抓取") {
+  return `${prefix}，${supportedCrawlUrlMessage}`;
 }

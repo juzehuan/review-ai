@@ -5,7 +5,7 @@
         <div class="panel-label">Comment Intelligence</div>
         <div class="toolbar-title">评论采集控制台</div>
         <div class="toolbar-subtitle">
-          把 YouTube 和 TikTok 视频评论变成可持续监听的数据流，新评论自动入库、自动分析，任务状态一眼可见。
+          把 Shopee、YouTube、TikTok、Facebook 评论变成可持续监听的数据流，新评论自动入库、自动分析，任务状态一眼可见。
         </div>
       </div>
       <a-space wrap>
@@ -290,8 +290,8 @@
             <a-input v-model:value="monitorForm.productName" placeholder="可选，默认使用视频标题或链接" />
           </a-form-item>
         </div>
-        <a-form-item label="视频链接">
-          <a-input v-model:value="monitorForm.productUrl" placeholder="支持 YouTube 视频链接或 TikTok 视频链接" />
+        <a-form-item label="评论链接">
+          <a-input v-model:value="monitorForm.productUrl" placeholder="支持 Shopee 商品、YouTube 视频、TikTok 视频、Facebook 帖子/图片/Reel 链接" />
         </a-form-item>
         <div class="monitor-form-grid">
           <a-form-item label="来源渠道">
@@ -303,7 +303,7 @@
         </div>
         <div class="monitor-form-grid">
           <a-form-item label="每次最多采集">
-            <a-input-number v-model:value="monitorForm.maxReviews" :min="0" :max="5000" class="full-input" />
+            <a-input-number v-model:value="monitorForm.maxReviews" :min="0" :max="20000" class="full-input" />
             <div class="settings-help">填 0 表示不限，直到平台没有更多评论或采集超时。</div>
           </a-form-item>
           <a-form-item label="监听频率">
@@ -335,8 +335,8 @@
         <a-form-item label="内容名称">
           <a-input v-model:value="form.productName" placeholder="可选，留空时会尽量从页面标题识别" />
         </a-form-item>
-        <a-form-item label="视频链接">
-          <a-input v-model:value="form.productUrl" placeholder="支持 YouTube 视频链接或 TikTok 视频链接" />
+        <a-form-item label="评论链接">
+          <a-input v-model:value="form.productUrl" placeholder="支持 Shopee 商品、YouTube 视频、TikTok 视频、Facebook 帖子/图片/Reel 链接" />
         </a-form-item>
         <div class="monitor-form-grid">
           <a-form-item label="来源渠道">
@@ -347,8 +347,8 @@
           </a-form-item>
         </div>
         <a-form-item label="最多采集条数">
-          <a-input-number v-model:value="form.maxReviews" :min="0" :max="5000" class="full-input" />
-          <div class="settings-help">填 0 表示不限；TikTok 视频采集完成后会自动导入并启动 AI 分析。</div>
+          <a-input-number v-model:value="form.maxReviews" :min="0" :max="20000" class="full-input" />
+          <div class="settings-help">填 0 表示不限；采集完成后会自动导入并启动 AI 分析。</div>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -385,8 +385,9 @@ import {
 } from "@/api";
 import {
   ANALYSIS_TYPE_PRESETS,
-  SOURCE_CHANNEL_PRESETS,
+  CRAWL_SOURCE_CHANNEL_PRESETS,
   inferAnalysisType,
+  normalizeCrawlSourceChannel,
   type AnalysisType,
   type CrawlJobDTO,
   type CrawlJobStatus,
@@ -457,12 +458,12 @@ const monitorForm = reactive({
   autoAnalyze: true
 });
 
-const sourceChannelOptions = SOURCE_CHANNEL_PRESETS.filter((channel) => ["YouTube", "TikTok Video"].includes(channel.value)).map((channel) => ({
+const sourceChannelOptions = CRAWL_SOURCE_CHANNEL_PRESETS.map((channel) => ({
   label: channel.label,
   value: channel.value
 }));
 
-const analysisTypeOptions = ANALYSIS_TYPE_PRESETS.filter((item) => item.value === "video").map((item) => ({
+const analysisTypeOptions = ANALYSIS_TYPE_PRESETS.map((item) => ({
   label: item.label,
   value: item.value
 }));
@@ -550,6 +551,12 @@ function platformLabel(value?: string | null) {
   if (text.includes("tiktok")) {
     return "TikTok 视频";
   }
+  if (text.includes("facebook")) {
+    return "Facebook 评论";
+  }
+  if (text.includes("shopee")) {
+    return "Shopee 商品评论";
+  }
   return value || "-";
 }
 
@@ -564,8 +571,7 @@ function intervalLabel(value: number) {
 }
 
 function normalizeSourceChannel(value?: string | null) {
-  const text = String(value || "").trim();
-  return sourceChannelOptions.some((option) => option.value === text) ? text : "YouTube";
+  return normalizeCrawlSourceChannel(value, "YouTube");
 }
 
 function inferSourceChannelFromUrl(value?: string | null) {
@@ -576,7 +582,29 @@ function inferSourceChannelFromUrl(value?: string | null) {
   if (text.includes("tiktok.") && /\/@[^/]+\/video\/\d+/i.test(text)) {
     return "TikTok Video";
   }
+  if (text.includes("shopee.")) {
+    return "Shopee";
+  }
+  if (text.includes("facebook.") && /(story_fbid=|fbid=|[?&]v=|\/posts\/|\/videos\/|\/reel\/|\/photo\/|photo\.php|\/share\/[pv])/i.test(text)) {
+    return "Facebook";
+  }
   return "";
+}
+
+function defaultContentName(sourceChannel: string) {
+  if (sourceChannel === "YouTube") {
+    return "YouTube 视频评论";
+  }
+  if (sourceChannel === "TikTok Video") {
+    return "TikTok 视频评论";
+  }
+  if (sourceChannel === "Facebook") {
+    return "Facebook 帖子评论";
+  }
+  if (sourceChannel === "Shopee") {
+    return "Shopee 商品评论";
+  }
+  return "评论采集";
 }
 
 function formatTime(value?: string | null) {
@@ -795,11 +823,11 @@ function applyUrlInference(target: typeof form | typeof monitorForm, productUrl?
   }
   target.sourceChannel = sourceChannel;
   target.analysisType = inferAnalysisType(sourceChannel);
-  if (sourceChannel === "TikTok Video") {
+  if (sourceChannel === "TikTok Video" || sourceChannel === "Facebook") {
     target.maxReviews = 0;
   }
   if (!target.productName.trim()) {
-    target.productName = sourceChannel === "YouTube" ? "YouTube 视频评论" : "TikTok 视频评论";
+    target.productName = defaultContentName(sourceChannel);
   }
 }
 
@@ -838,7 +866,7 @@ async function submitCrawlJob() {
     return;
   }
   if (!form.productUrl.trim()) {
-    message.error("请填写视频链接。");
+    message.error("请填写评论链接。");
     return;
   }
   creating.value = true;
@@ -854,9 +882,7 @@ async function submitCrawlJob() {
     });
     jobs.value = [job, ...jobs.value.filter((item) => item.id !== job.id)];
     writeWorkspaceCache("crawl-jobs", jobs.value);
-    message.success(
-      form.sourceChannel === "TikTok Video" ? "TikTok 评论采集已加入队列，完成后会自动开始 AI 分析。" : "评论采集任务已加入队列。"
-    );
+    message.success("评论采集已加入队列，完成后会自动导入并启动 AI 分析。");
     showCreateModal.value = false;
     await loadJobs();
   } finally {
@@ -875,7 +901,7 @@ async function submitCrawlMonitor() {
     return;
   }
   if (!monitorForm.productUrl.trim()) {
-    message.error("请填写视频链接。");
+    message.error("请填写评论链接。");
     return;
   }
   monitorCreating.value = true;

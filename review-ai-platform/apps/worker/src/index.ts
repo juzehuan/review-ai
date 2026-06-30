@@ -2321,7 +2321,7 @@ async function autoImportAndAnalyzeCrawlResult(
       data: {
         runId: run.id,
         level: "info",
-        message: target.monitorId ? "Analysis run queued from crawl monitor" : "Analysis run queued from TikTok crawl job",
+        message: target.monitorId ? "Analysis run queued from crawl monitor" : "Analysis run queued from crawl job",
         meta: { crawlJobId: crawlJob.id, monitorId: target.monitorId || null, insertedRows: inserted.count }
       }
     });
@@ -2393,11 +2393,11 @@ async function autoImportAndAnalyzeFromMonitor(
   });
 }
 
-async function autoImportAndAnalyzeFromTikTokCrawlJob(
+async function autoImportAndAnalyzeFromCrawlJob(
   crawlJob: NonNullable<Awaited<ReturnType<typeof prisma.crawlJob.findUnique>>>,
   result: CrawlResult
 ) {
-  if (crawlJob.platform !== "tiktok-video" || crawlJob.taskId) {
+  if (crawlJob.taskId) {
     return;
   }
   await autoImportAndAnalyzeCrawlResult(crawlJob, result, {
@@ -2589,8 +2589,8 @@ const crawlWorker = new Worker(
             data: { lastError: message }
           });
         });
-      } else if (crawlJob.platform === "tiktok-video") {
-        await autoImportAndAnalyzeFromTikTokCrawlJob(crawlJob, result).catch(async (error) => {
+      } else {
+        await autoImportAndAnalyzeFromCrawlJob(crawlJob, result).catch(async (error) => {
           const message = error instanceof Error ? error.message : String(error);
           await prisma.crawlJob.update({
             where: { id: crawlJob.id },

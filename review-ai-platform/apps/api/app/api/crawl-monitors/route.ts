@@ -1,7 +1,7 @@
 import { prisma } from "@review-ai/db";
 import type { CreateCrawlMonitorResponse } from "@review-ai/shared";
 import { normalizeCrawlMonitorIntervalMinutes, queueCrawlMonitorRun } from "@/lib/crawl-monitor-runs";
-import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord } from "@/lib/crawl-utils";
+import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord, supportedCrawlUrlError } from "@/lib/crawl-utils";
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlMonitor } from "@/lib/serializers";
@@ -42,10 +42,10 @@ export async function POST(request: Request) {
     return fail("请填写监听任务名称。");
   }
   if (!input.productUrl) {
-    return fail("请填写 YouTube 或 TikTok 视频链接。");
+    return fail("请填写商品/视频/帖子链接。");
   }
   if (!input.crawlerPlatform) {
-    return fail("暂不支持该链接监听，目前仅支持 YouTube 视频链接和 TikTok 视频链接。", 400);
+    return fail(supportedCrawlUrlError("暂不支持该链接监听"), 400);
   }
   if (!crawlerSetting.enabled) {
     return fail("当前账号没有启用链接抓取，请先在抓取设置中开启评论采集。");

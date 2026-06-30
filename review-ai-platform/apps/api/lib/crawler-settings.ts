@@ -1,7 +1,12 @@
 import type { WorkspaceCrawlerSetting } from "@review-ai/db";
-import { CRAWLER_CHANNEL_PRESETS, type CrawlerChannel, type WorkspaceCrawlerSettingDTO } from "@review-ai/shared";
+import {
+  CRAWLER_CHANNEL_PRESETS,
+  normalizeCrawlSourceChannel,
+  type CrawlerChannel,
+  type WorkspaceCrawlerSettingDTO
+} from "@review-ai/shared";
 
-const DEFAULT_CHANNELS: CrawlerChannel[] = ["browser_intercept"];
+const DEFAULT_CHANNELS: CrawlerChannel[] = ["api_exporter", "api_basic", "browser_intercept"];
 
 const channelIds = new Set(CRAWLER_CHANNEL_PRESETS.map((item) => item.id));
 
@@ -28,8 +33,8 @@ export function defaultCrawlerSetting(): WorkspaceCrawlerSettingDTO {
     proxyUrl: process.env.SCRAPLING_PROXY || null,
     shopeeCookie: null,
     shopeeCookieSet: false,
-    crawlChannels: ["browser_intercept"],
-    defaultSourceChannel: process.env.SCRAPLING_DEFAULT_SOURCE === "TikTok Video" ? "TikTok Video" : "YouTube",
+    crawlChannels: DEFAULT_CHANNELS,
+    defaultSourceChannel: normalizeCrawlSourceChannel(process.env.SCRAPLING_DEFAULT_SOURCE, "YouTube"),
     defaultMaxReviews: Number(process.env.SCRAPLING_DEFAULT_MAX_REVIEWS || 200),
     requestTimeoutSec: Number(process.env.SCRAPLING_TIMEOUT_SEC || 180),
     updatedAt: null
@@ -47,8 +52,8 @@ export function serializeCrawlerSetting(setting: WorkspaceCrawlerSetting | null)
     proxyUrl: setting.proxyUrl,
     shopeeCookie: null,
     shopeeCookieSet: false,
-    crawlChannels: ["browser_intercept"],
-    defaultSourceChannel: setting.defaultSourceChannel === "TikTok Video" ? "TikTok Video" : "YouTube",
+    crawlChannels: parseCrawlerChannels(setting.crawlChannels),
+    defaultSourceChannel: normalizeCrawlSourceChannel(setting.defaultSourceChannel, "YouTube"),
     defaultMaxReviews: setting.defaultMaxReviews,
     requestTimeoutSec: setting.requestTimeoutSec,
     updatedAt: setting.updatedAt.toISOString()

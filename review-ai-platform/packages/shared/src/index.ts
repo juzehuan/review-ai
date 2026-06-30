@@ -239,6 +239,24 @@ export const SOURCE_CHANNEL_PRESETS = [
   { label: "Facebook", value: "Facebook" }
 ] as const;
 
+export const CRAWL_SOURCE_CHANNEL_VALUES = ["Shopee", "YouTube", "TikTok Video", "Facebook"] as const;
+export type CrawlSourceChannel = (typeof CRAWL_SOURCE_CHANNEL_VALUES)[number];
+
+const crawlSourceChannelSet = new Set<string>(CRAWL_SOURCE_CHANNEL_VALUES);
+
+export const CRAWL_SOURCE_CHANNEL_PRESETS = SOURCE_CHANNEL_PRESETS.filter((channel) =>
+  crawlSourceChannelSet.has(channel.value)
+) as Array<{ label: string; value: CrawlSourceChannel }>;
+
+export function isSupportedCrawlSourceChannel(value?: string | null): value is CrawlSourceChannel {
+  return crawlSourceChannelSet.has(String(value || "").trim());
+}
+
+export function normalizeCrawlSourceChannel(value?: string | null, fallback: CrawlSourceChannel = "YouTube"): CrawlSourceChannel {
+  const text = String(value || "").trim();
+  return isSupportedCrawlSourceChannel(text) ? text : fallback;
+}
+
 export const ANALYSIS_TYPE_PRESETS: Array<{ label: string; value: AnalysisType; description: string }> = [
   { label: "商品类评论", value: "product", description: "关注评分、卖点、痛点、售后、物流和商品改进。" },
   { label: "视频类评论", value: "video", description: "关注内容反馈、观点共鸣、争议、选题和受众互动。" },

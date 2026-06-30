@@ -216,16 +216,19 @@
           <a-form-item label="代理地址">
             <a-input v-model:value="crawlerForm.proxyUrl" :disabled="!canEditAi" placeholder="例如：http://127.0.0.1:7890" />
           </a-form-item>
+          <a-form-item label="默认来源渠道">
+            <a-select v-model:value="crawlerForm.defaultSourceChannel" :disabled="!canEditAi" :options="crawlerSourceChannelOptions" />
+          </a-form-item>
           <a-form-item label="默认抓取条数">
-            <a-input-number v-model:value="crawlerForm.defaultMaxReviews" :disabled="!canEditAi" :min="0" :max="1000" class="full-input" />
-            <div class="settings-help">填 0 表示不限，适用于 YouTube 和 TikTok 视频评论。</div>
+            <a-input-number v-model:value="crawlerForm.defaultMaxReviews" :disabled="!canEditAi" :min="0" :max="20000" class="full-input" />
+            <div class="settings-help">填 0 表示不限，适用于 Shopee、YouTube、TikTok、Facebook 评论采集。</div>
           </a-form-item>
           <a-form-item label="超时时间（秒）">
             <a-input-number v-model:value="crawlerForm.requestTimeoutSec" :disabled="!canEditAi" :min="30" :max="900" class="full-input" />
           </a-form-item>
         </a-form>
         <div class="settings-help">
-          AI 链接抓取当前仅支持 YouTube 视频和 TikTok 视频评论。代理会传给本地 Scrapling 脚本，用于访问公开视频评论接口。
+          链接抓取当前支持 Shopee 商品、YouTube 视频、TikTok 视频和 Facebook 帖子/图片/Reel 评论。代理会传给本地 Scrapling 脚本，用于访问公开评论接口。
         </div>
       </section>
     </div>
@@ -323,11 +326,13 @@ import { DownloadOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, UndoOutli
 import {
   ANALYSIS_TYPE_PRESETS,
   AI_PROVIDER_PRESETS,
+  CRAWL_SOURCE_CHANNEL_PRESETS,
   DEFAULT_INSIGHTS_PROMPT,
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_USER_PROMPT_TEMPLATE,
-  getAnalysisPromptProfile
+  getAnalysisPromptProfile,
+  normalizeCrawlSourceChannel
 } from "@review-ai/shared";
 import type { AnalysisType, MemberRole, WorkspaceAiSettingDTO, WorkspaceCrawlerSettingDTO, WorkspaceMemberDTO } from "@review-ai/shared";
 import {
@@ -426,7 +431,7 @@ const pageSubtitle = computed(() => {
     return "配置当前账号的模型供应商、接口密钥和评论分析提示词。";
   }
   if (activeSection.value === "crawler") {
-    return "配置当前账号的 YouTube/TikTok 视频评论抓取代理和默认抓取参数。";
+    return "配置当前账号的 Shopee、YouTube、TikTok、Facebook 评论抓取代理和默认抓取参数。";
   }
   return "管理当前空间、成员角色、我的空间列表和额度使用情况。";
 });
@@ -442,6 +447,10 @@ const providerModels = computed(() => {
   return models.includes(aiForm.modelName) ? models : [aiForm.modelName, ...models].filter(Boolean);
 });
 const promptProfileOptions = ANALYSIS_TYPE_PRESETS.map((item) => ({
+  label: item.label,
+  value: item.value
+}));
+const crawlerSourceChannelOptions = CRAWL_SOURCE_CHANNEL_PRESETS.map((item) => ({
   label: item.label,
   value: item.value
 }));
@@ -618,8 +627,8 @@ function assignCrawlerForm(data: WorkspaceCrawlerSettingDTO) {
   crawlerForm.proxyUrl = data.proxyUrl;
   crawlerForm.shopeeCookie = null;
   crawlerForm.shopeeCookieSet = false;
-  crawlerForm.crawlChannels = ["browser_intercept"];
-  crawlerForm.defaultSourceChannel = data.defaultSourceChannel === "TikTok Video" ? "TikTok Video" : "YouTube";
+  crawlerForm.crawlChannels = data.crawlChannels;
+  crawlerForm.defaultSourceChannel = normalizeCrawlSourceChannel(data.defaultSourceChannel, "YouTube");
   crawlerForm.defaultMaxReviews = data.defaultMaxReviews;
   crawlerForm.requestTimeoutSec = data.requestTimeoutSec;
   crawlerForm.updatedAt = data.updatedAt;
@@ -729,8 +738,7 @@ async function saveCrawlerSettings() {
     assignCrawlerForm(await updateWorkspaceCrawlerSettings({
       ...crawlerForm,
       shopeeCookie: null,
-      crawlChannels: ["browser_intercept"],
-      defaultSourceChannel: "YouTube"
+      defaultSourceChannel: normalizeCrawlSourceChannel(crawlerForm.defaultSourceChannel, "YouTube")
     }));
     message.success("爬虫设置已保存");
   } catch {

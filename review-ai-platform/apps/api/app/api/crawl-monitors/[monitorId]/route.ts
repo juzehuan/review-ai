@@ -1,6 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { normalizeCrawlMonitorIntervalMinutes, queueCrawlMonitorRun } from "@/lib/crawl-monitor-runs";
-import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord } from "@/lib/crawl-utils";
+import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord, supportedCrawlUrlError } from "@/lib/crawl-utils";
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlMonitor } from "@/lib/serializers";
@@ -52,7 +52,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ monit
   const input = body.productUrl ? normalizeRequestedCrawlInput(body, crawlerSetting) : null;
 
   if (input && !input.crawlerPlatform) {
-    return fail("暂不支持该链接监听，目前仅支持 YouTube 视频链接和 TikTok 视频链接。", 400);
+    return fail(supportedCrawlUrlError("暂不支持该链接监听"), 400);
   }
 
   const updated = await prisma.crawlMonitor.update({

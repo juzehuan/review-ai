@@ -115,7 +115,7 @@ def is_facebook_post_url(url: str) -> bool:
     path = parsed.path or ""
     params = parse_qs(parsed.query)
     if params.get("story_fbid") or params.get("fbid") or params.get("v"):
-        return bool(re.search(r"/(story\.php|permalink\.php|photo\.php|watch|posts|videos|reel|share/[pv])", path, re.IGNORECASE))
+        return bool(re.search(r"/(story\.php|permalink\.php|photo(?:\.php)?|watch|posts|videos|reel|share/[pv])", path, re.IGNORECASE))
     return bool(re.search(r"/(?:groups/[^/]+/posts|posts|videos|reel|share/[pv])/[^/?#]+", path, re.IGNORECASE))
 
 
