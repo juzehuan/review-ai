@@ -587,9 +587,36 @@ onMounted(load);
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  :global(html),
+  :global(body),
+  :global(#app),
+  :global(.public-route-shell) {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
   .shared-report-page {
-    padding: 0;
-    background: #ffffff;
+    min-height: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .shared-report {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .shared-report > * {
+    margin-bottom: 14px !important;
   }
 
   .shared-meta :deep(.ant-btn) {
@@ -598,10 +625,76 @@ onMounted(load);
 
   .shared-hero,
   .shared-summary,
+  .quality-alerts-panel,
+  .dynamic-tags-panel,
+  .duplicate-noise-panel,
+  .insight-clusters-panel,
   .shared-insights,
   .shared-evidence {
-    box-shadow: none;
+    display: block !important;
+    margin-bottom: 14px !important;
+    box-shadow: none !important;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .shared-hero {
+    min-height: auto !important;
+    color: #111827 !important;
+    background: #ffffff !important;
+  }
+
+  .shared-kicker,
+  .shared-hero p,
+  .shared-meta span {
+    color: #4b5563 !important;
+  }
+
+  .shared-stat-grid,
+  .chart-row,
+  .dynamic-tag-grid,
+  .duplicate-summary-strip,
+  .duplicate-group-grid,
+  .insight-cluster-grid,
+  .product-insights-grid,
+  .evidence-grid {
+    display: block !important;
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+  }
+
+  .shared-stat-grid > *,
+  .chart-row > *,
+  .dynamic-tag-grid > *,
+  .duplicate-summary-strip > *,
+  .duplicate-group-grid > *,
+  .insight-cluster-grid > *,
+  .product-insights-grid > *,
+  .evidence-grid > * {
+    margin-bottom: 10px !important;
+  }
+
+  .stat-card,
+  .dynamic-tag-card,
+  .duplicate-summary-strip > div,
+  .duplicate-group-card,
+  .insight-cluster-card,
+  .product-insight-card,
+  .evidence-card,
+  :deep(.chart-card) {
+    box-shadow: none !important;
     break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  :deep(.chart-card) {
+    margin-bottom: 10px !important;
+  }
+
+  :deep(.chart-container) {
+    height: 240px !important;
+    min-height: 240px !important;
+    max-height: 240px !important;
   }
 }
 </style>

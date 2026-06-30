@@ -1797,9 +1797,21 @@ onBeforeUnmount(() => {
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  :global(html),
   :global(body) {
     background: #ffffff !important;
+    width: auto !important;
+    height: auto !important;
     overflow: visible !important;
+  }
+
+  :global(#app) {
+    min-height: 0 !important;
   }
 
   :global(.app-shell),
@@ -1807,8 +1819,13 @@ onBeforeUnmount(() => {
   :global(.app-content) {
     display: block !important;
     height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
     background: #ffffff !important;
+  }
+
+  :global(.app-content) {
+    padding: 0 !important;
   }
 
   :global(.app-sidebar),
@@ -1826,21 +1843,118 @@ onBeforeUnmount(() => {
     width: 100% !important;
     max-width: none !important;
     gap: 14px !important;
+    display: block !important;
+  }
+
+  .dashboard-grid > * {
+    margin-bottom: 14px !important;
   }
 
   .report-hero,
   .report-executive-panel,
   .ai-summary-card,
   .quality-alerts-panel,
+  .insight-panel,
+  .dynamic-tags-panel,
+  .duplicate-noise-panel,
+  .insight-clusters-panel,
+  .evidence-panel,
+  .product-insights-panel {
+    display: block !important;
+    margin-bottom: 14px !important;
+    box-shadow: none !important;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .summary-grid,
+  .chart-row,
+  .chart-row-featured,
+  .report-snapshot-grid,
+  .dynamic-tag-grid,
+  .duplicate-summary-strip,
+  .duplicate-group-grid,
+  .insight-cluster-grid,
+  .evidence-grid,
+  .product-insights-grid {
+    display: block !important;
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+  }
+
+  .summary-grid > *,
+  .chart-row > *,
+  .chart-row-featured > *,
+  .report-snapshot-grid > *,
+  .dynamic-tag-grid > *,
+  .duplicate-summary-strip > *,
+  .duplicate-group-grid > *,
+  .insight-cluster-grid > *,
+  .evidence-grid > *,
+  .product-insights-grid > * {
+    margin-bottom: 10px !important;
+  }
+
+  .stat-card,
+  .report-snapshot-card,
+  .chart-card,
+  .product-insight-card,
+  .dynamic-tag-card,
+  .duplicate-summary-strip > div,
+  .duplicate-group-card,
+  .insight-cluster-card,
+  .evidence-card,
+  :deep(.chart-card) {
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  :deep(.chart-card) {
+    margin-bottom: 10px !important;
+  }
+
+  :deep(.chart-container),
+  .chart-container {
+    height: 240px !important;
+    min-height: 240px !important;
+    max-height: 240px !important;
+  }
+
+  .nps-layout {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .report-hero {
+    color: #111827 !important;
+    background: #ffffff !important;
+  }
+
+  .report-hero .overview-copy h2 {
+    color: #111827 !important;
+  }
+
+  .report-meta-row {
+    color: #4b5563 !important;
+  }
+
+  .pipeline-strip {
+    display: none !important;
+  }
+
   .chart-card,
   .insight-panel,
+  .stat-card,
+  .ai-summary-card,
+  .quality-alerts-panel,
   .dynamic-tags-panel,
   .duplicate-noise-panel,
   .insight-clusters-panel,
   .evidence-panel,
   .product-insights-panel,
   .product-insight-card {
-    break-inside: avoid;
     box-shadow: none !important;
   }
 }
