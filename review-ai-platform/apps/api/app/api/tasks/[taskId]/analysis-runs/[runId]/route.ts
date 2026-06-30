@@ -36,7 +36,7 @@ export async function PATCH(
     return fail("当前分析任务不可中断", 400);
   }
 
-  const updated = await prisma.analysisRun.update({
+  await prisma.analysisRun.update({
     where: { id: runId },
     data: {
       status: "failed",
@@ -58,5 +58,18 @@ export async function PATCH(
     data: { status: "imported" }
   });
 
-  return ok(serializeRun(updated));
+  const refreshed = await prisma.analysisRun.findUnique({
+    where: { id: runId },
+    include: {
+      logs: {
+        orderBy: { createdAt: "desc" },
+        take: 1
+      }
+    }
+  });
+  if (!refreshed) {
+    return fail("分析任务不存在", 404);
+  }
+
+  return ok(serializeRun(refreshed));
 }

@@ -149,7 +149,13 @@
             <template v-else-if="column.key === 'progress'">
               <div class="run-progress-cell">
                 <a-progress :percent="runProgress(record)" size="small" :status="progressStatus(record)" />
-                <span>{{ record.successCount }}/{{ record.reviewCount }}，失败 {{ record.failedCount }}</span>
+                <span>
+                  已处理 {{ record.processedCount }}/{{ record.reviewCount }}，成功 {{ record.successCount }}，失败 {{ record.failedCount }}
+                </span>
+                <span v-if="runMetricSummary(record)" class="muted">{{ runMetricSummary(record) }}</span>
+                <a-tag v-if="record.stalled" color="orange" class="analysis-stalled-tag">
+                  疑似无日志 {{ durationLabel(record.lastActivityAgoSeconds) }}
+                </a-tag>
               </div>
             </template>
             <template v-else-if="column.key === 'time'">
@@ -187,11 +193,15 @@
           </div>
           <div>
             <span class="summary-label">进度</span>
-            <strong>{{ selectedRun.successCount }}/{{ selectedRun.reviewCount }}</strong>
+            <strong>{{ selectedRun.processedCount }}/{{ selectedRun.reviewCount }}</strong>
           </div>
           <div>
             <span class="summary-label">失败</span>
-            <strong>{{ selectedRun.failedCount }}</strong>
+            <strong>{{ selectedRun.failedCount }} · {{ selectedRun.failureRatePercent }}%</strong>
+          </div>
+          <div>
+            <span class="summary-label">速度</span>
+            <strong>{{ selectedRun.throughputPerMinute ?? "-" }}/分钟</strong>
           </div>
         </div>
 
@@ -307,7 +317,7 @@ const runColumns = [
   { title: "状态", key: "status", width: 110 },
   { title: "模型", dataIndex: "modelName", key: "modelName", width: 180 },
   { title: "服务商", dataIndex: "provider", key: "provider", width: 110 },
-  { title: "进度", key: "progress", width: 240 },
+  { title: "进度", key: "progress", width: 320 },
   { title: "开始/结束", key: "time", width: 180 },
   { title: "操作", key: "action", width: 130 }
 ];
@@ -332,10 +342,7 @@ function canDeleteTask(task: TaskListItem) {
 }
 
 function runProgress(run: AnalysisRunDTO) {
-  if (!run.reviewCount) {
-    return 0;
-  }
-  return Math.min(Math.round((run.successCount / run.reviewCount) * 100), 100);
+  return run.progressPercent;
 }
 
 function progressStatus(run: AnalysisRunDTO) {
@@ -428,6 +435,32 @@ function formatTime(value?: string | null) {
 
 function formatMeta(meta: unknown) {
   return JSON.stringify(meta, null, 2);
+}
+
+function durationLabel(seconds?: number | null) {
+  if (seconds === null || seconds === undefined) {
+    return "-";
+  }
+  if (seconds < 60) {
+    return `${seconds} 秒`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes} 分钟`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  return restMinutes ? `${hours} 小时 ${restMinutes} 分钟` : `${hours} 小时`;
+}
+
+function runMetricSummary(run: AnalysisRunDTO) {
+  const parts = [
+    `耗时 ${durationLabel(run.durationSeconds)}`,
+    run.throughputPerMinute !== null ? `速度 ${run.throughputPerMinute}/分钟` : "",
+    run.estimatedRemainingSeconds !== null ? `预计剩余 ${durationLabel(run.estimatedRemainingSeconds)}` : "",
+    run.lastActivityAt ? `最后日志 ${durationLabel(run.lastActivityAgoSeconds)}前` : ""
+  ].filter(Boolean);
+  return parts.join(" · ");
 }
 
 function taskRowClassName(record: TaskListItem) {
@@ -740,6 +773,11 @@ onUnmounted(stopPolling);
   gap: 4px;
 }
 
+.analysis-stalled-tag {
+  justify-self: start;
+  margin-inline-end: 0;
+}
+
 .run-log-panel {
   min-height: 640px;
 }
@@ -866,7 +904,7 @@ onUnmounted(stopPolling);
 
   .run-summary {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .logs-box {

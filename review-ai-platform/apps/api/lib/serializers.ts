@@ -211,7 +211,22 @@ export function serializeAdminWorkspace(
   };
 }
 
-export function serializeRun(run: AnalysisRun): AnalysisRunDTO {
+export function serializeRun(run: AnalysisRun & { logs?: AnalysisRunLog[] }): AnalysisRunDTO {
+  const now = new Date();
+  const processedCount = run.successCount + run.failedCount;
+  const progressPercent = run.reviewCount ? Math.min(100, Math.round((processedCount / run.reviewCount) * 100)) : 0;
+  const failureRatePercent = processedCount ? Math.round((run.failedCount / processedCount) * 100) : 0;
+  const durationStart = run.startedAt || run.createdAt;
+  const durationEnd = run.finishedAt || now;
+  const durationSeconds = elapsedSeconds(durationStart, durationEnd) || 0;
+  const throughputPerMinute = durationSeconds > 0 && processedCount > 0 ? roundOne((processedCount / durationSeconds) * 60) : null;
+  const remainingCount = Math.max(run.reviewCount - processedCount, 0);
+  const estimatedRemainingSeconds =
+    throughputPerMinute && throughputPerMinute > 0 && ["queued", "running"].includes(run.status)
+      ? Math.ceil((remainingCount / throughputPerMinute) * 60)
+      : null;
+  const lastActivityAt = run.logs?.[0]?.createdAt || run.finishedAt || run.startedAt || run.createdAt;
+  const lastActivityAgoSeconds = Math.max(0, Math.floor((now.getTime() - lastActivityAt.getTime()) / 1000));
   return {
     id: run.id,
     taskId: run.taskId,
@@ -222,6 +237,16 @@ export function serializeRun(run: AnalysisRun): AnalysisRunDTO {
     reviewCount: run.reviewCount,
     successCount: run.successCount,
     failedCount: run.failedCount,
+    processedCount,
+    progressPercent,
+    failureRatePercent,
+    durationSeconds,
+    throughputPerMinute,
+    estimatedRemainingSeconds,
+    lastActivityAt: lastActivityAt.toISOString(),
+    lastActivityAgoSeconds,
+    stalled: ["queued", "running"].includes(run.status) && lastActivityAgoSeconds >= 300,
+    createdAt: run.createdAt.toISOString(),
     startedAt: run.startedAt?.toISOString() || null,
     finishedAt: run.finishedAt?.toISOString() || null,
     lastError: run.lastError || null

@@ -20,7 +20,13 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
 
   const runs = await prisma.analysisRun.findMany({
     where: { taskId },
-    orderBy: [{ createdAt: "desc" }, { startedAt: "desc" }]
+    orderBy: [{ createdAt: "desc" }, { startedAt: "desc" }],
+    include: {
+      logs: {
+        orderBy: { createdAt: "desc" },
+        take: 1
+      }
+    }
   });
   return ok(runs.map(serializeRun));
 }

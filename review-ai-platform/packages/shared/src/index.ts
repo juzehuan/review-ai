@@ -927,6 +927,16 @@ export interface AnalysisRunDTO {
   reviewCount: number;
   successCount: number;
   failedCount: number;
+  processedCount: number;
+  progressPercent: number;
+  failureRatePercent: number;
+  durationSeconds: number;
+  throughputPerMinute: number | null;
+  estimatedRemainingSeconds: number | null;
+  lastActivityAt: string | null;
+  lastActivityAgoSeconds: number;
+  stalled: boolean;
+  createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
   lastError: string | null;

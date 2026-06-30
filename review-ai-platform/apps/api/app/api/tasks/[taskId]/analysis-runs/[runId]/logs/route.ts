@@ -19,7 +19,13 @@ export async function GET(
   }
 
   const run = await prisma.analysisRun.findFirst({
-    where: { id: runId, taskId }
+    where: { id: runId, taskId },
+    include: {
+      logs: {
+        orderBy: { createdAt: "desc" },
+        take: 1
+      }
+    }
   });
   if (!run) {
     return ok({ run: null, logs: [] });
