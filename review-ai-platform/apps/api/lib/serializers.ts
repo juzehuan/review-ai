@@ -59,6 +59,17 @@ function readStringArray(value: unknown) {
   return Array.isArray(value) ? value.map((item) => String(item || "").trim()).filter(Boolean) : [];
 }
 
+function elapsedSeconds(start: Date | null | undefined, end: Date) {
+  if (!start) {
+    return null;
+  }
+  return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
+}
+
+function roundOne(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
 export function serializeTask(
   task: Task & {
     analysisRuns?: AnalysisRun[];
@@ -230,6 +241,14 @@ export function serializeRunLog(log: AnalysisRunLog): AnalysisRunLogDTO {
 
 export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
   const rawResult = rawObject(job.rawResult);
+  const now = new Date();
+  const isActive = job.status === "queued" || job.status === "running";
+  const durationEnd = job.finishedAt || (isActive ? now : job.updatedAt);
+  const durationSeconds = elapsedSeconds(job.startedAt, durationEnd);
+  const updatedAgoSeconds = Math.max(0, Math.floor((now.getTime() - job.updatedAt.getTime()) / 1000));
+  const coveragePercent = job.maxReviews > 0 ? Math.min(100, Math.round((job.fetchedRows / job.maxReviews) * 100)) : null;
+  const fetchRatePerMinute =
+    durationSeconds && durationSeconds > 0 && job.fetchedRows > 0 ? roundOne((job.fetchedRows / durationSeconds) * 60) : null;
   return {
     id: job.id,
     workspaceId: job.workspaceId,
@@ -248,6 +267,11 @@ export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
     fetchedRows: job.fetchedRows,
     importedRows: job.importedRows,
     skippedDuplicate: job.skippedDuplicate,
+    coveragePercent,
+    durationSeconds,
+    updatedAgoSeconds,
+    fetchRatePerMinute,
+    stalled: isActive && updatedAgoSeconds >= 180,
     crawlChannel: job.crawlChannel,
     crawlChannelLabel: job.crawlChannelLabel,
     stopReason: readOptionalString(rawResult?.stopReason),

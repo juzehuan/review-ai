@@ -204,7 +204,14 @@
           <template v-else-if="column.key === 'progress'">
             <div class="run-progress-cell">
               <a-progress :percent="record.progress" size="small" :status="progressStatus(record.status)" />
-              <span>已抓取 {{ record.fetchedRows }}/{{ record.maxReviews || "不限" }}</span>
+              <span>
+                已抓取 {{ record.fetchedRows }}/{{ record.maxReviews || "不限" }}
+                <template v-if="record.coveragePercent !== null"> · 目标 {{ record.coveragePercent }}%</template>
+              </span>
+              <span v-if="crawlThroughputSummary(record)" class="muted">{{ crawlThroughputSummary(record) }}</span>
+              <a-tag v-if="record.stalled" color="orange" class="crawl-stalled-tag">
+                疑似无更新 {{ durationLabel(record.updatedAgoSeconds) }}
+              </a-tag>
               <span v-if="record.stopReason" class="muted">停止原因：{{ stopReasonLabel(record.stopReason) }}</span>
               <span v-if="record.commentSortAttempted !== null" class="muted">
                 评论排序：{{ record.commentSortSwitched ? "已切换所有评论" : "未确认所有评论" }}
@@ -493,7 +500,7 @@ const currentMonitorAnalysisTypeDescription = computed(() => {
 const columns = [
   { title: "任务", key: "job", width: 360 },
   { title: "状态", key: "status", width: 110 },
-  { title: "进度", key: "progress", width: 220 },
+  { title: "进度", key: "progress", width: 300 },
   { title: "来源", key: "meta", width: 160 },
   { title: "时间", key: "time", width: 170 },
   { title: "错误", key: "error" },
@@ -669,6 +676,33 @@ function crawlMetricSummary(job: CrawlJobDTO) {
     job.payloadComments !== null ? `接口评论 ${job.payloadComments}` : "",
     job.domCommentCount !== null ? `DOM 评论 ${job.domCommentCount}` : "",
     job.domContentTextCount !== null ? `DOM 文本 ${job.domContentTextCount}` : ""
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function durationLabel(seconds?: number | null) {
+  if (seconds === null || seconds === undefined) {
+    return "-";
+  }
+  if (seconds < 60) {
+    return `${seconds} 秒`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes} 分钟`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  return restMinutes ? `${hours} 小时 ${restMinutes} 分钟` : `${hours} 小时`;
+}
+
+function crawlThroughputSummary(job: CrawlJobDTO) {
+  const parts = [
+    job.importedRows > 0 ? `导入 ${job.importedRows}` : "",
+    job.skippedDuplicate > 0 ? `重复 ${job.skippedDuplicate}` : "",
+    job.durationSeconds !== null ? `耗时 ${durationLabel(job.durationSeconds)}` : "",
+    job.fetchRatePerMinute !== null ? `速度 ${job.fetchRatePerMinute}/分钟` : "",
+    ["queued", "running"].includes(job.status) ? `更新于 ${durationLabel(job.updatedAgoSeconds)}前` : ""
   ].filter(Boolean);
   return parts.join(" · ");
 }
@@ -1081,6 +1115,11 @@ onUnmounted(() => {
   color: #64748b;
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.crawl-stalled-tag {
+  justify-self: start;
+  margin-inline-end: 0;
 }
 
 .error-pill {

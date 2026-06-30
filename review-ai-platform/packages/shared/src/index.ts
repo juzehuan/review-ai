@@ -190,6 +190,11 @@ export interface CrawlJobDTO {
   fetchedRows: number;
   importedRows: number;
   skippedDuplicate: number;
+  coveragePercent: number | null;
+  durationSeconds: number | null;
+  updatedAgoSeconds: number;
+  fetchRatePerMinute: number | null;
+  stalled: boolean;
   crawlChannel: CrawlerChannel | string | null;
   crawlChannelLabel: string | null;
   stopReason: string | null;
