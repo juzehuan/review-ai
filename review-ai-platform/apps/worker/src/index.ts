@@ -1605,7 +1605,26 @@ async function incrementRunProgress(runId: string, successCount: number, failedC
   });
 }
 
+function resolveDashboardLanguageContext(dashboard: DashboardDTO) {
+  const languageProfile = dashboard.languageProfile || {
+    primaryLanguage: "未知/表情符号",
+    nonChineseCount: 0,
+    nonChineseRate: 0,
+    mixedLanguageCount: 0,
+    distribution: []
+  };
+  const languageDistribution =
+    languageProfile.distribution.map((item) => `${item.label}(${item.percent}%)`).join("、") || languageProfile.primaryLanguage;
+  const languageInstruction =
+    languageProfile.nonChineseRate >= 30
+      ? "非中文/混合语言评论占比较高，必须优先尊重原文语义，结合当前任务类型判断情绪、立场、问题和建议，不要只按中文翻译字面意思下结论。"
+      : "如评论包含非中文或混合语言，优先尊重原文语义，翻译仅作为辅助参考。";
+
+  return { languageProfile, languageDistribution, languageInstruction };
+}
+
 function buildDashboardPromptContext(setting: ResolvedAiSetting, dashboard: DashboardDTO) {
+  const { languageProfile, languageDistribution, languageInstruction } = resolveDashboardLanguageContext(dashboard);
   const topCategories =
     dashboard.contentProfile.categoryDistribution.slice(0, 5).map((item) => `${item.label}(${item.percent}%)`).join("、") || dashboard.contentProfile.primaryCategory;
   const topClusters =
@@ -1619,6 +1638,10 @@ function buildDashboardPromptContext(setting: ResolvedAiSetting, dashboard: Dash
     `内容类别分布：${topCategories}`,
     `有效评论：${dashboard.contentProfile.valuableCommentCount}/${dashboard.reviewCount}`,
     `低价值评论占比：${dashboard.contentProfile.lowValueCommentRate}%`,
+    `评论主语言：${languageProfile.primaryLanguage}`,
+    `非中文/混合评论占比：${languageProfile.nonChineseRate}%（${languageProfile.nonChineseCount}/${dashboard.reviewCount}）`,
+    `语言分布：${languageDistribution}`,
+    `语言适配要求：${languageInstruction}`,
     `${issueLabel}：${dashboard.issues.slice(0, 5).map((item) => `${item.issueName}(${item.count})`).join("、") || "暂无明显问题"}`,
     `主要洞察聚类：${topClusters}`
   ].join("\n");
@@ -1643,6 +1666,7 @@ async function generateAiSummary(client: OpenAI | null, setting: ResolvedAiSetti
     dashboard.contentProfile.categoryDistribution.slice(0, 5).map((item) => `${item.label}(${item.percent}%)`).join("、") || dashboard.contentProfile.primaryCategory;
   const topClusters =
     dashboard.insightClusters.slice(0, 5).map((item) => `${item.title}(${item.count})`).join("、") || "暂无明显聚类";
+  const { languageProfile, languageDistribution, languageInstruction } = resolveDashboardLanguageContext(dashboard);
   if (process.env.ENABLE_MOCK_AI === "true" || !client) {
     return buildSummaryFallback(setting, dashboard, positive, neutral, negative, topIssues);
   }
@@ -1668,6 +1692,18 @@ async function generateAiSummary(client: OpenAI | null, setting: ResolvedAiSetti
     top_categories: topCategories,
     topClusters,
     top_clusters: topClusters,
+    primaryLanguage: languageProfile.primaryLanguage,
+    primary_language: languageProfile.primaryLanguage,
+    nonChineseRate: languageProfile.nonChineseRate,
+    non_chinese_rate: languageProfile.nonChineseRate,
+    nonChineseCount: languageProfile.nonChineseCount,
+    non_chinese_count: languageProfile.nonChineseCount,
+    mixedLanguageCount: languageProfile.mixedLanguageCount,
+    mixed_language_count: languageProfile.mixedLanguageCount,
+    languageDistribution,
+    language_distribution: languageDistribution,
+    dashboardLanguageInstruction: languageInstruction,
+    dashboard_language_instruction: languageInstruction,
     positivePercent: positive,
     positive_pct: positive,
     neutralPercent: neutral,
@@ -1707,7 +1743,7 @@ async function generateProductInsights(
   dashboard: DashboardDTO,
   analyses: AnalysisRow[]
 ): Promise<ProductInsightsDTO | null> {
-  if (setting.analysisType !== "product" || process.env.ENABLE_MOCK_AI === "true" || !client) {
+  if (process.env.ENABLE_MOCK_AI === "true" || !client) {
     return null;
   }
   const sample = (item: AnalysisRow) =>
@@ -1721,6 +1757,7 @@ async function generateProductInsights(
     dashboard.contentProfile.categoryDistribution.slice(0, 5).map((item) => `${item.label}(${item.percent}%)`).join("、") || dashboard.contentProfile.primaryCategory;
   const topClusters =
     dashboard.insightClusters.slice(0, 5).map((item) => `${item.title}(${item.count})`).join("、") || "暂无明显聚类";
+  const { languageProfile, languageDistribution, languageInstruction } = resolveDashboardLanguageContext(dashboard);
   const prompt = `${renderTemplate(setting.insightsPrompt, {
     reviewCount: dashboard.reviewCount,
     review_count: dashboard.reviewCount,
@@ -1743,6 +1780,18 @@ async function generateProductInsights(
     top_categories: topCategories,
     topClusters,
     top_clusters: topClusters,
+    primaryLanguage: languageProfile.primaryLanguage,
+    primary_language: languageProfile.primaryLanguage,
+    nonChineseRate: languageProfile.nonChineseRate,
+    non_chinese_rate: languageProfile.nonChineseRate,
+    nonChineseCount: languageProfile.nonChineseCount,
+    non_chinese_count: languageProfile.nonChineseCount,
+    mixedLanguageCount: languageProfile.mixedLanguageCount,
+    mixed_language_count: languageProfile.mixedLanguageCount,
+    languageDistribution,
+    language_distribution: languageDistribution,
+    dashboardLanguageInstruction: languageInstruction,
+    dashboard_language_instruction: languageInstruction,
     topIssues,
     top_issues: topIssues,
     topVariants,
@@ -1753,7 +1802,7 @@ async function generateProductInsights(
     negative_samples: negativeSamples,
     neutralSamples,
     neutral_samples: neutralSamples
-  })}\n\n补充分析上下文：\n${buildDashboardPromptContext(setting, dashboard)}\n\n请严格输出 JSON；字段内容必须匹配当前商品评论任务。`;
+  })}\n\n补充分析上下文：\n${buildDashboardPromptContext(setting, dashboard)}\n\n请严格输出 JSON；字段内容必须匹配当前任务类型；视频/社媒任务不要套用商品、物流、售后、包装等电商口径，除非评论明确提到。`;
   try {
     const response = await withTimeout(
       client.chat.completions.create({
