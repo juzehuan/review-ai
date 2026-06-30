@@ -205,6 +205,10 @@
             <div class="run-progress-cell">
               <a-progress :percent="record.progress" size="small" :status="progressStatus(record.status)" />
               <span>已抓取 {{ record.fetchedRows }}/{{ record.maxReviews || "不限" }}</span>
+              <span v-if="record.stopReason" class="muted">停止原因：{{ stopReasonLabel(record.stopReason) }}</span>
+              <span v-if="record.commentSortAttempted !== null" class="muted">
+                评论排序：{{ record.commentSortSwitched ? "已切换所有评论" : "未确认所有评论" }}
+              </span>
             </div>
           </template>
           <template v-else-if="column.key === 'meta'">
@@ -636,6 +640,22 @@ function errorSummary(value?: string | null) {
     return "链接解析失败";
   }
   return text.length > 24 ? `${text.slice(0, 24)}...` : text;
+}
+
+function stopReasonLabel(value?: string | null) {
+  if (value === "max_reviews") {
+    return "达到采集上限";
+  }
+  if (value === "no_more_comments") {
+    return "没有更多评论";
+  }
+  if (value === "timeout") {
+    return "采集超时";
+  }
+  if (value === "no_comments_found") {
+    return "未发现评论";
+  }
+  return value || "-";
 }
 
 function canStart(job: CrawlJobDTO) {

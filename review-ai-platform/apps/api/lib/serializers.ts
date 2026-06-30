@@ -37,6 +37,18 @@ import type {
 import type { InviteCode } from "@review-ai/db";
 import { parseCrawlerChannels } from "@/lib/crawler-settings";
 
+function rawObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function readOptionalString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readOptionalBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : null;
+}
+
 export function serializeTask(
   task: Task & {
     analysisRuns?: AnalysisRun[];
@@ -189,6 +201,7 @@ export function serializeRunLog(log: AnalysisRunLog): AnalysisRunLogDTO {
 }
 
 export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
+  const rawResult = rawObject(job.rawResult);
   return {
     id: job.id,
     workspaceId: job.workspaceId,
@@ -209,6 +222,9 @@ export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
     skippedDuplicate: job.skippedDuplicate,
     crawlChannel: job.crawlChannel,
     crawlChannelLabel: job.crawlChannelLabel,
+    stopReason: readOptionalString(rawResult?.stopReason),
+    commentSortAttempted: readOptionalBoolean(rawResult?.commentSortAttempted),
+    commentSortSwitched: readOptionalBoolean(rawResult?.commentSortSwitched),
     lastError: job.lastError,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),

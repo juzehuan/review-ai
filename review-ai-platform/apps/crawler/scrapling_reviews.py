@@ -1663,6 +1663,9 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         "title": "",
         "dom_comment_count": 0,
         "end_reached": False,
+        "comment_sort_attempted": False,
+        "comment_sort_switched": False,
+        "stop_reason": "unknown",
     }
 
     def page_action(page: Any) -> None:
@@ -1674,6 +1677,64 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
             state["title"] = (page.title() or "").replace("| Facebook", "").strip()
         except Exception:
             state["title"] = ""
+
+        def switch_to_all_comments() -> bool:
+            state["comment_sort_attempted"] = True
+            try:
+                opened = bool(
+                    page.evaluate(
+                        """() => {
+                            const clean = (value) => (value || "").replace(/\\s+/g, " ").trim().toLowerCase();
+                            const triggerLabels = [
+                              "most relevant",
+                              "top comments",
+                              "relevant comments",
+                              "最相关",
+                              "热门评论",
+                              "熱門留言",
+                              "热门留言"
+                            ];
+                            const nodes = Array.from(document.querySelectorAll("div[role='button'], span[role='button'], a[role='link']"));
+                            const target = nodes.find((node) => triggerLabels.some((label) => clean(node.textContent).includes(label.toLowerCase())));
+                            if (target) {
+                              target.click();
+                              return true;
+                            }
+                            return false;
+                        }"""
+                    )
+                )
+                if (opened):
+                    page.wait_for_timeout(1000)
+                switched = bool(
+                    page.evaluate(
+                        """() => {
+                            const clean = (value) => (value || "").replace(/\\s+/g, " ").trim().toLowerCase();
+                            const optionLabels = [
+                              "all comments",
+                              "所有评论",
+                              "全部评论",
+                              "所有留言",
+                              "全部留言",
+                              "所有回應",
+                              "所有回应"
+                            ];
+                            const nodes = Array.from(document.querySelectorAll("div[role='menuitem'], div[role='option'], div[role='button'], span[role='button']"));
+                            const target = nodes.find((node) => optionLabels.some((label) => clean(node.textContent).includes(label.toLowerCase())));
+                            if (target) {
+                              target.click();
+                              return true;
+                            }
+                            return false;
+                        }"""
+                    )
+                )
+                if switched:
+                    state["comment_sort_switched"] = True
+                    page.wait_for_timeout(1800)
+                return switched
+            except Exception:
+                return False
 
         def click_more_comments() -> bool:
             try:
@@ -1769,6 +1830,7 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         try:
             scroll_comments()
             page.wait_for_timeout(1800)
+            switch_to_all_comments()
         except Exception:
             page.wait_for_timeout(1200)
 
@@ -1830,7 +1892,12 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
             last_count = current_count
             if idle_rounds >= 5:
                 state["end_reached"] = True
+                state["stop_reason"] = "no_more_comments"
                 break
+        if limit_reached():
+            state["stop_reason"] = "max_reviews"
+        elif time.time() >= deadline and state.get("stop_reason") == "unknown":
+            state["stop_reason"] = "timeout"
 
     fetch_kwargs: dict[str, Any] = {
         "headless": True,
@@ -1850,6 +1917,9 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
     rows = list(comments_by_id.values())
     if max_reviews > 0:
         rows = rows[:max_reviews]
+    stop_reason = state.get("stop_reason")
+    if not rows and stop_reason == "unknown":
+        stop_reason = "no_comments_found"
     return {
         "source": "Facebook",
         "crawlChannel": "facebook_post",
@@ -1861,6 +1931,9 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         "postId": post_id,
         "domCommentCount": state.get("dom_comment_count"),
         "endReached": state.get("end_reached"),
+        "stopReason": stop_reason,
+        "commentSortAttempted": state.get("comment_sort_attempted"),
+        "commentSortSwitched": state.get("comment_sort_switched"),
         "rows": rows,
     }
 

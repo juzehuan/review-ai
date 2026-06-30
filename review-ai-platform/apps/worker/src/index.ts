@@ -60,6 +60,9 @@ type CrawlResult = {
   domCommentCount?: number;
   domContentTextCount?: number;
   endReached?: boolean;
+  stopReason?: string;
+  commentSortAttempted?: boolean;
+  commentSortSwitched?: boolean;
 };
 
 type ResolvedCrawlerSetting = {

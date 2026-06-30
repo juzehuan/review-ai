@@ -156,6 +156,9 @@ export interface CrawlJobDTO {
   skippedDuplicate: number;
   crawlChannel: CrawlerChannel | string | null;
   crawlChannelLabel: string | null;
+  stopReason: string | null;
+  commentSortAttempted: boolean | null;
+  commentSortSwitched: boolean | null;
   lastError: string | null;
   createdAt: string;
   updatedAt: string;

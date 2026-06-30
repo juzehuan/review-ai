@@ -26,6 +26,9 @@ export type CrawlResult = {
   shopId: string;
   itemId: string;
   rows: CrawledReview[];
+  stopReason?: string;
+  commentSortAttempted?: boolean;
+  commentSortSwitched?: boolean;
 };
 
 export type ResolvedCrawlerSetting = {
