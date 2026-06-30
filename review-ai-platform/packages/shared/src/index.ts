@@ -118,6 +118,26 @@ export interface AuditLogDTO {
   createdAt: string;
 }
 
+export interface QueueSnapshotDTO {
+  name: string;
+  label: string;
+  waiting: number;
+  active: number;
+  delayed: number;
+  failed: number;
+  completed: number;
+  paused: number;
+  waitingChildren: number;
+  pending: number;
+  isPaused: boolean;
+  error: string | null;
+}
+
+export interface QueueHealthDTO {
+  queues: QueueSnapshotDTO[];
+  updatedAt: string;
+}
+
 export interface WorkspaceAiSettingDTO {
   provider: string;
   apiKey: string | null;

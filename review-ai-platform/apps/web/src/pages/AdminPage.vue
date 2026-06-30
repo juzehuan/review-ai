@@ -164,6 +164,24 @@
         </div>
       </a-tab-pane>
 
+      <a-tab-pane key="queues" tab="队列健康">
+        <div class="table-shell">
+          <div class="table-title">任务队列状态</div>
+          <div class="member-email">更新时间：{{ formatTime(queueHealth?.updatedAt) }}</div>
+          <div class="summary-grid">
+            <div v-for="queue in queueHealth?.queues || []" :key="queue.name" class="stat-card" :class="queue.failed ? 'stat-card-alert' : 'stat-card-success'">
+              <div class="stat-label">{{ queue.label }}</div>
+              <div class="stat-value">{{ queue.pending }}</div>
+              <div class="stat-note">
+                等待 {{ queue.waiting }} · 运行 {{ queue.active }} · 延迟 {{ queue.delayed }} · 失败 {{ queue.failed }}
+              </div>
+              <a-alert v-if="queue.error" type="error" show-icon :message="queue.error" />
+              <a-tag v-else :color="queue.isPaused ? 'orange' : 'green'">{{ queue.isPaused ? "已暂停" : "消费中" }}</a-tag>
+            </div>
+          </div>
+        </div>
+      </a-tab-pane>
+
       <a-tab-pane key="audit" tab="操作日志">
         <div class="table-shell">
           <div class="table-title">最近操作</div>
@@ -250,9 +268,10 @@ import { message } from "ant-design-vue";
 import { ArrowLeftOutlined, KeyOutlined, ReloadOutlined, UserAddOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
 import type { Dayjs } from "dayjs";
-import type { AdminOverviewDTO, AdminUserDTO, AuditLogDTO, InviteCodeDTO } from "@review-ai/shared";
+import type { AdminOverviewDTO, AdminUserDTO, AuditLogDTO, InviteCodeDTO, QueueHealthDTO } from "@review-ai/shared";
 import {
   fetchAdminAuditLogs,
+  fetchAdminQueueHealth,
   createAdminUser,
   createInviteCode,
   fetchAdminOverview,
@@ -273,6 +292,7 @@ const overview = ref<AdminOverviewDTO | null>(null);
 const users = ref<AdminUserDTO[]>([]);
 const inviteCodes = ref<InviteCodeDTO[]>([]);
 const auditLogs = ref<AuditLogDTO[]>([]);
+const queueHealth = ref<QueueHealthDTO | null>(null);
 const forbidden = ref(false);
 const savingUserId = ref("");
 const quotaDrafts = reactive<Record<string, { monthlyReviewLimit: number; monthlyRunLimit: number }>>({});
@@ -329,19 +349,25 @@ async function loadAuditLogs() {
   auditLogs.value = await fetchAdminAuditLogs({ limit: 120 });
 }
 
+async function loadQueueHealth() {
+  queueHealth.value = await fetchAdminQueueHealth();
+}
+
 async function load() {
   loading.value = true;
   forbidden.value = false;
   try {
-    const [overviewResult, userResult, inviteResult, auditResult] = await Promise.all([
+    const [overviewResult, userResult, inviteResult, queueResult, auditResult] = await Promise.all([
       fetchAdminOverview(),
       fetchAdminUsers(),
       fetchInviteCodes(),
+      loadQueueHealth().then(() => queueHealth.value),
       loadAuditLogs().then(() => auditLogs.value)
     ]);
     overview.value = overviewResult;
     users.value = userResult;
     inviteCodes.value = inviteResult;
+    queueHealth.value = queueResult;
     auditLogs.value = auditResult;
     for (const user of userResult) {
       quotaDrafts[user.id] = {

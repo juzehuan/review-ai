@@ -21,6 +21,7 @@ import type {
   MemberRole,
   MyWorkspaceDTO,
   PromptEvalDTO,
+  QueueHealthDTO,
   ReportShareDTO,
   ReviewCorrectionDTO,
   ReviewActionItemDTO,
@@ -246,6 +247,11 @@ export async function fetchInviteCodes() {
 
 export async function fetchAdminAuditLogs(params?: { limit?: number }) {
   const { data } = await api.get<AuditLogDTO[]>("/admin/audit-logs", { params });
+  return data;
+}
+
+export async function fetchAdminQueueHealth() {
+  const { data } = await api.get<QueueHealthDTO>("/admin/queue-health");
   return data;
 }
 
