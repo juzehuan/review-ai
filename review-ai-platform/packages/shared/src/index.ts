@@ -144,9 +144,26 @@ export interface WorkloadHealthSnapshotDTO {
   lastFailureAt: string | null;
 }
 
+export interface QueueFailureDTO {
+  id: string;
+  kind: "crawl" | "analysis";
+  status: string;
+  label: string;
+  workspaceId: string | null;
+  workspaceName: string | null;
+  workspaceSlug: string | null;
+  taskId: string | null;
+  taskName: string | null;
+  sourceChannel: string | null;
+  modelName: string | null;
+  error: string | null;
+  failedAt: string;
+}
+
 export interface QueueHealthDTO {
   queues: QueueSnapshotDTO[];
   workloads: WorkloadHealthSnapshotDTO[];
+  recentFailures: QueueFailureDTO[];
   updatedAt: string;
 }
 

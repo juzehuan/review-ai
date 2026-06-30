@@ -199,6 +199,42 @@
               </a-tag>
             </div>
           </div>
+          <div class="table-title workload-title">最近失败任务</div>
+          <a-table
+            :columns="failureColumns"
+            :data-source="queueHealth?.recentFailures || []"
+            :loading="loading"
+            row-key="id"
+            :pagination="{ pageSize: 8 }"
+            :scroll="{ x: 1180 }"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'kind'">
+                <a-tag :color="failureKindColor(record.kind)">{{ failureKindLabel(record.kind) }}</a-tag>
+                <div class="member-email">{{ record.status }}</div>
+              </template>
+              <template v-else-if="column.key === 'target'">
+                <div>{{ record.label }}</div>
+                <div class="member-email">{{ record.taskName || record.taskId || record.id }}</div>
+              </template>
+              <template v-else-if="column.key === 'workspace'">
+                <div>{{ record.workspaceName || record.workspaceSlug || record.workspaceId || "-" }}</div>
+                <div class="member-email">{{ record.workspaceSlug || record.workspaceId || "-" }}</div>
+              </template>
+              <template v-else-if="column.key === 'context'">
+                <div>{{ record.sourceChannel || "-" }}</div>
+                <div class="member-email">{{ record.modelName || "-" }}</div>
+              </template>
+              <template v-else-if="column.key === 'error'">
+                <a-tooltip :title="record.error || '-'">
+                  <span class="muted">{{ errorSummary(record.error) }}</span>
+                </a-tooltip>
+              </template>
+              <template v-else-if="column.key === 'time'">
+                {{ formatTime(record.failedAt) }}
+              </template>
+            </template>
+          </a-table>
         </div>
       </a-tab-pane>
 
@@ -293,6 +329,7 @@ import type {
   AdminUserDTO,
   AuditLogDTO,
   InviteCodeDTO,
+  QueueFailureDTO,
   QueueHealthDTO,
   WorkloadHealthSnapshotDTO
 } from "@review-ai/shared";
@@ -370,6 +407,15 @@ const auditColumns = [
   { title: "对象", key: "target", width: 260 },
   { title: "IP", dataIndex: "ipAddress", key: "ipAddress", width: 150 },
   { title: "详情", key: "metadata", width: 260 }
+];
+
+const failureColumns = [
+  { title: "类型", key: "kind", width: 130 },
+  { title: "失败对象", key: "target", width: 280 },
+  { title: "空间", key: "workspace", width: 210 },
+  { title: "渠道/模型", key: "context", width: 180 },
+  { title: "错误摘要", key: "error", width: 280 },
+  { title: "失败时间", key: "time", width: 190 }
 ];
 
 async function loadAuditLogs() {
@@ -453,6 +499,22 @@ function formatTime(value?: string | null) {
   }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
+}
+
+function failureKindLabel(kind: QueueFailureDTO["kind"]) {
+  return kind === "crawl" ? "采集" : "分析";
+}
+
+function failureKindColor(kind: QueueFailureDTO["kind"]) {
+  return kind === "crawl" ? "orange" : "purple";
+}
+
+function errorSummary(value?: string | null) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "-";
+  }
+  return text.length > 72 ? `${text.slice(0, 72)}...` : text;
 }
 
 function workloadStatusColor(workload: WorkloadHealthSnapshotDTO) {

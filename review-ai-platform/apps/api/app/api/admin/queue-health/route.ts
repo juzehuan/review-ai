@@ -1,5 +1,5 @@
 import type { Queue } from "bullmq";
-import type { QueueHealthDTO, QueueSnapshotDTO, WorkloadHealthSnapshotDTO } from "@review-ai/shared";
+import type { QueueFailureDTO, QueueHealthDTO, QueueSnapshotDTO, WorkloadHealthSnapshotDTO } from "@review-ai/shared";
 import { prisma } from "@review-ai/db";
 import { requireSuperAdmin } from "@/lib/auth";
 import { ok } from "@/lib/http";
@@ -130,6 +130,72 @@ async function readAnalysisWorkloadSnapshot(): Promise<WorkloadHealthSnapshotDTO
   };
 }
 
+async function readRecentFailures(limit = 12): Promise<QueueFailureDTO[]> {
+  const [crawlFailures, analysisFailures] = await Promise.all([
+    prisma.crawlJob.findMany({
+      where: { status: "failed" },
+      orderBy: [{ finishedAt: "desc" }, { updatedAt: "desc" }],
+      take: limit,
+      include: {
+        workspace: { select: { id: true, name: true, slug: true } },
+        task: { select: { id: true, name: true, productName: true } }
+      }
+    }),
+    prisma.analysisRun.findMany({
+      where: { status: { in: ["failed", "partial_failed"] } },
+      orderBy: [{ finishedAt: "desc" }, { createdAt: "desc" }],
+      take: limit,
+      include: {
+        task: {
+          select: {
+            id: true,
+            name: true,
+            productName: true,
+            sourceChannel: true,
+            workspaceId: true,
+            workspace: { select: { id: true, name: true, slug: true } }
+          }
+        }
+      }
+    })
+  ]);
+
+  return [
+    ...crawlFailures.map((job) => ({
+      id: job.id,
+      kind: "crawl" as const,
+      status: job.status,
+      label: job.name || job.productName || job.normalizedUrl,
+      workspaceId: job.workspaceId,
+      workspaceName: job.workspace.name,
+      workspaceSlug: job.workspace.slug,
+      taskId: job.taskId,
+      taskName: job.task?.name || job.task?.productName || null,
+      sourceChannel: job.sourceChannel || job.platform || null,
+      modelName: null,
+      error: job.lastError,
+      failedAt: (job.finishedAt || job.updatedAt).toISOString()
+    })),
+    ...analysisFailures.map((run) => ({
+      id: run.id,
+      kind: "analysis" as const,
+      status: run.status,
+      label: run.task?.name || run.task?.productName || run.id,
+      workspaceId: run.task?.workspaceId || null,
+      workspaceName: run.task?.workspace?.name || null,
+      workspaceSlug: run.task?.workspace?.slug || null,
+      taskId: run.taskId,
+      taskName: run.task?.name || run.task?.productName || null,
+      sourceChannel: run.task?.sourceChannel || null,
+      modelName: run.modelName,
+      error: run.lastError,
+      failedAt: (run.finishedAt || run.createdAt).toISOString()
+    }))
+  ]
+    .sort((a, b) => new Date(b.failedAt).getTime() - new Date(a.failedAt).getTime())
+    .slice(0, limit);
+}
+
 export async function GET(request: Request) {
   const auth = await requireSuperAdmin(request);
   if (auth.response) {
@@ -137,16 +203,19 @@ export async function GET(request: Request) {
   }
 
   const workloadPromise = Promise.all([readAnalysisWorkloadSnapshot(), readCrawlWorkloadSnapshot()]);
+  const recentFailuresPromise = readRecentFailures();
   const queues = await Promise.all([
     readQueueSnapshot("analysis-runs", "AI 分析队列", getAnalysisQueue()),
     readQueueSnapshot("crawl-jobs", "评论采集队列", getCrawlQueue())
   ]);
 
   const workloads = await workloadPromise;
+  const recentFailures = await recentFailuresPromise;
 
   return ok<QueueHealthDTO>({
     queues,
     workloads,
+    recentFailures,
     updatedAt: new Date().toISOString()
   });
 }
