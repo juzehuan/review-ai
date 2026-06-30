@@ -1,8 +1,39 @@
-import { prisma } from "@review-ai/db";
+import { prisma, type Subscription } from "@review-ai/db";
 import { fail } from "@/lib/http";
 import { requireAuthenticated } from "@/lib/auth";
 
 export const DEFAULT_WORKSPACE_SLUG = "default-workspace";
+const SUBSCRIPTION_PERIOD_DAYS = Math.max(Number(process.env.SUBSCRIPTION_PERIOD_DAYS || 30), 1);
+
+function addPeriodDays(date: Date) {
+  return new Date(date.getTime() + SUBSCRIPTION_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+}
+
+function resolvePeriodEndsAt(subscription: Subscription) {
+  return subscription.currentPeriodEndsAt || addPeriodDays(subscription.currentPeriodStartedAt);
+}
+
+export async function ensureSubscriptionPeriod(workspaceId: string, subscription?: Subscription | null) {
+  const current = subscription || (await prisma.subscription.findUnique({ where: { workspaceId } }));
+  if (!current) {
+    return null;
+  }
+
+  const now = new Date();
+  if (resolvePeriodEndsAt(current).getTime() > now.getTime()) {
+    return current;
+  }
+
+  return prisma.subscription.update({
+    where: { id: current.id },
+    data: {
+      currentPeriodReviewCount: 0,
+      currentPeriodRunCount: 0,
+      currentPeriodStartedAt: now,
+      currentPeriodEndsAt: addPeriodDays(now)
+    }
+  });
+}
 
 export async function getWorkspaceContext(request: Request) {
   const auth = await requireAuthenticated(request);
@@ -33,7 +64,8 @@ export async function getWorkspaceContext(request: Request) {
   });
 
   if (membership) {
-    return { workspace: membership.workspace, user: currentUser, membership, response: null };
+    const subscription = await ensureSubscriptionPeriod(membership.workspace.id, membership.workspace.subscription);
+    return { workspace: { ...membership.workspace, subscription }, user: currentUser, membership, response: null };
   }
 
   if (requestedSlug) {
@@ -53,7 +85,8 @@ export async function getWorkspaceContext(request: Request) {
         create: {
           planTier: "pro",
           monthlyReviewLimit: Number(process.env.DEFAULT_MONTHLY_REVIEW_LIMIT || 20000),
-          monthlyRunLimit: Number(process.env.DEFAULT_MONTHLY_RUN_LIMIT || 200)
+          monthlyRunLimit: Number(process.env.DEFAULT_MONTHLY_RUN_LIMIT || 200),
+          currentPeriodEndsAt: addPeriodDays(new Date())
         }
       }
     },
@@ -77,12 +110,13 @@ export async function getWorkspaceContext(request: Request) {
 
   if (!workspace.subscription) {
     const subscription = await prisma.subscription.create({
-      data: { workspaceId: workspace.id }
+      data: { workspaceId: workspace.id, currentPeriodEndsAt: addPeriodDays(new Date()) }
     });
     return { workspace: { ...workspace, subscription }, user: currentUser, membership: fallbackMembership, response: null };
   }
 
-  return { workspace, user: currentUser, membership: fallbackMembership, response: null };
+  const subscription = await ensureSubscriptionPeriod(workspace.id, workspace.subscription);
+  return { workspace: { ...workspace, subscription }, user: currentUser, membership: fallbackMembership, response: null };
 }
 
 export type WorkspaceContext = Awaited<ReturnType<typeof getWorkspaceContext>>;
@@ -153,7 +187,7 @@ export async function assertReviewQuota(workspaceId: string, incomingReviewCount
     return null;
   }
 
-  const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
+  const subscription = await ensureSubscriptionPeriod(workspaceId);
   if (!subscription) {
     return null;
   }
@@ -171,7 +205,7 @@ export async function assertRunQuota(workspaceId: string, bypassQuota = false) {
     return null;
   }
 
-  const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
+  const subscription = await ensureSubscriptionPeriod(workspaceId);
   if (!subscription) {
     return null;
   }

@@ -5,7 +5,7 @@ import { Queue, Worker } from "bullmq";
 import { OpenAI } from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { Prisma, prisma } from "@review-ai/db";
+import { Prisma, prisma, type Subscription } from "@review-ai/db";
 import {
   buildDashboardSnapshot,
   DEFAULT_INSIGHTS_PROMPT,
@@ -2108,6 +2108,38 @@ function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
+const SUBSCRIPTION_PERIOD_DAYS = Math.max(Number(process.env.SUBSCRIPTION_PERIOD_DAYS || 30), 1);
+
+function addSubscriptionPeriodDays(date: Date) {
+  return new Date(date.getTime() + SUBSCRIPTION_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+}
+
+function resolveSubscriptionPeriodEndsAt(subscription: Subscription) {
+  return subscription.currentPeriodEndsAt || addSubscriptionPeriodDays(subscription.currentPeriodStartedAt);
+}
+
+async function ensureSubscriptionPeriod(workspaceId: string) {
+  const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
+  if (!subscription) {
+    return null;
+  }
+
+  const now = new Date();
+  if (resolveSubscriptionPeriodEndsAt(subscription).getTime() > now.getTime()) {
+    return subscription;
+  }
+
+  return prisma.subscription.update({
+    where: { id: subscription.id },
+    data: {
+      currentPeriodReviewCount: 0,
+      currentPeriodRunCount: 0,
+      currentPeriodStartedAt: now,
+      currentPeriodEndsAt: addSubscriptionPeriodDays(now)
+    }
+  });
+}
+
 function parseOptionalDate(value: unknown) {
   if (!value) {
     return null;
@@ -2230,7 +2262,7 @@ async function autoImportAndAnalyzeCrawlResult(
     return;
   }
 
-  const subscription = await prisma.subscription.findUnique({ where: { workspaceId: target.workspaceId } });
+  const subscription = await ensureSubscriptionPeriod(target.workspaceId);
   if (subscription && subscription.currentPeriodReviewCount + rowsToCreate.length > subscription.monthlyReviewLimit) {
     await markAutoImportError(
       "评论额度不足，无法自动导入",
