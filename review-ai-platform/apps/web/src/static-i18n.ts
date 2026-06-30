@@ -819,6 +819,12 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   if (speedReports) {
     return locale === "en-US" ? `${speedReports[1]} tasks reporting speed` : `${speedReports[1]} งานส่งความเร็วกลับมา`;
   }
+  const sourceFacetCount = value.match(/^覆盖该任务全部\s+(\d+)\s+个来源$/);
+  if (sourceFacetCount) {
+    return locale === "en-US"
+      ? `Covers all ${sourceFacetCount[1]} sources in this task`
+      : `ครอบคลุมแหล่งที่มาทั้งหมด ${sourceFacetCount[1]} รายการในงานนี้`;
+  }
   const activeAnalysisRuns = value.match(/^(\d+)\s*个批次正在排队或分析$/);
   if (activeAnalysisRuns) {
     return locale === "en-US" ? `${activeAnalysisRuns[1]} runs queued or analyzing` : `${activeAnalysisRuns[1]} รอบรอคิวหรือกำลังวิเคราะห์`;

@@ -25,7 +25,7 @@ import type {
   ReportShareDTO,
   ReviewCorrectionDTO,
   ReviewActionItemDTO,
-  ReviewRowDTO,
+  ReviewListResponseDTO,
   SavedReviewViewDTO,
   SharedReportDTO,
   StartCrawlAnalysisResponse,
@@ -453,10 +453,7 @@ export async function fetchSharedReport(token: string) {
 }
 
 export async function fetchReviews(taskId: string, params: Record<string, string | number | boolean | undefined>) {
-  const { data } = await api.get<{ total: number; page: number; pageSize: number; items: ReviewRowDTO[] }>(
-    `/tasks/${taskId}/reviews`,
-    { params }
-  );
+  const { data } = await api.get<ReviewListResponseDTO>(`/tasks/${taskId}/reviews`, { params });
   return data;
 }
 

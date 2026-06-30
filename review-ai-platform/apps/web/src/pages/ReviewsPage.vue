@@ -150,6 +150,7 @@
             <a-select v-model:value="filters.sourceChannel" allow-clear placeholder="来源" class="advanced-filter-wide">
               <a-select-option v-for="source in sourceChannelOptions" :key="source" :value="source">{{ source }}</a-select-option>
             </a-select>
+            <div class="settings-help advanced-filter-wide">覆盖该任务全部 {{ sourceChannelOptions.length }} 个来源</div>
           </div>
         </section>
 
@@ -347,7 +348,7 @@ import {
   StarOutlined,
   StopOutlined
 } from "@ant-design/icons-vue";
-import type { AnalysisRunDTO, ReviewActionItemDTO, ReviewRowDTO, SavedReviewViewDTO, Sentiment } from "@review-ai/shared";
+import type { AnalysisRunDTO, ReviewActionItemDTO, ReviewListFacetsDTO, ReviewRowDTO, SavedReviewViewDTO, Sentiment } from "@review-ai/shared";
 import {
   cancelRun,
   createActionItem,
@@ -413,6 +414,7 @@ const { selectedTask, setSelectedTask } = useTaskStore();
 const loading = ref(false);
 const running = ref(false);
 const rows = ref<ReviewRowDTO[]>([]);
+const reviewFacets = ref<ReviewListFacetsDTO>({ sourceChannels: [] });
 const allRuns = ref<AnalysisRunDTO[]>([]);
 const latestRun = ref<AnalysisRunDTO | null>(null);
 const selectedResultRunId = ref<string | undefined>();
@@ -481,7 +483,7 @@ const intentOptions = computed(() =>
     .sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))
 );
 const sourceChannelOptions = computed(() =>
-  [...new Set(rows.value.map((item) => item.sourceChannel))]
+  [...new Set([...reviewFacets.value.sourceChannels, ...rows.value.map((item) => item.sourceChannel)])]
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))
 );
@@ -917,6 +919,9 @@ async function loadActionItems() {
 
 async function loadReviews() {
   if (!selectedTask.value) {
+    rows.value = [];
+    reviewFacets.value = { sourceChannels: [] };
+    pagination.total = 0;
     return;
   }
 
@@ -940,6 +945,7 @@ async function loadReviews() {
       reviewIds: evidenceReviewIds.value.length ? evidenceReviewIds.value.join(",") : undefined
     });
     rows.value = result.items;
+    reviewFacets.value = result.facets || { sourceChannels: [] };
     pagination.total = result.total;
     if (viewMode.value === "grouped") {
       pagination.current = 1;
