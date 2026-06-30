@@ -1,5 +1,5 @@
 import type { Queue } from "bullmq";
-import type { QueueFailureDTO, QueueHealthDTO, QueueSnapshotDTO, WorkloadHealthSnapshotDTO } from "@review-ai/shared";
+import type { QueueFailureDTO, QueueHealthDTO, QueueSnapshotDTO, QueueStalledDTO, WorkloadHealthSnapshotDTO } from "@review-ai/shared";
 import { prisma } from "@review-ai/db";
 import { requireSuperAdmin } from "@/lib/auth";
 import { ok } from "@/lib/http";
@@ -52,6 +52,17 @@ async function readQueueSnapshot(name: string, label: string, queue: Queue): Pro
 
 function secondsAgo(seconds: number) {
   return new Date(Date.now() - seconds * 1000);
+}
+
+function ageSeconds(date: Date, now = Date.now()) {
+  return Math.max(0, Math.floor((now - date.getTime()) / 1000));
+}
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 async function readCrawlWorkloadSnapshot(): Promise<WorkloadHealthSnapshotDTO> {
@@ -130,6 +141,100 @@ async function readAnalysisWorkloadSnapshot(): Promise<WorkloadHealthSnapshotDTO
   };
 }
 
+async function readStalledItems(limit = 12): Promise<QueueStalledDTO[]> {
+  const crawlStalledBefore = secondsAgo(CRAWL_STALL_SECONDS);
+  const analysisStalledBefore = secondsAgo(ANALYSIS_STALL_SECONDS);
+  const [crawlJobs, analysisRuns] = await Promise.all([
+    prisma.crawlJob.findMany({
+      where: {
+        status: { in: ["queued", "running"] },
+        updatedAt: { lt: crawlStalledBefore }
+      },
+      orderBy: { updatedAt: "asc" },
+      take: limit,
+      include: {
+        workspace: { select: { id: true, name: true, slug: true } },
+        task: { select: { id: true, name: true, productName: true } }
+      }
+    }),
+    prisma.analysisRun.findMany({
+      where: {
+        status: { in: ["queued", "running"] },
+        createdAt: { lt: analysisStalledBefore },
+        logs: { none: { createdAt: { gte: analysisStalledBefore } } }
+      },
+      orderBy: { createdAt: "asc" },
+      take: limit,
+      include: {
+        logs: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { createdAt: true }
+        },
+        task: {
+          select: {
+            id: true,
+            name: true,
+            productName: true,
+            sourceChannel: true,
+            workspaceId: true,
+            workspace: { select: { id: true, name: true, slug: true } }
+          }
+        }
+      }
+    })
+  ]);
+
+  const now = Date.now();
+  const crawlItems: QueueStalledDTO[] = crawlJobs.map((job) => {
+    const progressPercent = job.progress || (job.maxReviews > 0 ? (job.fetchedRows / job.maxReviews) * 100 : 0);
+    const maxReviewsLabel = job.maxReviews > 0 ? String(job.maxReviews) : "不限";
+    return {
+      id: job.id,
+      kind: "crawl",
+      status: job.status,
+      label: job.name || job.productName || job.normalizedUrl,
+      workspaceId: job.workspaceId,
+      workspaceName: job.workspace.name,
+      workspaceSlug: job.workspace.slug,
+      taskId: job.taskId,
+      taskName: job.task?.name || job.task?.productName || null,
+      sourceChannel: job.sourceChannel || job.platform || null,
+      modelName: null,
+      lastActivityAt: job.updatedAt.toISOString(),
+      ageSeconds: ageSeconds(job.updatedAt, now),
+      progressPercent: clampPercent(progressPercent),
+      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`
+    };
+  });
+
+  const analysisItems: QueueStalledDTO[] = analysisRuns.map((run) => {
+    const workspace = run.task.workspace;
+    const lastActivityAt = run.logs[0]?.createdAt || run.startedAt || run.createdAt;
+    const processed = run.successCount + run.failedCount;
+    const progressPercent = run.reviewCount > 0 ? (processed / run.reviewCount) * 100 : run.status === "running" ? 1 : 0;
+    return {
+      id: run.id,
+      kind: "analysis",
+      status: run.status,
+      label: run.task.name || run.task.productName || run.id,
+      workspaceId: run.task.workspaceId,
+      workspaceName: workspace?.name || null,
+      workspaceSlug: workspace?.slug || null,
+      taskId: run.taskId,
+      taskName: run.task.name || run.task.productName || null,
+      sourceChannel: run.task.sourceChannel || null,
+      modelName: run.modelName,
+      lastActivityAt: lastActivityAt.toISOString(),
+      ageSeconds: ageSeconds(lastActivityAt, now),
+      progressPercent: clampPercent(progressPercent),
+      detail: `已处理 ${processed}/${run.reviewCount}，失败 ${run.failedCount}`
+    };
+  });
+
+  return [...crawlItems, ...analysisItems].sort((a, b) => b.ageSeconds - a.ageSeconds).slice(0, limit);
+}
+
 async function readRecentFailures(limit = 12): Promise<QueueFailureDTO[]> {
   const [crawlFailures, analysisFailures] = await Promise.all([
     prisma.crawlJob.findMany({
@@ -204,6 +309,7 @@ export async function GET(request: Request) {
 
   const workloadPromise = Promise.all([readAnalysisWorkloadSnapshot(), readCrawlWorkloadSnapshot()]);
   const recentFailuresPromise = readRecentFailures();
+  const stalledItemsPromise = readStalledItems();
   const queues = await Promise.all([
     readQueueSnapshot("analysis-runs", "AI 分析队列", getAnalysisQueue()),
     readQueueSnapshot("crawl-jobs", "评论采集队列", getCrawlQueue())
@@ -211,10 +317,12 @@ export async function GET(request: Request) {
 
   const workloads = await workloadPromise;
   const recentFailures = await recentFailuresPromise;
+  const stalledItems = await stalledItemsPromise;
 
   return ok<QueueHealthDTO>({
     queues,
     workloads,
+    stalledItems,
     recentFailures,
     updatedAt: new Date().toISOString()
   });

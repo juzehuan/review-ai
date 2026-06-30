@@ -165,6 +165,37 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "可用邀请码": "Available invites",
     "用户与配额": "Users & quotas",
     "用户管理": "User management",
+    "队列健康": "Queue health",
+    "AI 分析队列": "AI analysis queue",
+    "评论采集队列": "Comment crawl queue",
+    "采集任务库": "Crawl task store",
+    "AI 分析批次库": "AI analysis run store",
+    "任务队列状态": "Task queue status",
+    "数据库任务健康": "Database task health",
+    "疑似卡住任务": "Likely stalled tasks",
+    "最近失败任务": "Recent failed tasks",
+    "任务对象": "Task target",
+    "失败对象": "Failed target",
+    "渠道/模型": "Channel / model",
+    "错误摘要": "Error summary",
+    "失败时间": "Failed at",
+    "最后活动": "Last activity",
+    "更新时间": "Updated at",
+    "等待": "Waiting",
+    "运行": "Running",
+    "延迟": "Delayed",
+    "已暂停": "Paused",
+    "消费中": "Consuming",
+    "排队": "Queued",
+    "疑似卡住": "Likely stalled",
+    "最早活跃": "Oldest active",
+    "最近失败": "Latest failure",
+    "需要检查": "Needs review",
+    "有失败记录": "Has failures",
+    "空闲": "Idle",
+    "采集": "Crawl",
+    "已静默": "Silent for",
+    "导入": "Imported",
     "后台权限": "Console role",
     "配额调整": "Quota adjustment",
     "本期用量": "Current usage",
@@ -484,6 +515,37 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "可用邀请码": "โค้ดเชิญที่ใช้ได้",
     "用户与配额": "ผู้ใช้และโควตา",
     "用户管理": "จัดการผู้ใช้",
+    "队列健康": "สถานะคิว",
+    "AI 分析队列": "คิววิเคราะห์ AI",
+    "评论采集队列": "คิวเก็บคอมเมนต์",
+    "采集任务库": "คลังงานเก็บข้อมูล",
+    "AI 分析批次库": "คลังรอบวิเคราะห์ AI",
+    "任务队列状态": "สถานะคิวงาน",
+    "数据库任务健康": "สถานะงานในฐานข้อมูล",
+    "疑似卡住任务": "งานที่อาจค้าง",
+    "最近失败任务": "งานที่ล้มเหลวล่าสุด",
+    "任务对象": "เป้าหมายงาน",
+    "失败对象": "เป้าหมายที่ล้มเหลว",
+    "渠道/模型": "ช่องทาง / โมเดล",
+    "错误摘要": "สรุปข้อผิดพลาด",
+    "失败时间": "เวลาที่ล้มเหลว",
+    "最后活动": "กิจกรรมล่าสุด",
+    "更新时间": "อัปเดตเมื่อ",
+    "等待": "รอ",
+    "运行": "กำลังทำงาน",
+    "延迟": "หน่วงเวลา",
+    "已暂停": "หยุดชั่วคราว",
+    "消费中": "กำลังประมวลผลคิว",
+    "排队": "เข้าคิว",
+    "疑似卡住": "อาจค้าง",
+    "最早活跃": "ทำงานครั้งแรกสุด",
+    "最近失败": "ล้มเหลวล่าสุด",
+    "需要检查": "ต้องตรวจสอบ",
+    "有失败记录": "มีประวัติล้มเหลว",
+    "空闲": "ว่าง",
+    "采集": "เก็บข้อมูล",
+    "已静默": "เงียบมา",
+    "导入": "นำเข้า",
     "后台权限": "สิทธิ์คอนโซล",
     "配额调整": "ปรับโควตา",
     "本期用量": "การใช้งานรอบนี้",
@@ -678,10 +740,11 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const unlimited = staticText[locale]["不限"];
   const translateUnit = (unit: string) => {
     if (locale === "en-US") {
-      return unit === "分钟" ? "minutes" : unit === "小时" ? "hours" : unit === "天" ? "days" : unit;
+      return unit === "秒" ? "seconds" : unit === "分钟" ? "minutes" : unit === "小时" ? "hours" : unit === "天" ? "days" : unit;
     }
-    return unit === "分钟" ? "นาที" : unit === "小时" ? "ชั่วโมง" : unit === "天" ? "วัน" : unit;
+    return unit === "秒" ? "วินาที" : unit === "分钟" ? "นาที" : unit === "小时" ? "ชั่วโมง" : unit === "天" ? "วัน" : unit;
   };
+  const translateDuration = (text: string) => text.replace(/(秒|分钟|小时|天)/g, (unit) => translateUnit(unit));
   const taskCount = value.match(/^(\d+)\s*个任务$/);
   if (taskCount) {
     return locale === "en-US" ? `${taskCount[1]} tasks` : `${taskCount[1]} งาน`;
@@ -702,10 +765,28 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   if (alertCount) {
     return locale === "en-US" ? `${alertCount[1]} items` : `${alertCount[1]} รายการ`;
   }
+  const silentFor = value.match(/^已静默\s+(.+)$/);
+  if (silentFor) {
+    const duration = translateDuration(silentFor[1]);
+    return locale === "en-US" ? `Silent for ${duration}` : `เงียบมา ${duration}`;
+  }
+  const fetchedWithImport = value.match(/^已抓取\s+(.+)\/(.+)，导入\s+(.+)$/);
+  if (fetchedWithImport) {
+    const max = fetchedWithImport[2] === "不限" ? unlimited : fetchedWithImport[2];
+    return locale === "en-US"
+      ? `Fetched ${fetchedWithImport[1]}/${max}, imported ${fetchedWithImport[3]}`
+      : `เก็บแล้ว ${fetchedWithImport[1]}/${max}, นำเข้า ${fetchedWithImport[3]}`;
+  }
   const fetched = value.match(/^已抓取\s+(.+)\/(.+)$/);
   if (fetched) {
     const max = fetched[2] === "不限" ? unlimited : fetched[2];
     return locale === "en-US" ? `Fetched ${fetched[1]}/${max}` : `เก็บแล้ว ${fetched[1]}/${max}`;
+  }
+  const processedWithFailures = value.match(/^已处理\s+(.+)\/(.+)，失败\s+(.+)$/);
+  if (processedWithFailures) {
+    return locale === "en-US"
+      ? `Processed ${processedWithFailures[1]}/${processedWithFailures[2]}, failed ${processedWithFailures[3]}`
+      : `ประมวลผลแล้ว ${processedWithFailures[1]}/${processedWithFailures[2]}, ล้มเหลว ${processedWithFailures[3]}`;
   }
   const failedProgress = value.match(/^(.+)\/(.+)，失败\s+(.+)$/);
   if (failedProgress) {

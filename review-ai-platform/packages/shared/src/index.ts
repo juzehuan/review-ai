@@ -160,9 +160,28 @@ export interface QueueFailureDTO {
   failedAt: string;
 }
 
+export interface QueueStalledDTO {
+  id: string;
+  kind: "crawl" | "analysis";
+  status: string;
+  label: string;
+  workspaceId: string | null;
+  workspaceName: string | null;
+  workspaceSlug: string | null;
+  taskId: string | null;
+  taskName: string | null;
+  sourceChannel: string | null;
+  modelName: string | null;
+  lastActivityAt: string;
+  ageSeconds: number;
+  progressPercent: number;
+  detail: string;
+}
+
 export interface QueueHealthDTO {
   queues: QueueSnapshotDTO[];
   workloads: WorkloadHealthSnapshotDTO[];
+  stalledItems: QueueStalledDTO[];
   recentFailures: QueueFailureDTO[];
   updatedAt: string;
 }

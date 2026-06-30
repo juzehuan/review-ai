@@ -199,6 +199,42 @@
               </a-tag>
             </div>
           </div>
+          <div class="table-title workload-title">疑似卡住任务</div>
+          <a-table
+            :columns="stalledColumns"
+            :data-source="queueHealth?.stalledItems || []"
+            :loading="loading"
+            row-key="id"
+            :pagination="{ pageSize: 8 }"
+            :scroll="{ x: 1180 }"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'kind'">
+                <a-tag :color="failureKindColor(record.kind)">{{ failureKindLabel(record.kind) }}</a-tag>
+                <div class="member-email">{{ record.status }}</div>
+              </template>
+              <template v-else-if="column.key === 'target'">
+                <div>{{ record.label }}</div>
+                <div class="member-email">{{ record.taskName || record.taskId || record.id }}</div>
+              </template>
+              <template v-else-if="column.key === 'workspace'">
+                <div>{{ record.workspaceName || record.workspaceSlug || record.workspaceId || "-" }}</div>
+                <div class="member-email">{{ record.workspaceSlug || record.workspaceId || "-" }}</div>
+              </template>
+              <template v-else-if="column.key === 'context'">
+                <div>{{ record.sourceChannel || "-" }}</div>
+                <div class="member-email">{{ record.modelName || "-" }}</div>
+              </template>
+              <template v-else-if="column.key === 'progress'">
+                <a-progress :percent="record.progressPercent" size="small" :status="record.kind === 'crawl' ? 'active' : 'normal'" />
+                <div class="member-email">{{ record.detail }}</div>
+              </template>
+              <template v-else-if="column.key === 'activity'">
+                <div>{{ formatTime(record.lastActivityAt) }}</div>
+                <div class="member-email">已静默 {{ durationLabel(record.ageSeconds) }}</div>
+              </template>
+            </template>
+          </a-table>
           <div class="table-title workload-title">最近失败任务</div>
           <a-table
             :columns="failureColumns"
@@ -331,6 +367,7 @@ import type {
   InviteCodeDTO,
   QueueFailureDTO,
   QueueHealthDTO,
+  QueueStalledDTO,
   WorkloadHealthSnapshotDTO
 } from "@review-ai/shared";
 import {
@@ -418,6 +455,15 @@ const failureColumns = [
   { title: "失败时间", key: "time", width: 190 }
 ];
 
+const stalledColumns = [
+  { title: "类型", key: "kind", width: 130 },
+  { title: "任务对象", key: "target", width: 280 },
+  { title: "空间", key: "workspace", width: 210 },
+  { title: "渠道/模型", key: "context", width: 180 },
+  { title: "进度", key: "progress", width: 240 },
+  { title: "最后活动", key: "activity", width: 190 }
+];
+
 async function loadAuditLogs() {
   auditLogs.value = await fetchAdminAuditLogs({ limit: 120 });
 }
@@ -501,11 +547,30 @@ function formatTime(value?: string | null) {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
 }
 
-function failureKindLabel(kind: QueueFailureDTO["kind"]) {
+function durationLabel(seconds?: number | null) {
+  const totalSeconds = Math.max(0, Math.floor(Number(seconds || 0)));
+  if (totalSeconds < 60) {
+    return `${totalSeconds} 秒`;
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  if (minutes < 60) {
+    return `${minutes} 分钟`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours} 小时 ${minutes % 60} 分钟`;
+  }
+  const days = Math.floor(hours / 24);
+  return `${days} 天 ${hours % 24} 小时`;
+}
+
+type QueueItemKind = QueueFailureDTO["kind"] | QueueStalledDTO["kind"];
+
+function failureKindLabel(kind: QueueItemKind) {
   return kind === "crawl" ? "采集" : "分析";
 }
 
-function failureKindColor(kind: QueueFailureDTO["kind"]) {
+function failureKindColor(kind: QueueItemKind) {
   return kind === "crawl" ? "orange" : "purple";
 }
 
