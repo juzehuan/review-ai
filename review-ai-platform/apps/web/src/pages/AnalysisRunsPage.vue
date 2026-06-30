@@ -106,6 +106,38 @@
       </a-table>
     </section>
 
+    <div class="analysis-health-strip" :class="{ 'analysis-health-strip-alert': stalledRunCount > 0 }">
+      <div class="analysis-health-head">
+        <div>
+          <div class="panel-label">AI Queue Health</div>
+          <div class="settings-section-title">AI 分析运行观察</div>
+        </div>
+        <a-tag :color="analysisHealthStatusColor">{{ analysisHealthStatusLabel }}</a-tag>
+      </div>
+      <div class="analysis-health-metrics">
+        <div class="analysis-health-metric">
+          <span>疑似无日志</span>
+          <strong>{{ stalledRunCount }}</strong>
+          <small>{{ stalledRunSummary }}</small>
+        </div>
+        <div class="analysis-health-metric">
+          <span>活跃分析量</span>
+          <strong>{{ activeRunProgressText }}</strong>
+          <small>{{ activeRunProgressNote }}</small>
+        </div>
+        <div class="analysis-health-metric">
+          <span>失败占比</span>
+          <strong>{{ activeFailureRateText }}</strong>
+          <small>{{ activeFailureRateNote }}</small>
+        </div>
+        <div class="analysis-health-metric">
+          <span>最近日志</span>
+          <strong>{{ latestRunActivityText }}</strong>
+          <small>{{ latestRunActivityNote }}</small>
+        </div>
+      </div>
+    </div>
+
     <div class="runs-layout">
       <section class="runs-table-panel">
         <div class="panel-head">
@@ -332,6 +364,77 @@ const hasWorkerLog = computed(() => logs.value.some((log) => log.message.include
 const filteredLogs = computed(() =>
   logLevelFilter.value === "all" ? logs.value : logs.value.filter((log) => log.level === logLevelFilter.value)
 );
+const activeRuns = computed(() => runs.value.filter((run) => ["queued", "running"].includes(run.status)));
+const stalledRuns = computed(() => activeRuns.value.filter((run) => run.stalled));
+const stalledRunCount = computed(() => stalledRuns.value.length);
+const longestStalledRun = computed(() => {
+  return [...stalledRuns.value].sort((a, b) => b.lastActivityAgoSeconds - a.lastActivityAgoSeconds)[0] || null;
+});
+const latestActivityRun = computed(() => {
+  return [...runs.value].sort((a, b) => b.lastActivityAgoSeconds - a.lastActivityAgoSeconds).at(-1) || null;
+});
+const activeRunProgressText = computed(() => {
+  if (!activeRuns.value.length) {
+    return "暂无运行批次";
+  }
+  const processed = activeRuns.value.reduce((total, run) => total + run.processedCount, 0);
+  const total = activeRuns.value.reduce((sum, run) => sum + run.reviewCount, 0);
+  return `${processed}/${total}`;
+});
+const activeRunProgressNote = computed(() => {
+  return activeRuns.value.length ? `${activeRuns.value.length} 个批次正在排队或分析` : "没有排队或分析批次";
+});
+const activeFailureRateText = computed(() => {
+  const reviewCount = activeRuns.value.reduce((total, run) => total + run.reviewCount, 0);
+  if (!reviewCount) {
+    return "-";
+  }
+  const failedCount = activeRuns.value.reduce((total, run) => total + run.failedCount, 0);
+  return `${Number(((failedCount / reviewCount) * 100).toFixed(1))}%`;
+});
+const activeFailureRateNote = computed(() => {
+  if (!activeRuns.value.length) {
+    return "暂无运行批次";
+  }
+  const failedCount = activeRuns.value.reduce((total, run) => total + run.failedCount, 0);
+  return `运行批次失败 ${failedCount} 条`;
+});
+const analysisHealthStatusLabel = computed(() => {
+  if (stalledRunCount.value) {
+    return "需要检查";
+  }
+  if (activeRuns.value.length) {
+    return "运行中";
+  }
+  return "空闲";
+});
+const analysisHealthStatusColor = computed(() => {
+  if (stalledRunCount.value) {
+    return "orange";
+  }
+  if (activeRuns.value.length) {
+    return "blue";
+  }
+  return "green";
+});
+const stalledRunSummary = computed(() => {
+  if (!selectedTask.value) {
+    return "选择任务后查看批次";
+  }
+  if (!longestStalledRun.value) {
+    return activeRuns.value.length ? "运行批次正常写入日志" : "暂无运行中的分析批次";
+  }
+  return `最长无日志 ${durationLabel(longestStalledRun.value.lastActivityAgoSeconds)} · ${shortRunName(longestStalledRun.value)}`;
+});
+const latestRunActivityText = computed(() => {
+  if (!latestActivityRun.value?.lastActivityAt) {
+    return "-";
+  }
+  return `${durationLabel(latestActivityRun.value.lastActivityAgoSeconds)}前`;
+});
+const latestRunActivityNote = computed(() => {
+  return latestActivityRun.value ? shortRunName(latestActivityRun.value) : "暂无分析批次";
+});
 
 function canCancel(run: AnalysisRunDTO) {
   return ["queued", "running"].includes(run.status);
@@ -451,6 +554,11 @@ function durationLabel(seconds?: number | null) {
   const hours = Math.floor(minutes / 60);
   const restMinutes = minutes % 60;
   return restMinutes ? `${hours} 小时 ${restMinutes} 分钟` : `${hours} 小时`;
+}
+
+function shortRunName(run: AnalysisRunDTO) {
+  const text = `${run.provider} / ${run.modelName}`;
+  return text.length > 30 ? `${text.slice(0, 30)}...` : text;
 }
 
 function runMetricSummary(run: AnalysisRunDTO) {
@@ -768,6 +876,66 @@ onUnmounted(stopPolling);
   align-items: start;
 }
 
+.analysis-health-strip {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(59, 130, 246, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.analysis-health-strip-alert {
+  border-color: rgba(245, 158, 11, 0.38);
+  box-shadow: 0 12px 30px rgba(245, 158, 11, 0.12);
+}
+
+.analysis-health-head {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.analysis-health-metrics {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.analysis-health-metric {
+  border-left: 1px solid rgba(148, 163, 184, 0.24);
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 14px;
+}
+
+.analysis-health-metric:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.analysis-health-metric span,
+.analysis-health-metric small {
+  color: #64748b;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-health-metric strong {
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .run-progress-cell {
   display: grid;
   gap: 4px;
@@ -887,11 +1055,41 @@ onUnmounted(stopPolling);
   .runs-layout {
     grid-template-columns: 1fr;
   }
+
+  .analysis-health-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analysis-health-metric:nth-child(odd) {
+    border-left: 0;
+    padding-left: 0;
+  }
 }
 
 @media (max-width: 760px) {
   .task-actions {
     gap: 6px !important;
+  }
+
+  .analysis-health-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .analysis-health-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-health-metric {
+    border-left: 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.24);
+    padding-left: 0;
+    padding-top: 12px;
+  }
+
+  .analysis-health-metric:first-child {
+    border-top: 0;
+    padding-top: 0;
   }
 
   .task-actions :deep(.ant-btn) {

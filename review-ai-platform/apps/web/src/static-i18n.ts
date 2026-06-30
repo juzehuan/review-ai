@@ -72,6 +72,17 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "请选择上方任务查看分析批次": "Select a task above to view runs",
     "选择任务后查看批次": "Select a task to view runs",
     "选择任务后查看日志": "Select a task to view logs",
+    "AI 分析运行观察": "AI analysis runtime watch",
+    "疑似无日志": "Likely no logs",
+    "活跃分析量": "Active analysis volume",
+    "失败占比": "Failure rate",
+    "最近日志": "Latest log",
+    "暂无运行批次": "No running runs",
+    "没有排队或分析批次": "No queued or analyzing runs",
+    "暂无运行中的分析批次": "No running analysis runs",
+    "暂无分析批次": "No analysis runs",
+    "运行批次正常写入日志": "Running runs are writing logs normally",
+    "最长无日志": "Longest without logs",
     "请选择一个分析任务查看行动项": "Select an analysis task to view action items",
     "帮助中心": "Help center",
     "用户后台": "User console",
@@ -434,6 +445,17 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "请选择上方任务查看分析批次": "เลือกงานด้านบนเพื่อดูรอบวิเคราะห์",
     "选择任务后查看批次": "เลือกงานเพื่อดูรอบ",
     "选择任务后查看日志": "เลือกงานเพื่อดูบันทึก",
+    "AI 分析运行观察": "ดูสถานะการวิเคราะห์ AI",
+    "疑似无日志": "อาจไม่มีบันทึก",
+    "活跃分析量": "ปริมาณวิเคราะห์ที่กำลังทำ",
+    "失败占比": "อัตราล้มเหลว",
+    "最近日志": "บันทึกล่าสุด",
+    "暂无运行批次": "ไม่มีรอบที่กำลังทำงาน",
+    "没有排队或分析批次": "ไม่มีรอบรอคิวหรือกำลังวิเคราะห์",
+    "暂无运行中的分析批次": "ไม่มีรอบวิเคราะห์ที่กำลังทำงาน",
+    "暂无分析批次": "ยังไม่มีรอบวิเคราะห์",
+    "运行批次正常写入日志": "รอบที่กำลังทำงานเขียนบันทึกปกติ",
+    "最长无日志": "ไม่มีบันทึกนานสุด",
     "请选择一个分析任务查看行动项": "เลือกงานวิเคราะห์เพื่อดูงานติดตาม",
     "帮助中心": "ศูนย์ช่วยเหลือ",
     "用户后台": "คอนโซลผู้ใช้",
@@ -797,6 +819,14 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   if (speedReports) {
     return locale === "en-US" ? `${speedReports[1]} tasks reporting speed` : `${speedReports[1]} งานส่งความเร็วกลับมา`;
   }
+  const activeAnalysisRuns = value.match(/^(\d+)\s*个批次正在排队或分析$/);
+  if (activeAnalysisRuns) {
+    return locale === "en-US" ? `${activeAnalysisRuns[1]} runs queued or analyzing` : `${activeAnalysisRuns[1]} รอบรอคิวหรือกำลังวิเคราะห์`;
+  }
+  const activeRunFailures = value.match(/^运行批次失败\s+(\d+)\s+条$/);
+  if (activeRunFailures) {
+    return locale === "en-US" ? `Running runs failed ${activeRunFailures[1]} items` : `รอบที่กำลังทำงานล้มเหลว ${activeRunFailures[1]} รายการ`;
+  }
   const ratePerMinute = value.match(/^([\d.]+)\/分钟$/);
   if (ratePerMinute) {
     return locale === "en-US" ? `${ratePerMinute[1]}/min` : `${ratePerMinute[1]}/นาที`;
@@ -805,6 +835,16 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   if (longestSilent) {
     const duration = translateDuration(longestSilent[1]);
     return locale === "en-US" ? `Longest silent ${duration} · ${longestSilent[2]}` : `เงียบนานสุด ${duration} · ${longestSilent[2]}`;
+  }
+  const longestNoLogs = value.match(/^最长无日志\s+(.+)\s+·\s+(.+)$/);
+  if (longestNoLogs) {
+    const duration = translateDuration(longestNoLogs[1]);
+    return locale === "en-US" ? `Longest without logs ${duration} · ${longestNoLogs[2]}` : `ไม่มีบันทึกนานสุด ${duration} · ${longestNoLogs[2]}`;
+  }
+  const likelyNoLogs = value.match(/^疑似无日志\s+(.+)$/);
+  if (likelyNoLogs) {
+    const duration = translateDuration(likelyNoLogs[1]);
+    return locale === "en-US" ? `Likely no logs ${duration}` : `อาจไม่มีบันทึก ${duration}`;
   }
   const durationAgo = value.match(/^(\d+\s*(?:秒|分钟|小时|天)(?:\s+\d+\s*(?:秒|分钟|小时|天))?)前$/);
   if (durationAgo) {
