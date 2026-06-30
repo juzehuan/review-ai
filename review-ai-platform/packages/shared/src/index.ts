@@ -738,6 +738,8 @@ export interface ReviewRowDTO {
 
 export interface ReviewListFacetsDTO {
   sourceChannels: string[];
+  intentLabels: string[];
+  analysisTags: string[];
 }
 
 export interface ReviewListResponseDTO {

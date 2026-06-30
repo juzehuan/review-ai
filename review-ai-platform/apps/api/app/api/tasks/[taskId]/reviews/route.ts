@@ -45,9 +45,15 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   });
 
   const run = await findAnalysisRunForResults(taskId, searchParams.get("runId"));
+  const analysisFacetRowsPromise = run
+    ? prisma.reviewAnalysis.findMany({
+        where: { runId: run.id, review: { taskId } },
+        select: { intentLabels: true, topicLabels: true }
+      })
+    : Promise.resolve([]);
   const hasAnalysisFilter = Boolean(sentiment || issue || intent || tag || needsAttention !== null);
   if (hasAnalysisFilter && !run) {
-    const facets = buildReviewFacets(await sourceChannelRowsPromise);
+    const facets = buildReviewFacets(await sourceChannelRowsPromise, []);
     return ok<ReviewListResponseDTO>({ total: 0, page, pageSize, items: [], facets });
   }
 
@@ -76,8 +82,9 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     : null;
 
   if (sortBy === "sentimentScore" && analysisWhere) {
-    const [sourceChannelRows, total, analyses] = await Promise.all([
+    const [sourceChannelRows, analysisFacetRows, total, analyses] = await Promise.all([
       sourceChannelRowsPromise,
+      analysisFacetRowsPromise,
       prisma.reviewAnalysis.count({ where: analysisWhere }),
       prisma.reviewAnalysis.findMany({
         where: analysisWhere,
@@ -92,7 +99,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
       total,
       page,
       pageSize,
-      facets: buildReviewFacets(sourceChannelRows),
+      facets: buildReviewFacets(sourceChannelRows, analysisFacetRows),
       items: analyses.map((analysis) => serializeReviewRow({ ...analysis.review, analyses: [analysis] }))
     });
   }
@@ -104,8 +111,9 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const orderBy: Prisma.ReviewOrderByWithRelationInput =
     sortBy === "ratingStar" ? { ratingStar: sortOrder } : { commentTime: sortOrder };
 
-  const [sourceChannelRows, total, reviews] = await Promise.all([
+  const [sourceChannelRows, analysisFacetRows, total, reviews] = await Promise.all([
     sourceChannelRowsPromise,
+    analysisFacetRowsPromise,
     prisma.review.count({ where: reviewWhere }),
     prisma.review.findMany({
       where: reviewWhere,
@@ -123,15 +131,24 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     total,
     page,
     pageSize,
-    facets: buildReviewFacets(sourceChannelRows),
+    facets: buildReviewFacets(sourceChannelRows, analysisFacetRows),
     items: reviews.map(serializeReviewRow)
   });
 }
 
-function buildReviewFacets(sourceChannelRows: Array<{ sourceChannel: string }>): ReviewListFacetsDTO {
+function buildReviewFacets(
+  sourceChannelRows: Array<{ sourceChannel: string }>,
+  analysisFacetRows: Array<{ intentLabels: string[]; topicLabels: string[] }>
+): ReviewListFacetsDTO {
   return {
     sourceChannels: [...new Set(sourceChannelRows.map((item) => item.sourceChannel).filter(Boolean))].sort((a, b) =>
       a.localeCompare(b, "zh-Hans-CN")
-    )
+    ),
+    intentLabels: sortedUnique(analysisFacetRows.flatMap((item) => item.intentLabels)),
+    analysisTags: sortedUnique(analysisFacetRows.flatMap((item) => item.topicLabels))
   };
+}
+
+function sortedUnique(values: string[]) {
+  return [...new Set(values.map((item) => item.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
 }

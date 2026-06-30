@@ -150,6 +150,9 @@
             <a-select v-model:value="filters.sourceChannel" allow-clear placeholder="来源" class="advanced-filter-wide">
               <a-select-option v-for="source in sourceChannelOptions" :key="source" :value="source">{{ source }}</a-select-option>
             </a-select>
+            <a-select v-model:value="filters.analysisTag" allow-clear placeholder="AI 标签" class="advanced-filter-wide">
+              <a-select-option v-for="tag in analysisTagOptions" :key="tag" :value="tag">{{ tag }}</a-select-option>
+            </a-select>
             <div class="settings-help advanced-filter-wide">覆盖该任务全部 {{ sourceChannelOptions.length }} 个来源</div>
           </div>
         </section>
@@ -396,6 +399,7 @@ type SavedView = {
     ratingStar?: number;
     sentiment?: string;
     intent?: string;
+    analysisTag?: string;
     hasMedia?: boolean;
     sourceChannel?: string;
     keyword: string;
@@ -408,13 +412,14 @@ type SavedView = {
 };
 
 const DEFAULT_VIEW_ID = "all-comments";
+const EMPTY_REVIEW_FACETS: ReviewListFacetsDTO = { sourceChannels: [], intentLabels: [], analysisTags: [] };
 const route = useRoute();
 const router = useRouter();
 const { selectedTask, setSelectedTask } = useTaskStore();
 const loading = ref(false);
 const running = ref(false);
 const rows = ref<ReviewRowDTO[]>([]);
-const reviewFacets = ref<ReviewListFacetsDTO>({ sourceChannels: [] });
+const reviewFacets = ref<ReviewListFacetsDTO>({ ...EMPTY_REVIEW_FACETS });
 const allRuns = ref<AnalysisRunDTO[]>([]);
 const latestRun = ref<AnalysisRunDTO | null>(null);
 const selectedResultRunId = ref<string | undefined>();
@@ -440,6 +445,7 @@ const filters = reactive({
   ratingStar: undefined as number | undefined,
   sentiment: undefined as string | undefined,
   intent: undefined as string | undefined,
+  analysisTag: undefined as string | undefined,
   hasMedia: undefined as boolean | undefined,
   sourceChannel: undefined as string | undefined,
   keyword: ""
@@ -478,7 +484,12 @@ const defaultVisibleColumnKeys: ColumnKey[] = allColumns
   .map((column) => column.key);
 const visibleColumnKeys = ref<ColumnKey[]>([...defaultVisibleColumnKeys]);
 const intentOptions = computed(() =>
-  [...new Set(rows.value.flatMap((item) => item.intentLabels || []))]
+  [...new Set([...reviewFacets.value.intentLabels, ...rows.value.flatMap((item) => item.intentLabels || [])])]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))
+);
+const analysisTagOptions = computed(() =>
+  [...new Set([...reviewFacets.value.analysisTags, ...rows.value.flatMap((item) => item.analysisTags || [])])]
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))
 );
@@ -492,10 +503,10 @@ const mediaCount = computed(() => rows.value.filter((item) => item.hasMedia).len
 const negativeCount = computed(() => rows.value.filter((item) => item.sentiment === "negative").length);
 const visibleColumns = computed(() => allColumns.filter((column) => visibleColumnKeys.value.includes(column.key)));
 const advancedFilterCount = computed(() =>
-  [filters.ratingStar, filters.hasMedia, filters.sourceChannel].filter((value) => value !== undefined && value !== "").length
+  [filters.ratingStar, filters.hasMedia, filters.sourceChannel, filters.analysisTag].filter((value) => value !== undefined && value !== "").length
 );
 const activeFilterCount = computed(() =>
-  [filters.ratingStar, filters.sentiment, filters.intent, filters.hasMedia, filters.sourceChannel, filters.keyword.trim()].filter((value) => value !== undefined && value !== "").length +
+  [filters.ratingStar, filters.sentiment, filters.intent, filters.analysisTag, filters.hasMedia, filters.sourceChannel, filters.keyword.trim()].filter((value) => value !== undefined && value !== "").length +
   (evidenceIssue.value || evidenceReviewIds.value.length ? 1 : 0)
 );
 const canCancelRun = computed(() => Boolean(latestRun.value && ["queued", "running"].includes(latestRun.value.status)));
@@ -598,6 +609,7 @@ function savedViewFromDto(view: SavedReviewViewDTO): SavedView {
       ratingStar: typeof filters.ratingStar === "number" ? filters.ratingStar : undefined,
       sentiment: typeof filters.sentiment === "string" ? filters.sentiment : undefined,
       intent: typeof filters.intent === "string" ? filters.intent : undefined,
+      analysisTag: typeof filters.analysisTag === "string" ? filters.analysisTag : undefined,
       hasMedia: typeof filters.hasMedia === "boolean" ? filters.hasMedia : undefined,
       sourceChannel: typeof filters.sourceChannel === "string" ? filters.sourceChannel : undefined,
       keyword: typeof filters.keyword === "string" ? filters.keyword : ""
@@ -621,6 +633,7 @@ function snapshotCurrentView(name: string, id?: string): SavedView {
       ratingStar: filters.ratingStar,
       sentiment: filters.sentiment,
       intent: filters.intent,
+      analysisTag: filters.analysisTag,
       hasMedia: filters.hasMedia,
       sourceChannel: filters.sourceChannel,
       keyword: filters.keyword
@@ -649,6 +662,7 @@ function applyView(view: SavedView) {
   filters.ratingStar = view.filters.ratingStar;
   filters.sentiment = view.filters.sentiment;
   filters.intent = view.filters.intent;
+  filters.analysisTag = view.filters.analysisTag;
   filters.hasMedia = view.filters.hasMedia;
   filters.sourceChannel = view.filters.sourceChannel;
   filters.keyword = view.filters.keyword;
@@ -823,6 +837,9 @@ function clearRouteSourcedFilters(type: string) {
   if (type === "intent") {
     filters.intent = undefined;
   }
+  if (type === "dynamic-tag") {
+    filters.analysisTag = undefined;
+  }
   if (type === "keyword") {
     filters.keyword = "";
   }
@@ -920,7 +937,7 @@ async function loadActionItems() {
 async function loadReviews() {
   if (!selectedTask.value) {
     rows.value = [];
-    reviewFacets.value = { sourceChannels: [] };
+    reviewFacets.value = { ...EMPTY_REVIEW_FACETS };
     pagination.total = 0;
     return;
   }
@@ -935,6 +952,7 @@ async function loadReviews() {
       ratingStar: filters.ratingStar,
       sentiment: filters.sentiment,
       intent: filters.intent,
+      tag: filters.analysisTag,
       hasMedia: filters.hasMedia,
       sourceChannel: filters.sourceChannel,
       keyword: filters.keyword || undefined,
@@ -945,7 +963,7 @@ async function loadReviews() {
       reviewIds: evidenceReviewIds.value.length ? evidenceReviewIds.value.join(",") : undefined
     });
     rows.value = result.items;
-    reviewFacets.value = result.facets || { sourceChannels: [] };
+    reviewFacets.value = result.facets || { ...EMPTY_REVIEW_FACETS };
     pagination.total = result.total;
     if (viewMode.value === "grouped") {
       pagination.current = 1;
@@ -1014,6 +1032,7 @@ async function handleExport() {
       ratingStar: filters.ratingStar,
       sentiment: filters.sentiment,
       intent: filters.intent,
+      tag: filters.analysisTag,
       hasMedia: filters.hasMedia,
       sourceChannel: filters.sourceChannel,
       keyword: filters.keyword || undefined,
@@ -1040,6 +1059,7 @@ function resetFilters() {
   filters.ratingStar = undefined;
   filters.sentiment = undefined;
   filters.intent = undefined;
+  filters.analysisTag = undefined;
   filters.hasMedia = undefined;
   filters.sourceChannel = undefined;
   filters.keyword = "";
@@ -1123,16 +1143,18 @@ watch(
     route.query.ratingStar,
     route.query.sentiment,
     route.query.intent,
+    route.query.tag,
     route.query.sourceChannel,
     route.query.keyword
   ],
-  ([issue, runId, reviewIds, nextEvidenceLabel, nextEvidenceType, ratingStar, sentiment, intent, sourceChannel, keyword]) => {
+  ([issue, runId, reviewIds, nextEvidenceLabel, nextEvidenceType, ratingStar, sentiment, intent, tag, sourceChannel, keyword]) => {
     evidenceIssue.value = routeString(issue) || "";
     evidenceLabel.value = routeString(nextEvidenceLabel) || "";
     evidenceType.value = routeString(nextEvidenceType) || "";
     filters.ratingStar = routeRatingStar(ratingStar);
     filters.sentiment = routeSentiment(sentiment);
     filters.intent = routeString(intent);
+    filters.analysisTag = routeString(tag);
     filters.sourceChannel = routeString(sourceChannel);
     filters.keyword = routeString(keyword) || "";
     const nextReviewIds = routeString(reviewIds);
