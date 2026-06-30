@@ -195,6 +195,12 @@ export interface CrawlJobDTO {
   stopReason: string | null;
   commentSortAttempted: boolean | null;
   commentSortSwitched: boolean | null;
+  nextRequests: number | null;
+  payloadComments: number | null;
+  domCommentCount: number | null;
+  domContentTextCount: number | null;
+  endReached: boolean | null;
+  channelErrors: string[];
   lastError: string | null;
   createdAt: string;
   updatedAt: string;

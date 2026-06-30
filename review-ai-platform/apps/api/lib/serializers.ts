@@ -51,6 +51,14 @@ function readOptionalBoolean(value: unknown) {
   return typeof value === "boolean" ? value : null;
 }
 
+function readOptionalNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function readStringArray(value: unknown) {
+  return Array.isArray(value) ? value.map((item) => String(item || "").trim()).filter(Boolean) : [];
+}
+
 export function serializeTask(
   task: Task & {
     analysisRuns?: AnalysisRun[];
@@ -245,6 +253,12 @@ export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
     stopReason: readOptionalString(rawResult?.stopReason),
     commentSortAttempted: readOptionalBoolean(rawResult?.commentSortAttempted),
     commentSortSwitched: readOptionalBoolean(rawResult?.commentSortSwitched),
+    nextRequests: readOptionalNumber(rawResult?.nextRequests),
+    payloadComments: readOptionalNumber(rawResult?.payloadComments),
+    domCommentCount: readOptionalNumber(rawResult?.domCommentCount),
+    domContentTextCount: readOptionalNumber(rawResult?.domContentTextCount),
+    endReached: readOptionalBoolean(rawResult?.endReached),
+    channelErrors: readStringArray(rawResult?.channelErrors),
     lastError: job.lastError,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),

@@ -209,6 +209,11 @@
               <span v-if="record.commentSortAttempted !== null" class="muted">
                 评论排序：{{ record.commentSortSwitched ? "已切换所有评论" : "未确认所有评论" }}
               </span>
+              <span v-if="crawlMetricSummary(record)" class="muted">{{ crawlMetricSummary(record) }}</span>
+              <span v-if="record.endReached !== null" class="muted">末尾状态：{{ record.endReached ? "已到达" : "未确认" }}</span>
+              <a-tooltip v-if="record.channelErrors.length" :title="record.channelErrors.join('\n')">
+                <span class="muted">通道异常 {{ record.channelErrors.length }} 条</span>
+              </a-tooltip>
             </div>
           </template>
           <template v-else-if="column.key === 'meta'">
@@ -656,6 +661,16 @@ function stopReasonLabel(value?: string | null) {
     return "未发现评论";
   }
   return value || "-";
+}
+
+function crawlMetricSummary(job: CrawlJobDTO) {
+  const parts = [
+    job.nextRequests !== null ? `接口请求 ${job.nextRequests}` : "",
+    job.payloadComments !== null ? `接口评论 ${job.payloadComments}` : "",
+    job.domCommentCount !== null ? `DOM 评论 ${job.domCommentCount}` : "",
+    job.domContentTextCount !== null ? `DOM 文本 ${job.domContentTextCount}` : ""
+  ].filter(Boolean);
+  return parts.join(" · ");
 }
 
 function canStart(job: CrawlJobDTO) {
