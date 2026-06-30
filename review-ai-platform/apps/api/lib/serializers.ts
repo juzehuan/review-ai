@@ -303,6 +303,8 @@ export function serializeReportShare(share: ReportShare, shareUrl: string): Repo
     lastViewedAt: share.lastViewedAt?.toISOString() || null,
     expiresAt: share.expiresAt?.toISOString() || null,
     revokedAt: share.revokedAt?.toISOString() || null,
+    snapshotMode: share.dashboardSnapshot ? "snapshot" : "live",
+    snapshotCreatedAt: share.snapshotCreatedAt?.toISOString() || null,
     shareUrl,
     createdAt: share.createdAt.toISOString(),
     updatedAt: share.updatedAt.toISOString()

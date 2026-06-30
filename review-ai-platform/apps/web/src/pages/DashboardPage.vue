@@ -86,6 +86,8 @@
                 <a-input :value="share.shareUrl" readonly />
                 <div class="muted">
                   浏览 {{ share.viewCount }} 次 · 创建于 {{ formatTime(share.createdAt) }}
+                  <span> · {{ share.snapshotMode === "snapshot" ? "固定快照" : "实时报告" }}</span>
+                  <span v-if="share.snapshotCreatedAt"> · 快照 {{ formatTime(share.snapshotCreatedAt) }}</span>
                   <span v-if="share.revokedAt"> · 已撤销</span>
                 </div>
               </div>

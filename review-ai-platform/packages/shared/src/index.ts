@@ -241,6 +241,8 @@ export interface ReportShareDTO {
   lastViewedAt: string | null;
   expiresAt: string | null;
   revokedAt: string | null;
+  snapshotMode: "snapshot" | "live";
+  snapshotCreatedAt: string | null;
   shareUrl: string;
   createdAt: string;
   updatedAt: string;
@@ -254,6 +256,8 @@ export interface SharedReportDTO {
     viewCount: number;
     createdAt: string;
     expiresAt: string | null;
+    snapshotMode: "snapshot" | "live";
+    snapshotCreatedAt: string | null;
   };
   task: TaskListItem;
   dashboard: DashboardDTO;

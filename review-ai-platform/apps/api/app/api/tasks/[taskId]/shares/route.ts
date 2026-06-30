@@ -2,8 +2,9 @@ import { randomBytes } from "node:crypto";
 import { prisma } from "@review-ai/db";
 import type { ReportShareDTO } from "@review-ai/shared";
 import { writeAuditLog } from "@/lib/audit-log";
+import { buildDashboardForTask } from "@/lib/dashboard";
 import { ok } from "@/lib/http";
-import { serializeReportShare } from "@/lib/serializers";
+import { serializeReportShare, serializeTask } from "@/lib/serializers";
 import { buildPublicShareUrl } from "@/lib/share-url";
 import { getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -24,6 +25,10 @@ async function createUniqueToken() {
     }
   }
   return randomBytes(32).toString("base64url");
+}
+
+function jsonSnapshot<T>(value: T | null) {
+  return value ? JSON.parse(JSON.stringify(value)) : undefined;
 }
 
 export async function GET(request: Request, context: { params: Promise<{ taskId: string }> }) {
@@ -66,6 +71,10 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const title = String(body.title || scoped.task.productName || scoped.task.name || "").trim();
+  const dashboardSnapshot = await buildDashboardForTask(taskId).catch(() => null);
+  const taskSnapshot = jsonSnapshot(serializeTask(scoped.task));
+  const dashboardSnapshotJson = jsonSnapshot(dashboardSnapshot);
+  const snapshotCreatedAt = dashboardSnapshot ? new Date() : null;
   const existing = await prisma.reportShare.findFirst({
     where: {
       workspaceId: taskWorkspaceId,
@@ -76,18 +85,30 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     orderBy: { createdAt: "desc" }
   });
 
-  const share =
-    existing ||
-    (await prisma.reportShare.create({
-      data: {
-        workspaceId: taskWorkspaceId,
-        taskId,
-        token: await createUniqueToken(),
-        title,
-        expiresAt: parseExpiresAt(body.expiresAt),
-        createdByUserId: workspaceContext.user.id
-      }
-    }));
+  const share = existing
+    ? existing.dashboardSnapshot
+      ? existing
+      : await prisma.reportShare.update({
+          where: { id: existing.id },
+          data: {
+            dashboardSnapshot: dashboardSnapshotJson,
+            taskSnapshot,
+            snapshotCreatedAt
+          }
+        })
+    : await prisma.reportShare.create({
+        data: {
+          workspaceId: taskWorkspaceId,
+          taskId,
+          token: await createUniqueToken(),
+          title,
+          expiresAt: parseExpiresAt(body.expiresAt),
+          createdByUserId: workspaceContext.user.id,
+          dashboardSnapshot: dashboardSnapshotJson,
+          taskSnapshot,
+          snapshotCreatedAt
+        }
+      });
   if (!existing) {
     await writeAuditLog(request, {
       workspaceId: taskWorkspaceId,
@@ -98,7 +119,8 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       targetLabel: title,
       metadata: {
         taskId,
-        expiresAt: share.expiresAt?.toISOString() || null
+        expiresAt: share.expiresAt?.toISOString() || null,
+        snapshotMode: dashboardSnapshot ? "snapshot" : "live"
       }
     });
   }

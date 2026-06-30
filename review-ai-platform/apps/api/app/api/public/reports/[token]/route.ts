@@ -1,5 +1,5 @@
 import { prisma } from "@review-ai/db";
-import type { SharedReportDTO } from "@review-ai/shared";
+import type { DashboardDTO, SharedReportDTO, TaskListItem } from "@review-ai/shared";
 import { fail, ok } from "@/lib/http";
 import { buildDashboardForTask } from "@/lib/dashboard";
 import { serializeTask } from "@/lib/serializers";
@@ -36,7 +36,8 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
   });
 
   try {
-    const dashboard = await buildDashboardForTask(share.taskId);
+    const dashboard = (share.dashboardSnapshot as DashboardDTO | null) || (await buildDashboardForTask(share.taskId));
+    const task = (share.taskSnapshot as TaskListItem | null) || serializeTask(share.task);
     return ok({
       share: {
         id: updatedShare.id,
@@ -44,9 +45,11 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
         title: updatedShare.title,
         viewCount: updatedShare.viewCount,
         createdAt: updatedShare.createdAt.toISOString(),
-        expiresAt: updatedShare.expiresAt?.toISOString() || null
+        expiresAt: updatedShare.expiresAt?.toISOString() || null,
+        snapshotMode: share.dashboardSnapshot ? "snapshot" : "live",
+        snapshotCreatedAt: share.snapshotCreatedAt?.toISOString() || null
       },
-      task: serializeTask(share.task),
+      task,
       dashboard
     } satisfies SharedReportDTO);
   } catch (error) {

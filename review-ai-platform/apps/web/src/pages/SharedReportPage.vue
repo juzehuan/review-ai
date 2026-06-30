@@ -22,6 +22,7 @@
           <span>评论 {{ report.dashboard.reviewCount }}</span>
           <span>{{ scoreLabel }} {{ report.dashboard.nps }}</span>
           <span>浏览 {{ report.share.viewCount }}</span>
+          <span>{{ report.share.snapshotMode === "snapshot" ? "固定快照" : "实时报告" }}</span>
           <a-button size="small" @click="printReport">打印/PDF</a-button>
         </div>
       </section>
