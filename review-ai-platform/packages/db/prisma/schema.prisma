@@ -63,6 +63,7 @@ model User {
   passwordHash String?           @map("password_hash")
   avatarUrl    String?           @map("avatar_url")
   isSuperAdmin Boolean           @default(false) @map("is_super_admin")
+  isActive     Boolean           @default(true) @map("is_active")
   createdAt    DateTime          @default(now()) @map("created_at")
   memberships  WorkspaceMember[]
   sessions     AuthSession[]

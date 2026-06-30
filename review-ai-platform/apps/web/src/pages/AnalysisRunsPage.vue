@@ -34,7 +34,7 @@
         :data-source="tasks"
         :pagination="{ pageSize: 10 }"
         :loading="loadingTasks"
-        :scroll="{ x: 1440 }"
+        :scroll="{ x: currentUser?.isSuperAdmin ? 1650 : 1440 }"
         :row-class-name="taskRowClassName"
         @row="taskRowProps"
       >
@@ -43,6 +43,12 @@
             <div class="task-name-cell">
               <strong>{{ record.name }}</strong>
               <span>{{ record.productName }}</span>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'workspace'">
+            <div class="task-name-cell">
+              <strong>{{ record.workspaceOwnerName || record.workspaceOwnerEmail || "未设置负责人" }}</strong>
+              <span>{{ record.workspaceName || record.workspaceSlug || record.workspaceId || "-" }}</span>
             </div>
           </template>
           <template v-else-if="column.key === 'taskStatus'">
@@ -286,15 +292,16 @@ const canWriteWorkspace = computed(() => {
   );
 });
 
-const taskColumns = [
+const taskColumns = computed(() => [
   { title: "任务", key: "task", width: 260 },
+  ...(currentUser.value?.isSuperAdmin ? [{ title: "所属用户/空间", key: "workspace", width: 210 }] : []),
   { title: "来源", dataIndex: "sourceChannel", key: "sourceChannel", width: 110 },
   { title: "分析类型", key: "analysisType", width: 120 },
   { title: "导入状态", key: "taskStatus", width: 120 },
   { title: "分析状态", key: "analysisStatus", width: 130 },
   { title: "创建时间", key: "createdAt", width: 180 },
   { title: "操作", key: "actions", width: 280 }
-];
+]);
 
 const runColumns = [
   { title: "状态", key: "status", width: 110 },

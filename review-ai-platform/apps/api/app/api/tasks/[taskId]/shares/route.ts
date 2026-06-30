@@ -32,13 +32,14 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     return workspaceContext.response;
   }
 
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
-  if (scoped.response) {
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
+  if (scoped.response || !scoped.task) {
     return scoped.response;
   }
+  const taskWorkspaceId = scoped.task.workspaceId || workspaceContext.workspace.id;
 
   const shares = await prisma.reportShare.findMany({
-    where: { workspaceId: workspaceContext.workspace.id, taskId },
+    where: { workspaceId: taskWorkspaceId, taskId },
     orderBy: { createdAt: "desc" }
   });
 
@@ -56,16 +57,17 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     return roleResponse;
   }
 
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response || !scoped.task) {
     return scoped.response;
   }
+  const taskWorkspaceId = scoped.task.workspaceId || workspaceContext.workspace.id;
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const title = String(body.title || scoped.task.productName || scoped.task.name || "").trim();
   const existing = await prisma.reportShare.findFirst({
     where: {
-      workspaceId: workspaceContext.workspace.id,
+      workspaceId: taskWorkspaceId,
       taskId,
       enabled: true,
       revokedAt: null
@@ -77,7 +79,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     existing ||
     (await prisma.reportShare.create({
       data: {
-        workspaceId: workspaceContext.workspace.id,
+        workspaceId: taskWorkspaceId,
         taskId,
         token: await createUniqueToken(),
         title,

@@ -30,7 +30,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   if (workspaceContext.response || !workspaceContext.workspace) {
     return workspaceContext.response;
   }
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response) {
     return scoped.response;
   }
@@ -60,10 +60,11 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
   if (roleResponse) {
     return roleResponse;
   }
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
-  if (scoped.response) {
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
+  if (scoped.response || !scoped.task) {
     return scoped.response;
   }
+  const taskWorkspaceId = scoped.task.workspaceId || workspaceContext.workspace.id;
 
   const body = await request.json().catch(() => ({}));
   const title = String(body.title || "").trim();
@@ -73,7 +74,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
   const assigneeUserId = typeof body.assigneeUserId === "string" && body.assigneeUserId ? body.assigneeUserId : null;
   if (assigneeUserId) {
     const assignee = await prisma.workspaceMember.findUnique({
-      where: { workspaceId_userId: { workspaceId: workspaceContext.workspace.id, userId: assigneeUserId } }
+      where: { workspaceId_userId: { workspaceId: taskWorkspaceId, userId: assigneeUserId } }
     });
     if (!assignee) {
       return fail("负责人不属于当前空间", 400);

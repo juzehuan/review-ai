@@ -224,6 +224,11 @@
           <template v-else-if="column.key === 'comment'">
             <a class="table-comment-link" @click="selectedRow = record">{{ truncate(record.comment, 72) }}</a>
           </template>
+          <template v-else-if="column.key === 'cmtId'">
+            <a-tooltip :title="record.cmtId || '-'">
+              <span class="table-comment-id">{{ record.cmtId || "-" }}</span>
+            </a-tooltip>
+          </template>
           <template v-else-if="column.key === 'hasMedia'">
             <a-tag :color="record.hasMedia ? 'blue' : 'default'">{{ record.hasMedia ? "有" : "无" }}</a-tag>
           </template>
@@ -369,6 +374,7 @@ type SorterConfig = {
 };
 
 type ColumnKey =
+  | "rowNo"
   | "cmtId"
   | "productName"
   | "variantName"
@@ -450,7 +456,8 @@ const viewOptions = [
 ];
 
 const allColumns = [
-  { title: "编号", dataIndex: "cmtId", key: "cmtId", width: 140 },
+  { title: "编号", dataIndex: "rowNo", key: "rowNo", width: 90 },
+  { title: "评论ID", dataIndex: "cmtId", key: "cmtId", width: 110 },
   { title: "商品名称", dataIndex: "productName", key: "productName", width: 200 },
   { title: "规格/颜色", dataIndex: "variantName", key: "variantName", width: 140 },
   { title: "用户评价", dataIndex: "comment", key: "comment", width: 380 },
@@ -464,7 +471,10 @@ const allColumns = [
 ] as const;
 
 const columnOptions = allColumns.map((column) => ({ label: column.title, value: column.key }));
-const visibleColumnKeys = ref<ColumnKey[]>(allColumns.map((column) => column.key));
+const defaultVisibleColumnKeys: ColumnKey[] = allColumns
+  .filter((column) => column.key !== "cmtId")
+  .map((column) => column.key);
+const visibleColumnKeys = ref<ColumnKey[]>([...defaultVisibleColumnKeys]);
 const intentOptions = computed(() =>
   [...new Set(rows.value.flatMap((item) => item.intentLabels || []))]
     .filter(Boolean)
@@ -569,12 +579,15 @@ function buildDefaultView(): SavedView {
     viewMode: "table",
     sortBy: "commentTime",
     sortOrder: "desc",
-    visibleColumnKeys: allColumns.map((column) => column.key)
+    visibleColumnKeys: [...defaultVisibleColumnKeys]
   };
 }
 
 function savedViewFromDto(view: SavedReviewViewDTO): SavedView {
   const filters = view.filters as SavedView["filters"];
+  const visibleColumnKeys = view.visibleColumnKeys.filter((key): key is ColumnKey =>
+    allColumns.some((column) => column.key === key)
+  );
   return {
     id: view.id,
     name: view.name,
@@ -593,9 +606,7 @@ function savedViewFromDto(view: SavedReviewViewDTO): SavedView {
     viewMode: view.viewMode === "grouped" ? "grouped" : "table",
     sortBy: view.sortBy || "commentTime",
     sortOrder: view.sortOrder === "asc" ? "asc" : "desc",
-    visibleColumnKeys: view.visibleColumnKeys.filter((key): key is ColumnKey =>
-      allColumns.some((column) => column.key === key)
-    )
+    visibleColumnKeys: visibleColumnKeys.includes("rowNo") ? visibleColumnKeys : ["rowNo", ...visibleColumnKeys]
   };
 }
 
@@ -704,6 +715,13 @@ function truncate(value: string, max: number) {
 }
 
 function displayCell(record: ReviewRowDTO, key: ColumnKey) {
+  if (key === "rowNo") {
+    const index = rows.value.findIndex((item) => item.id === record.id);
+    const page = pagination.current || 1;
+    const pageSize = pagination.pageSize || 10;
+    return index >= 0 ? (page - 1) * pageSize + index + 1 : "-";
+  }
+
   const value = record[key];
   if (Array.isArray(value)) {
     return value.join("、") || "-";

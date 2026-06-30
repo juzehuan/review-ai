@@ -6,7 +6,7 @@ import { fail, ok } from "@/lib/http";
 import { getPlatformAiSetting } from "@/lib/platform-settings";
 import { getAnalysisQueue } from "@/lib/queue";
 import { serializeRun } from "@/lib/serializers";
-import { assertReviewQuota, assertRunQuota, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+import { assertReviewQuota, assertRunQuota, canAccessAllWorkspaces, canBypassQuota, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 function parseCrawlResult(value: Prisma.JsonValue | null): CrawlResult | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -68,8 +68,10 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     return roleResponse;
   }
   const { workspace } = workspaceContext;
+  const allowGlobalAccess = canAccessAllWorkspaces(workspaceContext);
+  const quotaUnlimited = canBypassQuota(workspaceContext);
   const job = await prisma.crawlJob.findFirst({
-    where: { id: jobId, workspaceId: workspace.id }
+    where: allowGlobalAccess ? { id: jobId } : { id: jobId, workspaceId: workspace.id }
   });
 
   if (!job) {
@@ -106,11 +108,12 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     return fail("爬取结果里没有可导入的评论，不能开始分析", 400);
   }
 
-  const quotaResponse = job.taskId ? null : await assertReviewQuota(workspace.id, rowsToCreate.length);
+  const quotaWorkspaceId = job.workspaceId;
+  const quotaResponse = job.taskId ? null : await assertReviewQuota(quotaWorkspaceId, rowsToCreate.length, quotaUnlimited);
   if (quotaResponse) {
     return quotaResponse;
   }
-  const runQuotaResponse = await assertRunQuota(workspace.id);
+  const runQuotaResponse = await assertRunQuota(quotaWorkspaceId, quotaUnlimited);
   if (runQuotaResponse) {
     return runQuotaResponse;
   }
@@ -135,7 +138,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
       const first = rowsToCreate[0];
       const task = await tx.task.create({
         data: {
-          workspaceId: workspace.id,
+          workspaceId: quotaWorkspaceId,
           name: job.name,
           productName: job.productName || crawlResult.productName || job.name,
           shopId: crawlResult.shopId || first.shopId || fallback.shopId,
@@ -178,10 +181,12 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
       });
       reviewCount = inserted.count;
 
-      await tx.subscription.update({
-        where: { workspaceId: workspace.id },
-        data: { currentPeriodReviewCount: { increment: inserted.count } }
-      });
+      if (!quotaUnlimited) {
+        await tx.subscription.update({
+          where: { workspaceId: quotaWorkspaceId },
+          data: { currentPeriodReviewCount: { increment: inserted.count } }
+        });
+      }
 
       await tx.crawlJob.update({
         where: { id: job.id },
@@ -217,10 +222,12 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
       data: { status: "analyzing" }
     });
 
-    await tx.subscription.update({
-      where: { workspaceId: workspace.id },
-      data: { currentPeriodRunCount: { increment: 1 } }
-    });
+    if (!quotaUnlimited) {
+      await tx.subscription.update({
+        where: { workspaceId: quotaWorkspaceId },
+        data: { currentPeriodRunCount: { increment: 1 } }
+      });
+    }
 
     await tx.analysisRunLog.create({
       data: {
@@ -237,7 +244,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
   await getAnalysisQueue().add("run-analysis", {
     runId: result.run.id,
     taskId: result.taskId,
-    workspaceId: workspace.id
+    workspaceId: quotaWorkspaceId
   });
 
   return ok(

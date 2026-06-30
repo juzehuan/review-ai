@@ -85,6 +85,9 @@
             <div class="task-name-cell">
               <strong>{{ record.name }}</strong>
               <span>{{ record.productName }}</span>
+              <span v-if="currentUser?.isSuperAdmin">
+                {{ record.workspaceOwnerName || record.workspaceOwnerEmail || "未设置负责人" }} · {{ record.workspaceName || record.workspaceSlug || record.workspaceId || "-" }}
+              </span>
             </div>
           </template>
           <template v-else-if="column.key === 'status'">
@@ -137,12 +140,18 @@ const activeRuns = computed(() =>
 );
 const recentTasks = computed(() => tasks.value.slice(0, 8));
 const reviewUsage = computed(() => {
+  if (currentUser.value?.isSuperAdmin) {
+    return t("common.unlimited");
+  }
   if (!workspace.value) {
     return "0/0";
   }
   return `${workspace.value.currentPeriodReviewCount}/${workspace.value.monthlyReviewLimit}`;
 });
 const runUsage = computed(() => {
+  if (currentUser.value?.isSuperAdmin) {
+    return t("common.unlimited");
+  }
   if (!workspace.value) {
     return "0/0";
   }

@@ -227,9 +227,14 @@ export async function createAdminUser(payload: { email: string; name: string; is
 
 export async function updateAdminUser(
   userId: string,
-  payload: { name?: string; isSuperAdmin?: boolean; monthlyReviewLimit?: number; monthlyRunLimit?: number }
+  payload: { name?: string; isSuperAdmin?: boolean; isActive?: boolean; monthlyReviewLimit?: number; monthlyRunLimit?: number }
 ) {
   const { data } = await api.patch<AdminUserDTO>(`/admin/users/${userId}`, payload);
+  return data;
+}
+
+export async function resetAdminUserPassword(userId: string) {
+  const { data } = await api.post<{ password: string }>(`/admin/users/${userId}/reset-password`);
   return data;
 }
 

@@ -3,7 +3,7 @@ import type { ImportTaskResponse } from "@review-ai/shared";
 import { inferAnalysisType } from "@review-ai/shared";
 import { parseReviewFile } from "@/lib/csv";
 import { fail, ok } from "@/lib/http";
-import { assertReviewQuota, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+import { assertReviewQuota, canBypassQuota, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function POST(request: Request) {
   const context = await getWorkspaceContext(request);
@@ -46,7 +46,8 @@ export async function POST(request: Request) {
     return fail("CSV 没有可导入的数据");
   }
 
-  const quotaResponse = await assertReviewQuota(workspace.id, parsedRows.length);
+  const quotaUnlimited = canBypassQuota(context);
+  const quotaResponse = await assertReviewQuota(workspace.id, parsedRows.length, quotaUnlimited);
   if (quotaResponse) {
     return quotaResponse;
   }
@@ -107,14 +108,16 @@ export async function POST(request: Request) {
       skipDuplicates: true
     });
 
-    await tx.subscription.update({
-      where: { workspaceId: workspace.id },
-      data: {
-        currentPeriodReviewCount: {
-          increment: createManyData.length
+    if (!quotaUnlimited) {
+      await tx.subscription.update({
+        where: { workspaceId: workspace.id },
+        data: {
+          currentPeriodReviewCount: {
+            increment: createManyData.length
+          }
         }
-      }
-    });
+      });
+    }
 
     return {
       taskId: task.id,

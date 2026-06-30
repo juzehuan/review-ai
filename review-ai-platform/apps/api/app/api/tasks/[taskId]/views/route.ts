@@ -9,7 +9,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   if (workspaceContext.response || !workspaceContext.workspace) {
     return workspaceContext.response;
   }
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response) {
     return scoped.response;
   }
@@ -31,7 +31,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
   if (roleResponse) {
     return roleResponse;
   }
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response) {
     return scoped.response;
   }

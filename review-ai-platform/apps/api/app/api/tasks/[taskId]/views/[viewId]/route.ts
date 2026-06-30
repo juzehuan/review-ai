@@ -16,7 +16,7 @@ export async function PATCH(
   if (roleResponse) {
     return roleResponse;
   }
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response) {
     return scoped.response;
   }
@@ -62,7 +62,7 @@ export async function DELETE(
   if (roleResponse) {
     return roleResponse;
   }
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response) {
     return scoped.response;
   }

@@ -2,7 +2,7 @@ import { prisma } from "@review-ai/db";
 import type { TaskCompareDTO, TaskCompareItemDTO } from "@review-ai/shared";
 import { buildDashboardForTask } from "@/lib/dashboard";
 import { fail, ok } from "@/lib/http";
-import { getWorkspaceContext } from "@/lib/workspace";
+import { canAccessAllWorkspaces, getWorkspaceContext } from "@/lib/workspace";
 
 function round(value: number, digits = 1) {
   const factor = 10 ** digits;
@@ -22,7 +22,9 @@ export async function POST(request: Request) {
   }
 
   const tasks = await prisma.task.findMany({
-    where: { id: { in: taskIds }, workspaceId: workspaceContext.workspace.id },
+    where: canAccessAllWorkspaces(workspaceContext)
+      ? { id: { in: taskIds } }
+      : { id: { in: taskIds }, workspaceId: workspaceContext.workspace.id },
     include: { analysisRuns: { orderBy: { createdAt: "desc" }, take: 1 } }
   });
 

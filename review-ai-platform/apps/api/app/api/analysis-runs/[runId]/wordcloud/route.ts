@@ -9,7 +9,7 @@ export async function GET(request: Request, context: { params: Promise<{ runId: 
     return workspaceContext.response;
   }
   const { workspace } = workspaceContext;
-  const scoped = await requireScopedRun(runId, workspace.id);
+  const scoped = await requireScopedRun(runId, workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response) {
     return scoped.response;
   }

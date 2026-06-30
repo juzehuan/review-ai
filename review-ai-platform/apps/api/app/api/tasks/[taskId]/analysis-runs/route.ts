@@ -4,7 +4,7 @@ import { fail, ok } from "@/lib/http";
 import { serializeRun } from "@/lib/serializers";
 import { defaultAiSetting, resolveApiKey } from "@/lib/ai-settings";
 import { getPlatformAiSetting } from "@/lib/platform-settings";
-import { assertRunQuota, getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
+import { assertRunQuota, canBypassQuota, getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function GET(request: Request, context: { params: Promise<{ taskId: string }> }) {
   const { taskId } = await context.params;
@@ -13,7 +13,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     return workspaceContext.response;
   }
   const { workspace } = workspaceContext;
-  const scoped = await requireScopedTask(taskId, workspace.id);
+  const scoped = await requireScopedTask(taskId, workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response) {
     return scoped.response;
   }
@@ -36,13 +36,15 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     return roleResponse;
   }
   const { workspace } = workspaceContext;
-  const scoped = await requireScopedTask(taskId, workspace.id);
+  const scoped = await requireScopedTask(taskId, workspace.id, workspaceContext.user?.isSuperAdmin);
 
   if (scoped.response || !scoped.task) {
     return scoped.response;
   }
 
-  const quotaResponse = await assertRunQuota(workspace.id);
+  const quotaUnlimited = canBypassQuota(workspaceContext);
+  const quotaWorkspaceId = scoped.task.workspaceId || workspace.id;
+  const quotaResponse = await assertRunQuota(quotaWorkspaceId, quotaUnlimited);
   if (quotaResponse) {
     return quotaResponse;
   }
@@ -80,14 +82,16 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       data: { status: "analyzing" }
     });
 
-    await tx.subscription.update({
-      where: { workspaceId: workspace.id },
-      data: {
-        currentPeriodRunCount: {
-          increment: 1
+    if (!quotaUnlimited) {
+      await tx.subscription.update({
+        where: { workspaceId: quotaWorkspaceId },
+        data: {
+          currentPeriodRunCount: {
+            increment: 1
+          }
         }
-      }
-    });
+      });
+    }
 
     return createdRun;
   });
@@ -95,7 +99,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
   await getAnalysisQueue().add("run-analysis", {
     runId: run.id,
     taskId,
-    workspaceId: workspace.id
+    workspaceId: quotaWorkspaceId
   });
 
   await prisma.analysisRunLog.create({

@@ -56,7 +56,7 @@
       <a-tab-pane key="users" tab="用户与配额">
         <div class="table-shell">
           <div class="table-title">用户管理</div>
-          <a-table :columns="userColumns" :data-source="users" :loading="loading" row-key="id" :scroll="{ x: 1120 }">
+          <a-table :columns="userColumns" :data-source="users" :loading="loading" row-key="id" :scroll="{ x: 1360 }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'user'">
                 <div class="member-cell">
@@ -76,8 +76,19 @@
                   @change="(checked: unknown) => saveUser(record, { isSuperAdmin: Boolean(checked) })"
                 />
               </template>
+              <template v-else-if="column.key === 'status'">
+                <a-switch
+                  :checked="record.isActive"
+                  checked-children="启用"
+                  un-checked-children="禁用"
+                  :disabled="record.id === currentUser?.id"
+                  :loading="savingUserId === record.id"
+                  @change="(checked: unknown) => saveUser(record, { isActive: Boolean(checked) }, '用户状态已更新')"
+                />
+              </template>
               <template v-else-if="column.key === 'quota'">
-                <div class="quota-editor">
+                <a-tag v-if="record.isSuperAdmin" color="purple">超管不限额</a-tag>
+                <div v-else class="quota-editor">
                   <a-input-number
                     :value="record.monthlyReviewLimit"
                     :min="0"
@@ -98,7 +109,10 @@
                 </div>
               </template>
               <template v-else-if="column.key === 'usage'">
-                <div class="usage-cell">
+                <div v-if="record.isSuperAdmin" class="usage-cell">
+                  <span>不限额</span>
+                </div>
+                <div v-else class="usage-cell">
                   <span>{{ record.currentPeriodReviewCount }}/{{ record.monthlyReviewLimit }} 评论</span>
                   <a-progress :percent="reviewPercent(record)" size="small" :show-info="false" />
                   <span>{{ record.currentPeriodRunCount }}/{{ record.monthlyRunLimit }} 分析</span>
@@ -107,6 +121,16 @@
               <template v-else-if="column.key === 'inviteCode'">
                 <a-tag v-if="record.inviteCode" color="blue">{{ record.inviteCode }}</a-tag>
                 <span v-else class="muted">无</span>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <a-popconfirm
+                  title="确定将该用户密码重置为 123456？"
+                  ok-text="重置"
+                  cancel-text="取消"
+                  @confirm="resetPassword(record)"
+                >
+                  <a-button size="small" :loading="savingUserId === record.id">重置密码</a-button>
+                </a-popconfirm>
               </template>
             </template>
           </a-table>
@@ -203,8 +227,10 @@ import {
   fetchAdminOverview,
   fetchAdminUsers,
   fetchInviteCodes,
+  resetAdminUserPassword,
   updateAdminUser
 } from "@/api";
+import { useTaskStore } from "@/composables";
 import { copyTextToClipboard } from "@/utils/clipboard";
 
 const loading = ref(false);
@@ -218,6 +244,7 @@ const inviteCodes = ref<InviteCodeDTO[]>([]);
 const forbidden = ref(false);
 const savingUserId = ref("");
 const quotaDrafts = reactive<Record<string, { monthlyReviewLimit: number; monthlyRunLimit: number }>>({});
+const { currentUser } = useTaskStore();
 
 const userForm = reactive({
   name: "",
@@ -240,10 +267,12 @@ const inviteForm = reactive<{
 const userColumns = [
   { title: "用户", key: "user", width: 280 },
   { title: "后台权限", key: "role", width: 150 },
+  { title: "账号状态", key: "status", width: 130 },
   { title: "配额调整", key: "quota", width: 390 },
   { title: "本期用量", key: "usage", width: 230 },
   { title: "注册邀请码", key: "inviteCode", width: 180 },
-  { title: "创建时间", dataIndex: "createdAt", key: "createdAt", width: 210 }
+  { title: "创建时间", dataIndex: "createdAt", key: "createdAt", width: 210 },
+  { title: "操作", key: "actions", width: 130, fixed: "right" }
 ];
 
 const inviteColumns = [
@@ -311,14 +340,33 @@ function updateDraft(userId: string, key: "monthlyReviewLimit" | "monthlyRunLimi
   };
 }
 
-async function saveUser(record: AdminUserDTO, patch: { isSuperAdmin?: boolean }) {
+function readErrorMessage(error: unknown, fallback: string) {
+  if (axios.isAxiosError(error) && typeof error.response?.data?.message === "string") {
+    return error.response.data.message;
+  }
+  return fallback;
+}
+
+async function saveUser(record: AdminUserDTO, patch: { isSuperAdmin?: boolean; isActive?: boolean }, successMessage = "用户权限已更新") {
   savingUserId.value = record.id;
   try {
     const updated = await updateAdminUser(record.id, patch);
     users.value = users.value.map((item) => (item.id === updated.id ? updated : item));
-    message.success("用户权限已更新");
-  } catch {
-    message.error("用户权限更新失败");
+    message.success(successMessage);
+  } catch (error) {
+    message.error(readErrorMessage(error, "用户信息更新失败"));
+  } finally {
+    savingUserId.value = "";
+  }
+}
+
+async function resetPassword(record: AdminUserDTO) {
+  savingUserId.value = record.id;
+  try {
+    const result = await resetAdminUserPassword(record.id);
+    message.success(`密码已重置为 ${result.password}`);
+  } catch (error) {
+    message.error(readErrorMessage(error, "密码重置失败"));
   } finally {
     savingUserId.value = "";
   }
@@ -354,7 +402,7 @@ async function submitUser() {
   saving.value = true;
   try {
     await createAdminUser({ ...userForm });
-    message.success("用户已保存");
+    message.success("用户已保存，初始密码为 123456");
     userModalOpen.value = false;
     await load();
   } catch {

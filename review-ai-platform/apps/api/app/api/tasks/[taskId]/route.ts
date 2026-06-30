@@ -1,7 +1,7 @@
 import { prisma } from "@review-ai/db";
 import { fail, ok } from "@/lib/http";
 import { serializeRun, serializeTask } from "@/lib/serializers";
-import { getWorkspaceContext, requireWorkspaceRole, taskWorkspaceWhere } from "@/lib/workspace";
+import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole, taskWorkspaceWhere } from "@/lib/workspace";
 
 export async function GET(request: Request, context: { params: Promise<{ taskId: string }> }) {
   const { taskId } = await context.params;
@@ -10,9 +10,10 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     return workspaceContext.response;
   }
   const { workspace } = workspaceContext;
+  const allowGlobalAccess = canAccessAllWorkspaces(workspaceContext);
 
   const task = await prisma.task.findFirst({
-    where: taskWorkspaceWhere(taskId, workspace.id),
+    where: allowGlobalAccess ? { id: taskId } : taskWorkspaceWhere(taskId, workspace.id),
     include: {
       analysisRuns: {
         orderBy: { createdAt: "desc" },
@@ -48,7 +49,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ task
   }
 
   const task = await prisma.task.findFirst({
-    where: taskWorkspaceWhere(taskId, workspaceContext.workspace.id),
+    where: canAccessAllWorkspaces(workspaceContext) ? { id: taskId } : taskWorkspaceWhere(taskId, workspaceContext.workspace.id),
     include: {
       analysisRuns: {
         where: { status: { in: ["queued", "running"] } },

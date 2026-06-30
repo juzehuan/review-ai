@@ -14,6 +14,7 @@ const RegisterPage = () => import("./pages/RegisterPage.vue");
 const SharedReportPage = () => import("./pages/SharedReportPage.vue");
 const WorkspaceSettingsPage = () => import("./pages/WorkspaceSettingsPage.vue");
 const HelpCenterPage = () => import("./pages/HelpCenterPage.vue");
+const AccountSettingsPage = () => import("./pages/AccountSettingsPage.vue");
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -33,6 +34,7 @@ export const router = createRouter({
     { path: "/analysis-runs", component: AnalysisRunsPage },
     { path: "/crawl-jobs", component: CrawlJobsPage },
     { path: "/help", component: HelpCenterPage },
+    { path: "/account", component: AccountSettingsPage },
     { path: "/users", redirect: "/admin" },
     { path: "/settings", redirect: "/settings/ai" },
     { path: "/settings/workspace", redirect: "/settings/ai" },

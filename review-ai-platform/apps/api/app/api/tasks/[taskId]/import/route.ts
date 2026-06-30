@@ -2,7 +2,7 @@ import { Prisma, prisma } from "@review-ai/db";
 import type { AppendImportResponse } from "@review-ai/shared";
 import { parseReviewFile } from "@/lib/csv";
 import { fail, ok } from "@/lib/http";
-import { assertReviewQuota, getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
+import { assertReviewQuota, canBypassQuota, getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function POST(request: Request, context: { params: Promise<{ taskId: string }> }) {
   const { taskId } = await context.params;
@@ -17,7 +17,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
   }
 
   const { workspace } = workspaceContext;
-  const scoped = await requireScopedTask(taskId, workspace.id);
+  const scoped = await requireScopedTask(taskId, workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response || !scoped.task) {
     return scoped.response;
   }
@@ -75,7 +75,9 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       rawJson: row.rawJson as Prisma.InputJsonValue
     }));
 
-  const quotaResponse = await assertReviewQuota(workspace.id, rowsToCreate.length);
+  const quotaUnlimited = canBypassQuota(workspaceContext);
+  const quotaWorkspaceId = scoped.task.workspaceId || workspace.id;
+  const quotaResponse = await assertReviewQuota(quotaWorkspaceId, rowsToCreate.length, quotaUnlimited);
   if (quotaResponse) {
     return quotaResponse;
   }
@@ -99,10 +101,12 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       : { count: 0 };
 
     if (inserted.count > 0) {
-      await tx.subscription.update({
-        where: { workspaceId: workspace.id },
-        data: { currentPeriodReviewCount: { increment: inserted.count } }
-      });
+      if (!quotaUnlimited) {
+        await tx.subscription.update({
+          where: { workspaceId: quotaWorkspaceId },
+          data: { currentPeriodReviewCount: { increment: inserted.count } }
+        });
+      }
       await tx.task.update({
         where: { id: taskId },
         data: { status: "imported" }

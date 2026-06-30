@@ -206,6 +206,7 @@ const navSections = computed<NavSection[]>(() => [
       { path: "/growth", label: t("nav.growthOps"), disabled: false, icon: RiseOutlined },
       { path: "/crawl-jobs", label: t("nav.reviewCollection"), disabled: false, icon: CloudDownloadOutlined },
       { path: "/analysis-runs", label: t("nav.analysisRuns"), disabled: false, icon: UnorderedListOutlined },
+      { path: "/account", label: t("nav.accountSettings"), disabled: false, icon: LockOutlined },
       { path: "/help", label: t("nav.helpCenter"), disabled: false, icon: QuestionCircleOutlined }
     ]
   },
@@ -236,6 +237,9 @@ const navSections = computed<NavSection[]>(() => [
 const isPublicRoute = computed(() => Boolean(route.meta.public));
 const appDeviceClass = computed(() => `app-device-${deviceKind.value}`);
 const usageText = computed(() => {
+  if (currentUser.value?.isSuperAdmin) {
+    return t("common.unlimited");
+  }
   if (!workspace.value) {
     return "0/0";
   }
@@ -243,6 +247,9 @@ const usageText = computed(() => {
 });
 
 const runUsageText = computed(() => {
+  if (currentUser.value?.isSuperAdmin) {
+    return t("common.unlimited");
+  }
   if (!workspace.value) {
     return "0/0";
   }
@@ -250,6 +257,9 @@ const runUsageText = computed(() => {
 });
 
 const usagePercent = computed(() => {
+  if (currentUser.value?.isSuperAdmin) {
+    return 0;
+  }
   if (!workspace.value?.monthlyReviewLimit) {
     return 0;
   }
@@ -280,6 +290,9 @@ const pageTitle = computed(() => {
   }
   if (route.path === "/help") {
     return t("nav.helpCenter");
+  }
+  if (route.path === "/account") {
+    return t("nav.accountSettings");
   }
   return t("nav.userBackend");
 });

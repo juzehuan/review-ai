@@ -1173,7 +1173,8 @@ select {
 .table-shell {
   padding: 12px;
   overflow: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
 }
 
 .review-mobile-list {
@@ -1350,6 +1351,17 @@ select {
 
 .table-comment-link {
   color: #175cff;
+}
+
+.table-comment-id {
+  display: block;
+  max-width: 96px;
+  overflow: hidden;
+  color: #697386;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .member-cell {

@@ -25,6 +25,22 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     return fail("用户不存在", 404);
   }
 
+  const nextIsActive = typeof body.isActive === "boolean" ? body.isActive : user.isActive;
+  const nextIsSuperAdmin = typeof body.isSuperAdmin === "boolean" ? body.isSuperAdmin : user.isSuperAdmin;
+
+  if (auth.user?.id === userId && !nextIsActive) {
+    return fail("不能禁用当前登录账号", 400);
+  }
+
+  if (user.isSuperAdmin && (!nextIsActive || !nextIsSuperAdmin)) {
+    const activeSuperAdminCount = await prisma.user.count({
+      where: { isSuperAdmin: true, isActive: true }
+    });
+    if (activeSuperAdminCount <= 1) {
+      return fail("至少保留一个启用中的超管账号", 400);
+    }
+  }
+
   const workspace = await ensurePersonalWorkspace(prisma, user);
   const currentSubscription =
     workspace.subscription ||
@@ -33,14 +49,19 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     }));
 
   await prisma.$transaction(async (tx) => {
-    if (typeof body.name === "string" || typeof body.isSuperAdmin === "boolean") {
+    if (typeof body.name === "string" || typeof body.isSuperAdmin === "boolean" || typeof body.isActive === "boolean") {
       await tx.user.update({
         where: { id: userId },
         data: {
           ...(typeof body.name === "string" && body.name.trim() ? { name: body.name.trim() } : {}),
-          ...(typeof body.isSuperAdmin === "boolean" ? { isSuperAdmin: body.isSuperAdmin } : {})
+          ...(typeof body.isSuperAdmin === "boolean" ? { isSuperAdmin: body.isSuperAdmin } : {}),
+          ...(typeof body.isActive === "boolean" ? { isActive: body.isActive } : {})
         }
       });
+
+      if (body.isActive === false) {
+        await tx.authSession.deleteMany({ where: { userId } });
+      }
     }
 
     await tx.subscription.update({

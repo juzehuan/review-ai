@@ -18,7 +18,7 @@ export async function PATCH(
     return roleResponse;
   }
 
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response) {
     return scoped.response;
   }

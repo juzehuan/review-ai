@@ -1,6 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { fail, ok } from "@/lib/http";
-import { requireSuperAdmin } from "@/lib/auth";
+import { DEFAULT_RESET_PASSWORD, hashPassword, requireSuperAdmin } from "@/lib/auth";
 import { ensurePersonalWorkspace } from "@/lib/personal-workspace";
 import { serializeAdminUser } from "@/lib/serializers";
 
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   const user = await prisma.user.upsert({
     where: { email },
     update: { name, isSuperAdmin },
-    create: { email, name, isSuperAdmin }
+    create: { email, name, isSuperAdmin, isActive: true, passwordHash: hashPassword(DEFAULT_RESET_PASSWORD) }
   });
   await ensurePersonalWorkspace(prisma, user);
 

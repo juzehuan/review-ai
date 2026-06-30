@@ -107,28 +107,38 @@ export function taskWorkspaceWhere(taskId: string, workspaceId: string) {
   };
 }
 
-export async function getScopedTask(taskId: string, workspaceId: string) {
+export function canAccessAllWorkspaces(context: Pick<WorkspaceContext, "user">) {
+  return Boolean(context.user?.isSuperAdmin);
+}
+
+export function canBypassQuota(context: Pick<WorkspaceContext, "user">) {
+  return Boolean(context.user?.isSuperAdmin);
+}
+
+export async function getScopedTask(taskId: string, workspaceId: string, allowGlobalAccess = false) {
   return prisma.task.findFirst({
-    where: taskWorkspaceWhere(taskId, workspaceId)
+    where: allowGlobalAccess ? { id: taskId } : taskWorkspaceWhere(taskId, workspaceId)
   });
 }
 
-export async function requireScopedTask(taskId: string, workspaceId: string) {
-  const task = await getScopedTask(taskId, workspaceId);
+export async function requireScopedTask(taskId: string, workspaceId: string, allowGlobalAccess = false) {
+  const task = await getScopedTask(taskId, workspaceId, allowGlobalAccess);
   if (!task) {
     return { task: null, response: fail("任务不存在或不属于当前工作空间", 404) };
   }
   return { task, response: null };
 }
 
-export async function requireScopedRun(runId: string, workspaceId: string) {
+export async function requireScopedRun(runId: string, workspaceId: string, allowGlobalAccess = false) {
   const run = await prisma.analysisRun.findFirst({
-    where: {
-      id: runId,
-      task: {
-        workspaceId
-      }
-    }
+    where: allowGlobalAccess
+      ? { id: runId }
+      : {
+          id: runId,
+          task: {
+            workspaceId
+          }
+        }
   });
 
   if (!run) {
@@ -138,7 +148,11 @@ export async function requireScopedRun(runId: string, workspaceId: string) {
   return { run, response: null };
 }
 
-export async function assertReviewQuota(workspaceId: string, incomingReviewCount: number) {
+export async function assertReviewQuota(workspaceId: string, incomingReviewCount: number, bypassQuota = false) {
+  if (bypassQuota) {
+    return null;
+  }
+
   const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
   if (!subscription) {
     return null;
@@ -152,7 +166,11 @@ export async function assertReviewQuota(workspaceId: string, incomingReviewCount
   return null;
 }
 
-export async function assertRunQuota(workspaceId: string) {
+export async function assertRunQuota(workspaceId: string, bypassQuota = false) {
+  if (bypassQuota) {
+    return null;
+  }
+
   const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
   if (!subscription) {
     return null;

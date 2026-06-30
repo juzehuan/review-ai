@@ -37,11 +37,21 @@ import type {
 import type { InviteCode } from "@review-ai/db";
 import { parseCrawlerChannels } from "@/lib/crawler-settings";
 
-export function serializeTask(task: Task & { analysisRuns?: AnalysisRun[] }): TaskListItem {
+export function serializeTask(
+  task: Task & {
+    analysisRuns?: AnalysisRun[];
+    workspace?: (Workspace & { memberships?: Array<WorkspaceMember & { user: User }> }) | null;
+  }
+): TaskListItem {
   const latestRun = task.analysisRuns?.[0] || null;
+  const ownerMember = task.workspace?.memberships?.find((member) => member.role === "owner") || task.workspace?.memberships?.[0] || null;
   return {
     id: task.id,
     workspaceId: task.workspaceId,
+    workspaceName: task.workspace?.name || null,
+    workspaceSlug: task.workspace?.slug || null,
+    workspaceOwnerName: ownerMember?.user.name || null,
+    workspaceOwnerEmail: ownerMember?.user.email || null,
     name: task.name,
     productName: task.productName,
     shopId: task.shopId,
@@ -84,6 +94,7 @@ export function serializeUser(user: User): UserDTO {
     email: user.email,
     name: user.name,
     isSuperAdmin: user.isSuperAdmin,
+    isActive: user.isActive,
     createdAt: user.createdAt.toISOString()
   };
 }

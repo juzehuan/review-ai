@@ -26,7 +26,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     return workspaceContext.response;
   }
 
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response || !scoped.task) {
     return scoped.response;
   }

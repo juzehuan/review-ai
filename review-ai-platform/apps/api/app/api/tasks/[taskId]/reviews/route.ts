@@ -12,7 +12,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     return workspaceContext.response;
   }
   const { workspace } = workspaceContext;
-  const scoped = await requireScopedTask(taskId, workspace.id);
+  const scoped = await requireScopedTask(taskId, workspace.id, workspaceContext.user?.isSuperAdmin);
   if (scoped.response) {
     return scoped.response;
   }

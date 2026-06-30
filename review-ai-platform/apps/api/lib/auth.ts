@@ -3,6 +3,7 @@ import { prisma } from "@review-ai/db";
 import { fail } from "@/lib/http";
 
 const SESSION_DAYS = 14;
+export const DEFAULT_RESET_PASSWORD = "123456";
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -64,6 +65,10 @@ export async function getCurrentUser(request: Request) {
   });
 
   if (!session || session.expiresAt.getTime() < Date.now()) {
+    return null;
+  }
+
+  if (!session.user.isActive) {
     return null;
   }
 

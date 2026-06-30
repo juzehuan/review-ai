@@ -15,13 +15,14 @@ export async function DELETE(request: Request, context: { params: Promise<{ task
     return roleResponse;
   }
 
-  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id);
-  if (scoped.response) {
+  const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
+  if (scoped.response || !scoped.task) {
     return scoped.response;
   }
+  const taskWorkspaceId = scoped.task.workspaceId || workspaceContext.workspace.id;
 
   const existing = await prisma.reportShare.findFirst({
-    where: { id: shareId, taskId, workspaceId: workspaceContext.workspace.id }
+    where: { id: shareId, taskId, workspaceId: taskWorkspaceId }
   });
   if (!existing) {
     return fail("分享链接不存在或不属于当前任务。", 404);

@@ -34,12 +34,12 @@
       </section>
       <section class="settings-panel">
         <div class="panel-label">评论额度</div>
-        <div class="settings-title">{{ workspace?.currentPeriodReviewCount || 0 }}/{{ workspace?.monthlyReviewLimit || 0 }}</div>
+        <div class="settings-title">{{ reviewUsageLabel }}</div>
         <a-progress :percent="reviewUsagePercent" size="small" />
       </section>
       <section class="settings-panel">
         <div class="panel-label">分析次数</div>
-        <div class="settings-title">{{ workspace?.currentPeriodRunCount || 0 }}/{{ workspace?.monthlyRunLimit || 0 }}</div>
+        <div class="settings-title">{{ runUsageLabel }}</div>
         <a-progress :percent="runUsagePercent" size="small" />
       </section>
     </div>
@@ -516,6 +516,9 @@ const activeInsightsPrompt = computed({
 });
 
 const reviewUsagePercent = computed(() => {
+  if (currentUser.value?.isSuperAdmin) {
+    return 0;
+  }
   if (!workspace.value?.monthlyReviewLimit) {
     return 0;
   }
@@ -526,11 +529,26 @@ const reviewUsagePercent = computed(() => {
 });
 
 const runUsagePercent = computed(() => {
+  if (currentUser.value?.isSuperAdmin) {
+    return 0;
+  }
   if (!workspace.value?.monthlyRunLimit) {
     return 0;
   }
   return Math.min(Math.round((workspace.value.currentPeriodRunCount / workspace.value.monthlyRunLimit) * 100), 100);
 });
+
+const reviewUsageLabel = computed(() =>
+  currentUser.value?.isSuperAdmin
+    ? "不限额"
+    : `${workspace.value?.currentPeriodReviewCount || 0}/${workspace.value?.monthlyReviewLimit || 0}`
+);
+
+const runUsageLabel = computed(() =>
+  currentUser.value?.isSuperAdmin
+    ? "不限额"
+    : `${workspace.value?.currentPeriodRunCount || 0}/${workspace.value?.monthlyRunLimit || 0}`
+);
 
 const columns = [
   { title: "空间", key: "name", width: 320 },

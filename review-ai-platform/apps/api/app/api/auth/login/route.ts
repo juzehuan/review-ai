@@ -18,6 +18,9 @@ export async function POST(request: Request) {
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return fail("邮箱或密码错误", 401);
   }
+  if (!user.isActive) {
+    return fail("账号已被禁用，请联系管理员", 403);
+  }
 
   const workspace = await ensurePersonalWorkspace(prisma, user);
 

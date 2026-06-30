@@ -12,6 +12,7 @@ export interface UserDTO {
   email: string;
   name: string;
   isSuperAdmin: boolean;
+  isActive: boolean;
   createdAt: string;
 }
 
@@ -46,6 +47,10 @@ export interface AuthResponseDTO {
 export interface TaskListItem {
   id: string;
   workspaceId: string | null;
+  workspaceName?: string | null;
+  workspaceSlug?: string | null;
+  workspaceOwnerName?: string | null;
+  workspaceOwnerEmail?: string | null;
   name: string;
   productName: string;
   shopId: string;
