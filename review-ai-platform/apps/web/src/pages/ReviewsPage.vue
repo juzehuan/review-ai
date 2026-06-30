@@ -351,7 +351,7 @@ import {
   StarOutlined,
   StopOutlined
 } from "@ant-design/icons-vue";
-import type { AnalysisRunDTO, ReviewActionItemDTO, ReviewListFacetsDTO, ReviewRowDTO, SavedReviewViewDTO, Sentiment } from "@review-ai/shared";
+import type { AnalysisRunDTO, ReviewActionItemDTO, ReviewListFacetsDTO, ReviewListStatsDTO, ReviewRowDTO, SavedReviewViewDTO, Sentiment } from "@review-ai/shared";
 import {
   cancelRun,
   createActionItem,
@@ -413,6 +413,7 @@ type SavedView = {
 
 const DEFAULT_VIEW_ID = "all-comments";
 const EMPTY_REVIEW_FACETS: ReviewListFacetsDTO = { sourceChannels: [], intentLabels: [], analysisTags: [] };
+const EMPTY_REVIEW_STATS: ReviewListStatsDTO = { mediaCount: 0, negativeCount: 0 };
 const route = useRoute();
 const router = useRouter();
 const { selectedTask, setSelectedTask } = useTaskStore();
@@ -420,6 +421,7 @@ const loading = ref(false);
 const running = ref(false);
 const rows = ref<ReviewRowDTO[]>([]);
 const reviewFacets = ref<ReviewListFacetsDTO>({ ...EMPTY_REVIEW_FACETS });
+const reviewStats = ref<ReviewListStatsDTO>({ ...EMPTY_REVIEW_STATS });
 const allRuns = ref<AnalysisRunDTO[]>([]);
 const latestRun = ref<AnalysisRunDTO | null>(null);
 const selectedResultRunId = ref<string | undefined>();
@@ -499,8 +501,8 @@ const sourceChannelOptions = computed(() =>
     .sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))
 );
 const totalCount = computed(() => pagination.total || 0);
-const mediaCount = computed(() => rows.value.filter((item) => item.hasMedia).length);
-const negativeCount = computed(() => rows.value.filter((item) => item.sentiment === "negative").length);
+const mediaCount = computed(() => reviewStats.value.mediaCount);
+const negativeCount = computed(() => reviewStats.value.negativeCount);
 const visibleColumns = computed(() => allColumns.filter((column) => visibleColumnKeys.value.includes(column.key)));
 const advancedFilterCount = computed(() =>
   [filters.ratingStar, filters.hasMedia, filters.sourceChannel, filters.analysisTag].filter((value) => value !== undefined && value !== "").length
@@ -938,6 +940,7 @@ async function loadReviews() {
   if (!selectedTask.value) {
     rows.value = [];
     reviewFacets.value = { ...EMPTY_REVIEW_FACETS };
+    reviewStats.value = { ...EMPTY_REVIEW_STATS };
     pagination.total = 0;
     return;
   }
@@ -964,6 +967,11 @@ async function loadReviews() {
     });
     rows.value = result.items;
     reviewFacets.value = result.facets || { ...EMPTY_REVIEW_FACETS };
+    reviewStats.value =
+      result.stats || {
+        mediaCount: result.items.filter((item) => item.hasMedia).length,
+        negativeCount: result.items.filter((item) => item.sentiment === "negative").length
+      };
     pagination.total = result.total;
     if (viewMode.value === "grouped") {
       pagination.current = 1;

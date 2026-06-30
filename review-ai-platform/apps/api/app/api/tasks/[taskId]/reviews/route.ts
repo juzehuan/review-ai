@@ -1,5 +1,5 @@
 import { Prisma, prisma } from "@review-ai/db";
-import type { ReviewListFacetsDTO, ReviewListResponseDTO } from "@review-ai/shared";
+import type { ReviewListFacetsDTO, ReviewListResponseDTO, ReviewListStatsDTO } from "@review-ai/shared";
 import { ok } from "@/lib/http";
 import { findAnalysisRunForResults } from "@/lib/analysis-runs";
 import { buildKeywordReviewWhere } from "@/lib/review-filters";
@@ -54,7 +54,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const hasAnalysisFilter = Boolean(sentiment || issue || intent || tag || needsAttention !== null);
   if (hasAnalysisFilter && !run) {
     const facets = buildReviewFacets(await sourceChannelRowsPromise, []);
-    return ok<ReviewListResponseDTO>({ total: 0, page, pageSize, items: [], facets });
+    return ok<ReviewListResponseDTO>({ total: 0, page, pageSize, items: [], facets, stats: emptyReviewStats() });
   }
 
   const baseWhere: Prisma.ReviewWhereInput = {
@@ -67,24 +67,41 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     ...(keyword ? buildKeywordReviewWhere(keyword, run?.id) : {})
   };
 
-  const analysisFilter: Prisma.ReviewAnalysisWhereInput | null = run
+  const baseAnalysisFilter: Prisma.ReviewAnalysisWhereInput | null = run
     ? {
         runId: run.id,
-        ...(sentiment ? { sentiment: sentiment as never } : {}),
         ...(issue ? { painPoints: { has: issue } } : {}),
         ...(intent ? { intentLabels: { has: intent } } : {}),
         ...(tag ? { topicLabels: { has: tag } } : {}),
         ...(needsAttention !== null ? { needsAttention: needsAttention === "true" } : {})
       }
     : null;
+  const analysisFilter: Prisma.ReviewAnalysisWhereInput | null = baseAnalysisFilter
+    ? {
+        ...baseAnalysisFilter,
+        ...(sentiment ? { sentiment: sentiment as never } : {})
+      }
+    : null;
   const analysisWhere: Prisma.ReviewAnalysisWhereInput | null = analysisFilter
     ? { ...analysisFilter, review: baseWhere }
     : null;
+  const reviewWhere: Prisma.ReviewWhereInput = {
+    ...baseWhere,
+    ...(analysisFilter ? { analyses: { some: analysisFilter } } : {})
+  };
+  const statsPromise = readReviewListStats({
+    baseWhere,
+    reviewWhere,
+    baseAnalysisFilter,
+    sentiment,
+    hasMedia
+  });
 
   if (sortBy === "sentimentScore" && analysisWhere) {
-    const [sourceChannelRows, analysisFacetRows, total, analyses] = await Promise.all([
+    const [sourceChannelRows, analysisFacetRows, stats, total, analyses] = await Promise.all([
       sourceChannelRowsPromise,
       analysisFacetRowsPromise,
+      statsPromise,
       prisma.reviewAnalysis.count({ where: analysisWhere }),
       prisma.reviewAnalysis.findMany({
         where: analysisWhere,
@@ -100,20 +117,18 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
       page,
       pageSize,
       facets: buildReviewFacets(sourceChannelRows, analysisFacetRows),
+      stats,
       items: analyses.map((analysis) => serializeReviewRow({ ...analysis.review, analyses: [analysis] }))
     });
   }
 
-  const reviewWhere: Prisma.ReviewWhereInput = {
-    ...baseWhere,
-    ...(analysisFilter ? { analyses: { some: analysisFilter } } : {})
-  };
   const orderBy: Prisma.ReviewOrderByWithRelationInput =
     sortBy === "ratingStar" ? { ratingStar: sortOrder } : { commentTime: sortOrder };
 
-  const [sourceChannelRows, analysisFacetRows, total, reviews] = await Promise.all([
+  const [sourceChannelRows, analysisFacetRows, stats, total, reviews] = await Promise.all([
     sourceChannelRowsPromise,
     analysisFacetRowsPromise,
+    statsPromise,
     prisma.review.count({ where: reviewWhere }),
     prisma.review.findMany({
       where: reviewWhere,
@@ -132,8 +147,51 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     page,
     pageSize,
     facets: buildReviewFacets(sourceChannelRows, analysisFacetRows),
+    stats,
     items: reviews.map(serializeReviewRow)
   });
+}
+
+function emptyReviewStats(): ReviewListStatsDTO {
+  return { mediaCount: 0, negativeCount: 0 };
+}
+
+async function readReviewListStats({
+  baseWhere,
+  reviewWhere,
+  baseAnalysisFilter,
+  sentiment,
+  hasMedia
+}: {
+  baseWhere: Prisma.ReviewWhereInput;
+  reviewWhere: Prisma.ReviewWhereInput;
+  baseAnalysisFilter: Prisma.ReviewAnalysisWhereInput | null;
+  sentiment: string | null;
+  hasMedia: string | null;
+}): Promise<ReviewListStatsDTO> {
+  const mediaCountPromise =
+    hasMedia !== null && hasMedia !== "true"
+      ? Promise.resolve(0)
+      : prisma.review.count({
+          where: {
+            ...reviewWhere,
+            hasMedia: true
+          }
+        });
+
+  const negativeCountPromise =
+    !baseAnalysisFilter || (sentiment && sentiment !== "negative")
+      ? Promise.resolve(0)
+      : prisma.reviewAnalysis.count({
+          where: {
+            ...baseAnalysisFilter,
+            sentiment: "negative",
+            review: baseWhere
+          }
+        });
+
+  const [mediaCount, negativeCount] = await Promise.all([mediaCountPromise, negativeCountPromise]);
+  return { mediaCount, negativeCount };
 }
 
 function buildReviewFacets(

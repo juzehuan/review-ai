@@ -742,12 +742,18 @@ export interface ReviewListFacetsDTO {
   analysisTags: string[];
 }
 
+export interface ReviewListStatsDTO {
+  mediaCount: number;
+  negativeCount: number;
+}
+
 export interface ReviewListResponseDTO {
   total: number;
   page: number;
   pageSize: number;
   items: ReviewRowDTO[];
   facets: ReviewListFacetsDTO;
+  stats: ReviewListStatsDTO;
 }
 
 export interface ProductInsightsDTO {
