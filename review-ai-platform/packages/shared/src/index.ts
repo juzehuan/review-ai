@@ -133,8 +133,20 @@ export interface QueueSnapshotDTO {
   error: string | null;
 }
 
+export interface WorkloadHealthSnapshotDTO {
+  name: string;
+  label: string;
+  queued: number;
+  running: number;
+  failed: number;
+  stalled: number;
+  oldestActiveCreatedAt: string | null;
+  lastFailureAt: string | null;
+}
+
 export interface QueueHealthDTO {
   queues: QueueSnapshotDTO[];
+  workloads: WorkloadHealthSnapshotDTO[];
   updatedAt: string;
 }
 

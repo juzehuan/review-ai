@@ -179,6 +179,26 @@
               <a-tag v-else :color="queue.isPaused ? 'orange' : 'green'">{{ queue.isPaused ? "已暂停" : "消费中" }}</a-tag>
             </div>
           </div>
+          <div class="table-title workload-title">数据库任务健康</div>
+          <div class="summary-grid">
+            <div
+              v-for="workload in queueHealth?.workloads || []"
+              :key="workload.name"
+              class="stat-card"
+              :class="workload.stalled || workload.failed ? 'stat-card-alert' : 'stat-card-success'"
+            >
+              <div class="stat-label">{{ workload.label }}</div>
+              <div class="stat-value">{{ workload.queued + workload.running }}</div>
+              <div class="stat-note">
+                排队 {{ workload.queued }} · 运行 {{ workload.running }} · 失败 {{ workload.failed }} · 疑似卡住 {{ workload.stalled }}
+              </div>
+              <div class="member-email">最早活跃：{{ formatTime(workload.oldestActiveCreatedAt) }}</div>
+              <div class="member-email">最近失败：{{ formatTime(workload.lastFailureAt) }}</div>
+              <a-tag :color="workloadStatusColor(workload)">
+                {{ workloadStatusLabel(workload) }}
+              </a-tag>
+            </div>
+          </div>
         </div>
       </a-tab-pane>
 
@@ -268,7 +288,14 @@ import { message } from "ant-design-vue";
 import { ArrowLeftOutlined, KeyOutlined, ReloadOutlined, UserAddOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
 import type { Dayjs } from "dayjs";
-import type { AdminOverviewDTO, AdminUserDTO, AuditLogDTO, InviteCodeDTO, QueueHealthDTO } from "@review-ai/shared";
+import type {
+  AdminOverviewDTO,
+  AdminUserDTO,
+  AuditLogDTO,
+  InviteCodeDTO,
+  QueueHealthDTO,
+  WorkloadHealthSnapshotDTO
+} from "@review-ai/shared";
 import {
   fetchAdminAuditLogs,
   fetchAdminQueueHealth,
@@ -428,6 +455,32 @@ function formatTime(value?: string | null) {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
 }
 
+function workloadStatusColor(workload: WorkloadHealthSnapshotDTO) {
+  if (workload.stalled) {
+    return "orange";
+  }
+  if (workload.failed) {
+    return "red";
+  }
+  if (workload.queued || workload.running) {
+    return "blue";
+  }
+  return "green";
+}
+
+function workloadStatusLabel(workload: WorkloadHealthSnapshotDTO) {
+  if (workload.stalled) {
+    return "需要检查";
+  }
+  if (workload.failed) {
+    return "有失败记录";
+  }
+  if (workload.queued || workload.running) {
+    return "处理中";
+  }
+  return "空闲";
+}
+
 function actionLabel(action: string) {
   return (
     {
@@ -581,3 +634,9 @@ function reviewPercent(record: AdminUserDTO) {
 
 onMounted(load);
 </script>
+
+<style scoped>
+.workload-title {
+  margin-top: 18px;
+}
+</style>
