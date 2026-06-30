@@ -747,6 +747,7 @@ export interface DashboardDTO {
   insightClusters: InsightClusterDTO[];
   qualityAlerts: DashboardQualityAlertDTO[];
   contentProfile: ContentProfileDTO;
+  languageProfile: LanguageProfileDTO;
   dynamicContentTags: DynamicContentTagDTO[];
   duplicateProfile: DuplicateCommentProfileDTO;
   wordCloud: WordCloudItemDTO[];
@@ -914,6 +915,17 @@ export interface DuplicateCommentProfileDTO {
   duplicateRate: number;
   largestGroupPercent: number;
   topGroups: DuplicateCommentGroupDTO[];
+}
+
+export type DashboardLanguageKey = "zh" | "th" | "en" | "ja" | "ko" | "mixed" | "unknown";
+
+export interface LanguageProfileDTO {
+  primaryLanguageKey: DashboardLanguageKey;
+  primaryLanguage: string;
+  nonChineseCount: number;
+  nonChineseRate: number;
+  mixedLanguageCount: number;
+  distribution: Array<{ key: DashboardLanguageKey; label: string; count: number; percent: number }>;
 }
 
 export interface ContentProfileDTO {
@@ -1488,6 +1500,73 @@ function sentimentLabelZh(sentiment: Sentiment) {
   return "中性";
 }
 
+const LANGUAGE_LABELS: Record<DashboardLanguageKey, string> = {
+  zh: "中文",
+  th: "泰文",
+  en: "英文/拉丁字母",
+  ja: "日文",
+  ko: "韩文",
+  mixed: "混合语言",
+  unknown: "未知/表情符号"
+};
+
+function detectDashboardLanguage(textValue: string): { key: DashboardLanguageKey; isNonChinese: boolean } {
+  const text = textValue.trim();
+  const counts = [
+    { key: "zh" as const, count: (text.match(/[\u3400-\u9fff]/g) || []).length },
+    { key: "th" as const, count: (text.match(/[\u0e00-\u0e7f]/g) || []).length },
+    { key: "en" as const, count: (text.match(/[a-z]/gi) || []).length },
+    { key: "ja" as const, count: (text.match(/[\u3040-\u30ff]/g) || []).length },
+    { key: "ko" as const, count: (text.match(/[\uac00-\ud7af]/g) || []).length }
+  ]
+    .filter((entry) => entry.count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  if (!counts.length) {
+    return { key: "unknown", isNonChinese: false };
+  }
+
+  const primary = counts[0];
+  const secondary = counts[1];
+  if (secondary && secondary.count >= Math.max(2, primary.count * 0.25)) {
+    return { key: "mixed", isNonChinese: primary.key !== "zh" || counts.some((entry) => entry.key !== "zh") };
+  }
+  return { key: primary.key, isNonChinese: primary.key !== "zh" };
+}
+
+function buildLanguageProfile(analyses: DashboardReviewLike[]): LanguageProfileDTO {
+  const total = analyses.length;
+  const distributionMap = new Map<DashboardLanguageKey, number>();
+  let nonChineseCount = 0;
+
+  for (const item of analyses) {
+    const language = detectDashboardLanguage(item.review.comment || item.review.commentTr || "");
+    distributionMap.set(language.key, (distributionMap.get(language.key) || 0) + 1);
+    if (language.isNonChinese) {
+      nonChineseCount += 1;
+    }
+  }
+
+  const distribution = ([...distributionMap.entries()] as Array<[DashboardLanguageKey, number]>)
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, count]) => ({
+      key,
+      label: LANGUAGE_LABELS[key],
+      count,
+      percent: total ? round((count / total) * 100) : 0
+    }));
+  const primary = distribution[0] || { key: "unknown" as const, label: LANGUAGE_LABELS.unknown, count: 0, percent: 0 };
+
+  return {
+    primaryLanguageKey: primary.key,
+    primaryLanguage: primary.label,
+    nonChineseCount,
+    nonChineseRate: total ? round((nonChineseCount / total) * 100) : 0,
+    mixedLanguageCount: distributionMap.get("mixed") || 0,
+    distribution
+  };
+}
+
 function toRepresentativeReview(item: DashboardReviewLike): RepresentativeReview {
   return {
     reviewId: item.reviewId,
@@ -1623,10 +1702,25 @@ function buildQualityAlerts(params: {
   topicMap: Map<string, number>;
   intentMap: Map<string, number>;
   contentProfile: ContentProfileDTO;
+  languageProfile: LanguageProfileDTO;
   dynamicContentTags: DynamicContentTagDTO[];
   duplicateProfile: DuplicateCommentProfileDTO;
 }): DashboardQualityAlertDTO[] {
-  const { analyses, analysisType, positiveCount, neutralCount, negativeCount, nps, keywordMap, topicMap, intentMap, contentProfile, dynamicContentTags, duplicateProfile } = params;
+  const {
+    analyses,
+    analysisType,
+    positiveCount,
+    neutralCount,
+    negativeCount,
+    nps,
+    keywordMap,
+    topicMap,
+    intentMap,
+    contentProfile,
+    languageProfile,
+    dynamicContentTags,
+    duplicateProfile
+  } = params;
   const total = analyses.length;
   if (!total) {
     return [];
@@ -1660,6 +1754,16 @@ function buildQualityAlerts(params: {
       : analyses.filter((item) =>
           [...item.topicLabels, ...item.keywords].some((word) => commerceNoiseWords.some((noise) => word.includes(noise)))
         ).length;
+
+  if (total >= 20 && languageProfile.nonChineseRate >= 30) {
+    alerts.push({
+      id: "non-chinese-language-mix",
+      level: languageProfile.nonChineseRate >= 60 ? "warning" : "info",
+      title: "非中文评论占比较高",
+      detail: `本次 ${languageProfile.nonChineseRate}% 的评论以非中文或混合语言为主，主语言为${languageProfile.primaryLanguage}。`,
+      recommendation: "建议复核原文语义和任务分析模式，避免仅依赖翻译文本判断情绪、立场或问题标签。"
+    });
+  }
 
   if (analysisType !== "product" && total >= 30 && negativePercent >= 70 && neutralSignalPercent >= 20) {
     alerts.push({
@@ -1979,6 +2083,7 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
   const withMedia = analyses.filter((item) => item.review.hasMedia).length;
   const needsAttentionCount = analyses.filter((item) => item.needsAttention).length;
   const contentProfile = buildContentProfile(analyses, analysisType, lowValueReviewIds);
+  const languageProfile = buildLanguageProfile(analyses);
   const insightClusters = buildInsightClusters(analysesForInsights, analysisType, total);
   const dynamicContentTags = buildDynamicContentTags(analysesForInsights, analysisType, total);
   const qualityAlerts = buildQualityAlerts({
@@ -1992,6 +2097,7 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
     topicMap,
     intentMap,
     contentProfile,
+    languageProfile,
     dynamicContentTags,
     duplicateProfile
   });
@@ -2043,6 +2149,7 @@ export function buildDashboardSnapshot(taskId: string, analyses: DashboardReview
     insightClusters,
     qualityAlerts,
     contentProfile,
+    languageProfile,
     dynamicContentTags,
     duplicateProfile,
     wordCloud: [...keywordMap.entries()]

@@ -72,6 +72,11 @@
           <div class="stat-value">{{ report.dashboard.contentProfile?.valuableCommentCount || 0 }}</div>
           <div class="stat-note">低价值评论 {{ report.dashboard.contentProfile?.lowValueCommentRate || 0 }}% 已降权</div>
         </article>
+        <article class="stat-card stat-card-cool">
+          <div class="stat-label">语言画像</div>
+          <div class="stat-value">{{ report.dashboard.languageProfile?.nonChineseRate || 0 }}%</div>
+          <div class="stat-note">非中文/混合评论，主语言 {{ report.dashboard.languageProfile?.primaryLanguage || "-" }}</div>
+        </article>
       </div>
 
       <div class="chart-row">
@@ -81,6 +86,7 @@
 
       <div class="chart-row">
         <EChartCard v-if="report.dashboard.contentProfile?.categoryDistribution?.length" title="内容类别分布" :option="contentCategoryOption" />
+        <EChartCard v-if="report.dashboard.languageProfile?.distribution?.length" title="评论语言分布" :option="languageOption" />
         <EChartCard title="高频问题统计" :option="issueOption" />
         <EChartCard v-if="report.dashboard.intentDistribution?.length" title="评论意图分布" :option="intentOption" />
         <EChartCard title="用户声音词云" :option="wordCloudOption" />
@@ -414,6 +420,28 @@ const contentCategoryOption = computed<EChartsOption>(() => ({
   ]
 }));
 
+const languageOption = computed<EChartsOption>(() => ({
+  tooltip: getTooltip("item") as EChartsOption["tooltip"],
+  legend: getLegend({ bottom: 6 }) as EChartsOption["legend"],
+  color: [
+    CHART_COLORS.cyan[0],
+    CHART_COLORS.primary[0],
+    CHART_COLORS.positive[0],
+    CHART_COLORS.accent[0],
+    CHART_COLORS.neutral[0],
+    CHART_COLORS.negative[0]
+  ],
+  series: [
+    {
+      ...(getPieItem(["42%", "72%"]) as Record<string, unknown>),
+      data: (report.value?.dashboard.languageProfile?.distribution || []).map((item) => ({
+        name: item.label,
+        value: item.count
+      }))
+    }
+  ]
+}));
+
 const intentOption = computed<EChartsOption>(() => ({
   tooltip: getTooltip() as EChartsOption["tooltip"],
   xAxis: getXAxis({
@@ -564,7 +592,7 @@ onMounted(load);
 
 .shared-stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
 }
 

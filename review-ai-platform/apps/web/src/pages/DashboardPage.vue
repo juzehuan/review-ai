@@ -194,6 +194,12 @@
         <div class="stat-value">{{ dashboard?.contentProfile?.valuableCommentCount || 0 }}</div>
         <div class="stat-note">低价值评论 {{ dashboard?.contentProfile?.lowValueCommentRate || 0 }}% 已降权</div>
       </div>
+
+      <div class="stat-card stat-card-cool">
+        <div class="stat-label">语言画像</div>
+        <div class="stat-value">{{ dashboard?.languageProfile?.nonChineseRate || 0 }}%</div>
+        <div class="stat-note">非中文/混合评论，主语言 {{ dashboard?.languageProfile?.primaryLanguage || "-" }}</div>
+      </div>
     </div>
 
     <div class="chart-row chart-row-featured">
@@ -260,6 +266,7 @@
 
     <div class="chart-row">
       <EChartCard v-if="dashboard?.contentProfile?.categoryDistribution?.length" title="内容类别分布" :option="contentCategoryOption" />
+      <EChartCard v-if="dashboard?.languageProfile?.distribution?.length" title="评论语言分布" :option="languageOption" />
       <EChartCard
         v-if="dashboard?.intentDistribution?.length"
         title="评论意图分布"
@@ -1516,6 +1523,28 @@ const contentCategoryOption = computed<EChartsOption>(() => ({
     {
       ...(getPieItem(["42%", "72%"]) as Record<string, unknown>),
       data: (dashboard.value?.contentProfile?.categoryDistribution || []).map((item) => ({
+        name: item.label,
+        value: item.count
+      }))
+    }
+  ]
+}));
+
+const languageOption = computed<EChartsOption>(() => ({
+  tooltip: getTooltip("item") as EChartsOption["tooltip"],
+  legend: getLegend({ bottom: 6 }) as EChartsOption["legend"],
+  color: [
+    CHART_COLORS.cyan[0],
+    CHART_COLORS.primary[0],
+    CHART_COLORS.positive[0],
+    CHART_COLORS.accent[0],
+    CHART_COLORS.neutral[0],
+    CHART_COLORS.negative[0]
+  ],
+  series: [
+    {
+      ...(getPieItem(["42%", "72%"]) as Record<string, unknown>),
+      data: (dashboard.value?.languageProfile?.distribution || []).map((item) => ({
         name: item.label,
         value: item.count
       }))

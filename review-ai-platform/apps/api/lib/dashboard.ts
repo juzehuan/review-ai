@@ -25,6 +25,17 @@ function scoreMeta(analysisType: AnalysisType): { scoreKind: DashboardScoreKind;
   };
 }
 
+function emptyLanguageProfile(): DashboardDTO["languageProfile"] {
+  return {
+    primaryLanguageKey: "unknown",
+    primaryLanguage: "未知/表情符号",
+    nonChineseCount: 0,
+    nonChineseRate: 0,
+    mixedLanguageCount: 0,
+    distribution: []
+  };
+}
+
 export async function buildDashboardForTask(taskId: string, requestedRunId?: string | null): Promise<DashboardDTO> {
   const task = await prisma.task.findUnique({ where: { id: taskId }, select: { analysisType: true } });
   const analysisType = ((task?.analysisType as AnalysisType | null) || "product");
@@ -67,6 +78,7 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
         lowValueCommentCount: 0,
         lowValueCommentRate: 0
       },
+      languageProfile: emptyLanguageProfile(),
       dynamicContentTags: [],
       duplicateProfile: {
         duplicateGroupCount: 0,
@@ -109,6 +121,7 @@ export async function buildDashboardForTask(taskId: string, requestedRunId?: str
         lowValueCommentCount: 0,
         lowValueCommentRate: 0
       },
+      languageProfile: emptyLanguageProfile(),
       dynamicContentTags: [],
       duplicateProfile: {
         duplicateGroupCount: 0,

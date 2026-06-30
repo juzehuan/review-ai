@@ -631,7 +631,7 @@ select {
 }
 
 .summary-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .review-stats-grid {
@@ -656,6 +656,10 @@ select {
 .stat-card-success,
 .mini-stat-warm {
   border-top: 3px solid #16a34a;
+}
+
+.stat-card-cool {
+  border-top: 3px solid #0ea5e9;
 }
 
 .stat-card-ink,
