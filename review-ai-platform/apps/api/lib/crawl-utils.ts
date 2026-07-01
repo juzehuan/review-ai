@@ -207,9 +207,9 @@ export function normalizeRequestedCrawlInput(body: Record<string, unknown>, defa
       ? detectedSourceChannel
       : normalizeCrawlSourceChannel(requestedSourceChannel || detectedSourceChannel || defaults.defaultSourceChannel, "YouTube");
   const rawAnalysisType = String(body.analysisType || "").trim();
-  const analysisType = ["product", "video", "tweet"].includes(rawAnalysisType)
-    ? rawAnalysisType
-    : inferAnalysisType(sourceChannel);
+  const requestedAnalysisType = ["product", "video", "tweet"].includes(rawAnalysisType) ? rawAnalysisType : "";
+  const analysisType =
+    crawlerPlatform && detectedSourceChannel ? inferAnalysisType(detectedSourceChannel) : requestedAnalysisType || inferAnalysisType(sourceChannel);
   const requestedMaxReviews = Number(body.maxReviews ?? defaults.defaultMaxReviews);
   const maxReviews = requestedMaxReviews <= 0 ? 0 : Math.min(Math.max(requestedMaxReviews, 1), 20000);
   const crawlChannels = crawlerPlatform === "shopee" ? defaults.crawlChannels : (["browser_intercept"] as CrawlerChannel[]);
