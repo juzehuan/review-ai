@@ -2396,6 +2396,12 @@ async function autoImportAndAnalyzeCrawlResult(
   const existingTask = target.taskId
     ? await prisma.task.findFirst({ where: { id: target.taskId, workspaceId: target.workspaceId } })
     : null;
+  const queuedAnalysisRun = existingTask
+    ? await prisma.analysisRun.findFirst({
+        where: { taskId: existingTask.id, status: "queued" },
+        orderBy: [{ createdAt: "desc" }, { startedAt: "desc" }]
+      })
+    : null;
   const existingIds = existingTask
     ? new Set(
         await prisma.review
@@ -2434,7 +2440,7 @@ async function autoImportAndAnalyzeCrawlResult(
     );
     return;
   }
-  if (subscription && subscription.currentPeriodRunCount + 1 > subscription.monthlyRunLimit) {
+  if (subscription && !queuedAnalysisRun && subscription.currentPeriodRunCount + 1 > subscription.monthlyRunLimit) {
     await markAutoImportError(
       "分析次数额度不足，无法自动分析",
       target.monitorId ? "分析次数额度不足，监听任务已暂停自动分析" : "分析次数额度不足，无法自动分析"
@@ -2499,12 +2505,61 @@ async function autoImportAndAnalyzeCrawlResult(
     await tx.subscription.update({
       where: { workspaceId: target.workspaceId },
       data: {
-        currentPeriodReviewCount: { increment: inserted.count },
-        currentPeriodRunCount: { increment: 1 }
+        currentPeriodReviewCount: { increment: inserted.count }
       }
     });
 
     const reviewCount = await tx.review.count({ where: { taskId: task.id } });
+    const queuedRun = await tx.analysisRun.findFirst({
+      where: { taskId: task.id, status: "queued" },
+      orderBy: [{ createdAt: "desc" }, { startedAt: "desc" }]
+    });
+    if (queuedRun) {
+      const run = await tx.analysisRun.update({
+        where: { id: queuedRun.id },
+        data: { reviewCount }
+      });
+      await tx.analysisRunLog.create({
+        data: {
+          runId: run.id,
+          level: "info",
+          message: target.monitorId ? "Crawl monitor import merged into queued analysis run" : "Crawl job import merged into queued analysis run",
+          meta: { crawlJobId: crawlJob.id, monitorId: target.monitorId || null, insertedRows: inserted.count, reviewCount }
+        }
+      });
+      await tx.task.update({
+        where: { id: task.id },
+        data: { status: "analyzing" }
+      });
+      await tx.crawlJob.update({
+        where: { id: crawlJob.id },
+        data: {
+          taskId: task.id,
+          status: "imported",
+          importedRows: inserted.count,
+          skippedDuplicate
+        }
+      });
+      if (target.monitorId) {
+        await tx.crawlMonitor.update({
+          where: { id: target.monitorId },
+          data: {
+            taskId: task.id,
+            lastCrawlJobId: crawlJob.id,
+            lastError: null
+          }
+        });
+      }
+      return { run, taskId: task.id, reusedQueuedRun: true };
+    }
+
+    if (subscription) {
+      const currentSubscription = await tx.subscription.findUnique({ where: { workspaceId: target.workspaceId } });
+      if (currentSubscription && currentSubscription.currentPeriodRunCount + 1 > currentSubscription.monthlyRunLimit) {
+        throw new Error("Analysis run quota is insufficient, unable to auto analyze");
+      }
+    }
+
     const run = await tx.analysisRun.create({
       data: {
         taskId: task.id,
@@ -2514,6 +2569,11 @@ async function autoImportAndAnalyzeCrawlResult(
         status: "queued",
         reviewCount
       }
+    });
+
+    await tx.subscription.update({
+      where: { workspaceId: target.workspaceId },
+      data: { currentPeriodRunCount: { increment: 1 } }
     });
 
     await tx.analysisRunLog.create({
@@ -2551,14 +2611,16 @@ async function autoImportAndAnalyzeCrawlResult(
       });
     }
 
-    return { run, taskId: task.id };
+    return { run, taskId: task.id, reusedQueuedRun: false };
   });
 
-  await analysisQueue.add("run-analysis", {
-    runId: transactionResult.run.id,
-    taskId: transactionResult.taskId,
-    workspaceId: target.workspaceId
-  });
+  if (!transactionResult.reusedQueuedRun) {
+    await analysisQueue.add("run-analysis", {
+      runId: transactionResult.run.id,
+      taskId: transactionResult.taskId,
+      workspaceId: target.workspaceId
+    });
+  }
 }
 
 async function autoImportAndAnalyzeFromMonitor(
