@@ -261,6 +261,32 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "检查 AI 配置、模型额度、网络超时和最近失败样本": "Check AI settings, model quota, network timeout, and recent failed samples",
     "查看 worker 日志和当前批次大小，必要时降低并发或重试": "Check worker logs and current batch size; reduce concurrency or retry if needed",
     "检查 AI worker 是否在线、模型接口是否可用、任务是否被长请求占用": "Check whether AI worker is online, model API is available, or the task is held by a long request",
+    "最新批次已有错误，先打开分析日志并筛选错误，再确认模型额度、网络超时或提示词返回格式。": "The latest run has an error. Open analysis logs, filter errors, then check model quota, network timeout, or prompt output format.",
+    "分析批次排队后长时间无日志，可能是 AI worker 未消费或队列阻塞。": "The analysis run has been queued with no logs for a long time. The AI worker may not be consuming, or the queue may be blocked.",
+    "分析批次长时间无新日志，建议查看 worker、模型接口和当前并发配置。": "The analysis run has no new logs for a long time. Check the worker, model API, and current concurrency settings.",
+    "批次已部分失败，报告可参考但需要复核失败样本，必要时重新分析。": "The run partially failed. The report can be referenced, but failed samples should be reviewed and reanalyzed if needed.",
+    "批次已有最近错误，先筛选错误日志，再检查 AI 配置、模型额度、网络超时和提示词返回格式。": "The run has a recent error. Filter error logs first, then check AI settings, model quota, network timeout, and prompt output format.",
+    "排队后长时间没有日志，疑似 AI worker 未消费、Redis 队列异常或前面任务积压。": "Queued with no logs for a long time. The AI worker may not be consuming, Redis may be abnormal, or earlier tasks may be backed up.",
+    "运行中长时间没有新日志，可能卡在模型请求、网络超时或 worker 并发占用。": "Running with no new logs for a long time. It may be stuck in a model request, network timeout, or occupied worker concurrency.",
+    "运行超过 5 分钟仍未处理评论，建议检查模型接口是否响应，以及 worker 是否被长请求占用。": "Running for over 5 minutes without processing comments. Check whether the model API responds and whether the worker is held by a long request.",
+    "批次部分失败，已成功的评论可用于报告，但失败样本需要复核或重试。": "The run partially failed. Successful comments can be used in the report, but failed samples need review or retry.",
+    "批次失败，确认模型额度、API Key、网络和提示词返回格式后再重试。": "The run failed. Confirm model quota, API key, network, and prompt output format before retrying.",
+    "平台拒绝访问，优先检查登录态、账号权限、评论区可见性和代理地区。": "The platform denied access. First check login state, account permissions, comment visibility, and proxy region.",
+    "平台触发限流，建议降低单次采集量或频率，更换代理后再重试。": "The platform rate-limited the request. Reduce per-crawl volume or frequency, change proxy, then retry.",
+    "平台或代理链路返回服务异常，建议稍后重试并检查代理稳定性。": "The platform or proxy returned a service error. Retry later and check proxy stability.",
+    "平台拒绝了本次请求，建议检查链接、接口签名、浏览器环境或登录态。": "The platform rejected this request. Check the link, API signature, browser environment, or login state.",
+    "评论排序未确认切到全部评论，可能只抓到相关评论；建议检查登录态和页面语言后重试。": "Comment sorting was not confirmed as all comments, so only relevant comments may be collected. Check login state and page language, then retry.",
+    "采集接近超时提前返回，建议降低单次最大采集量，或改用监听任务分批采集。": "Crawl returned early near timeout. Lower the max comments per crawl or use monitor tasks to collect in batches.",
+    "已达到本次采集上限，如需更多评论可提高最大采集条数后重新采集。": "This crawl reached its limit. Increase the max comments and crawl again if more comments are needed.",
+    "任务长时间没有更新，可能卡在页面加载、代理访问或平台风控，建议稍后刷新或联系管理员查看后台诊断。": "The task has not updated for a long time. It may be stuck on page loading, proxy access, or platform risk control. Refresh later or ask an admin to check backend diagnostics.",
+    "采集失败，先看错误摘要；确认链接公开、评论区开启、代理和登录态正常后再重试。": "Crawl failed. Check the error summary first; confirm the link is public, comments are enabled, proxy and login state are normal, then retry.",
+    "未采集到评论，先确认链接公开可访问、评论区开启，必要时换登录态或代理再试。": "No comments were collected. Confirm the link is public, comments are enabled, and switch login state or proxy if needed.",
+    "优先处理队列连接、暂停状态和一致性告警；需要时使用“补回队列”或停止后重新创建任务。": "Prioritize queue connection, paused state, and integrity alerts. Use Restore queue job or stop and recreate tasks if needed.",
+    "先看诊断建议和最近错误，再检查 worker、Redis、代理、平台登录态或 AI 模型配置。": "Read the diagnosis and recent error first, then check worker, Redis, proxy, platform login state, or AI model settings.",
+    "查看最近失败任务，已恢复的任务可略过；未恢复的采集或分析可以按需重试。": "Check recent failed tasks. Recovered tasks can be ignored; unrecovered crawls or analyses can be retried as needed.",
+    "当前未发现一致性告警或卡住任务，保持观察即可。": "No integrity alerts or stalled tasks are currently detected. Keep observing.",
+    "队列健康正常": "Queue health is normal",
+    "当前没有待处理告警、卡住任务或最近失败记录。": "There are no pending alerts, stalled tasks, or recent failure records.",
     "数据库仍是排队中，但 BullMQ 待处理队列里没有对应采集 job": "Database status is queued, but no matching crawl job exists in BullMQ pending queues",
     "数据库仍是排队中，但 BullMQ 待处理队列里没有对应分析 job": "Database status is queued, but no matching analysis job exists in BullMQ pending queues",
     "优先检查任务是否曾入队失败；确认后可在采集记录里重试，或停止该记录再重新采集": "Check whether enqueue failed; after confirming, retry from crawl records or stop it and crawl again",
@@ -734,6 +760,32 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "检查 AI 配置、模型额度、网络超时和最近失败样本": "ตรวจการตั้งค่า AI, โควตาโมเดล, timeout เครือข่าย และตัวอย่างที่ล้มเหลวล่าสุด",
     "查看 worker 日志和当前批次大小，必要时降低并发或重试": "ดูบันทึก worker และขนาด batch ปัจจุบัน ลด concurrency หรือลองใหม่หากจำเป็น",
     "检查 AI worker 是否在线、模型接口是否可用、任务是否被长请求占用": "ตรวจว่า AI worker ออนไลน์หรือไม่ API โมเดลใช้ได้หรือไม่ หรืองานติดคำขอยาวอยู่หรือไม่",
+    "最新批次已有错误，先打开分析日志并筛选错误，再确认模型额度、网络超时或提示词返回格式。": "รอบล่าสุดมีข้อผิดพลาด เปิดบันทึกวิเคราะห์และกรองข้อผิดพลาดก่อน แล้วตรวจโควตาโมเดล timeout เครือข่าย หรือรูปแบบผลลัพธ์พรอมป์",
+    "分析批次排队后长时间无日志，可能是 AI worker 未消费或队列阻塞。": "รอบวิเคราะห์เข้าคิวนานแต่ไม่มีบันทึก อาจเป็นเพราะ AI worker ไม่รับงานหรือคิวติดขัด",
+    "分析批次长时间无新日志，建议查看 worker、模型接口和当前并发配置。": "รอบวิเคราะห์ไม่มีบันทึกใหม่เป็นเวลานาน ควรตรวจ worker, API โมเดล และการตั้งค่า concurrency ปัจจุบัน",
+    "批次已部分失败，报告可参考但需要复核失败样本，必要时重新分析。": "รอบนี้ล้มเหลวบางส่วน รายงานใช้เป็นข้อมูลอ้างอิงได้ แต่ควรตรวจตัวอย่างที่ล้มเหลวและวิเคราะห์ใหม่หากจำเป็น",
+    "批次已有最近错误，先筛选错误日志，再检查 AI 配置、模型额度、网络超时和提示词返回格式。": "รอบนี้มีข้อผิดพลาดล่าสุด ให้กรองบันทึกข้อผิดพลาดก่อน แล้วตรวจการตั้งค่า AI โควตาโมเดล timeout เครือข่าย และรูปแบบผลลัพธ์พรอมป์",
+    "排队后长时间没有日志，疑似 AI worker 未消费、Redis 队列异常或前面任务积压。": "เข้าคิวแล้วไม่มีบันทึกเป็นเวลานาน อาจเป็นเพราะ AI worker ไม่รับงาน คิว Redis ผิดปกติ หรืองานก่อนหน้าค้างสะสม",
+    "运行中长时间没有新日志，可能卡在模型请求、网络超时或 worker 并发占用。": "กำลังทำงานแต่ไม่มีบันทึกใหม่เป็นเวลานาน อาจค้างที่คำขอโมเดล timeout เครือข่าย หรือ concurrency ของ worker ถูกใช้อยู่",
+    "运行超过 5 分钟仍未处理评论，建议检查模型接口是否响应，以及 worker 是否被长请求占用。": "ทำงานเกิน 5 นาทีแล้วยังไม่ประมวลผลคอมเมนต์ ควรตรวจว่า API โมเดลตอบสนองหรือไม่ และ worker ถูกคำขอยาวยึดอยู่หรือไม่",
+    "批次部分失败，已成功的评论可用于报告，但失败样本需要复核或重试。": "รอบนี้ล้มเหลวบางส่วน คอมเมนต์ที่สำเร็จใช้ในรายงานได้ แต่ตัวอย่างที่ล้มเหลวต้องตรวจหรือ retry",
+    "批次失败，确认模型额度、API Key、网络和提示词返回格式后再重试。": "รอบนี้ล้มเหลว ตรวจโควตาโมเดล API Key เครือข่าย และรูปแบบผลลัพธ์พรอมป์ก่อน retry",
+    "平台拒绝访问，优先检查登录态、账号权限、评论区可见性和代理地区。": "แพลตฟอร์มปฏิเสธการเข้าถึง ให้ตรวจสถานะล็อกอิน สิทธิ์บัญชี การมองเห็นคอมเมนต์ และพื้นที่ proxy ก่อน",
+    "平台触发限流，建议降低单次采集量或频率，更换代理后再重试。": "แพลตฟอร์มจำกัดอัตรา ควรลดจำนวนหรือความถี่ต่อครั้ง เปลี่ยน proxy แล้วลองใหม่",
+    "平台或代理链路返回服务异常，建议稍后重试并检查代理稳定性。": "แพลตฟอร์มหรือ proxy ส่งข้อผิดพลาดบริการ ควรลองใหม่ภายหลังและตรวจความเสถียรของ proxy",
+    "平台拒绝了本次请求，建议检查链接、接口签名、浏览器环境或登录态。": "แพลตฟอร์มปฏิเสธคำขอนี้ ควรตรวจลิงก์ ลายเซ็น API สภาพแวดล้อมเบราว์เซอร์ หรือสถานะล็อกอิน",
+    "评论排序未确认切到全部评论，可能只抓到相关评论；建议检查登录态和页面语言后重试。": "ยังยืนยันไม่ได้ว่าเปลี่ยนการเรียงเป็นคอมเมนต์ทั้งหมด อาจเก็บได้เฉพาะคอมเมนต์ที่เกี่ยวข้อง ควรตรวจล็อกอินและภาษาเพจก่อนลองใหม่",
+    "采集接近超时提前返回，建议降低单次最大采集量，或改用监听任务分批采集。": "การเก็บข้อมูลใกล้หมดเวลาและคืนผลก่อน ควรลดจำนวนสูงสุดต่อครั้งหรือใช้การติดตามเพื่อเก็บเป็นชุด",
+    "已达到本次采集上限，如需更多评论可提高最大采集条数后重新采集。": "ถึงขีดจำกัดการเก็บครั้งนี้แล้ว หากต้องการคอมเมนต์เพิ่มให้เพิ่มจำนวนสูงสุดแล้วเก็บใหม่",
+    "任务长时间没有更新，可能卡在页面加载、代理访问或平台风控，建议稍后刷新或联系管理员查看后台诊断。": "งานไม่อัปเดตเป็นเวลานาน อาจค้างที่การโหลดหน้า proxy หรือระบบป้องกันแพลตฟอร์ม ควรรีเฟรชภายหลังหรือติดต่อผู้ดูแลเพื่อตรวจ backend",
+    "采集失败，先看错误摘要；确认链接公开、评论区开启、代理和登录态正常后再重试。": "เก็บข้อมูลล้มเหลว ให้ดูสรุปข้อผิดพลาดก่อน ตรวจว่าลิงก์สาธารณะ เปิดคอมเมนต์ proxy และล็อกอินปกติ แล้วลองใหม่",
+    "未采集到评论，先确认链接公开可访问、评论区开启，必要时换登录态或代理再试。": "ไม่พบคอมเมนต์ ให้ยืนยันว่าลิงก์เข้าถึงได้และเปิดคอมเมนต์ หากจำเป็นให้เปลี่ยนล็อกอินหรือ proxy แล้วลองใหม่",
+    "优先处理队列连接、暂停状态和一致性告警；需要时使用“补回队列”或停止后重新创建任务。": "จัดการการเชื่อมต่อคิว สถานะหยุดชั่วคราว และ alert ความสอดคล้องก่อน ใช้การกู้คิวหรือหยุดแล้วสร้างงานใหม่หากจำเป็น",
+    "先看诊断建议和最近错误，再检查 worker、Redis、代理、平台登录态或 AI 模型配置。": "ดูคำแนะนำวินิจฉัยและข้อผิดพลาดล่าสุดก่อน แล้วตรวจ worker, Redis, proxy, สถานะล็อกอินแพลตฟอร์ม หรือการตั้งค่าโมเดล AI",
+    "查看最近失败任务，已恢复的任务可略过；未恢复的采集或分析可以按需重试。": "ดูงานที่ล้มเหลวล่าสุด งานที่กู้คืนแล้วข้ามได้ ส่วนงานเก็บหรือวิเคราะห์ที่ยังไม่กู้คืนสามารถ retry ตามต้องการ",
+    "当前未发现一致性告警或卡住任务，保持观察即可。": "ยังไม่พบ alert ความสอดคล้องหรืองานค้าง แค่ติดตามต่อก็พอ",
+    "队列健康正常": "สถานะคิวปกติ",
+    "当前没有待处理告警、卡住任务或最近失败记录。": "ไม่มี alert ที่ต้องจัดการ งานค้าง หรือประวัติล้มเหลวล่าสุด",
     "采集任务已重新加入队列": "นำงานเก็บข้อมูลกลับเข้าคิวแล้ว",
     "采集任务重试失败": "ลองงานเก็บข้อมูลใหม่ไม่สำเร็จ",
     "采集任务已停止": "หยุดงานเก็บข้อมูลแล้ว",
@@ -973,6 +1025,24 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
     return unit === "秒" ? "วินาที" : unit === "分钟" ? "นาที" : unit === "小时" ? "ชั่วโมง" : unit === "天" ? "วัน" : unit;
   };
   const translateDuration = (text: string) => text.replace(/(秒|分钟|小时|天)/g, (unit) => translateUnit(unit));
+  const translateQueueIssuePart = (part: string) => {
+    const queueError = part.match(/^(\d+)\s+个队列连接异常$/);
+    if (queueError) return locale === "en-US" ? `${queueError[1]} queue connection errors` : `คิวเชื่อมต่อผิดปกติ ${queueError[1]} รายการ`;
+    const pausedQueue = part.match(/^(\d+)\s+个队列暂停$/);
+    if (pausedQueue) return locale === "en-US" ? `${pausedQueue[1]} paused queues` : `คิวหยุดชั่วคราว ${pausedQueue[1]} รายการ`;
+    const integrity = part.match(/^(\d+)\s+个一致性告警$/);
+    if (integrity) return locale === "en-US" ? `${integrity[1]} integrity alerts` : `alert ความสอดคล้อง ${integrity[1]} รายการ`;
+    const stalled = part.match(/^(\d+)\s+个疑似卡住任务$/);
+    if (stalled) return locale === "en-US" ? `${stalled[1]} likely stalled tasks` : `งานที่อาจค้าง ${stalled[1]} รายการ`;
+    const bullFailed = part.match(/^BullMQ 失败\s+(\d+)\s+个$/);
+    if (bullFailed) return locale === "en-US" ? `BullMQ failed ${bullFailed[1]}` : `BullMQ ล้มเหลว ${bullFailed[1]} รายการ`;
+    const dbFailed = part.match(/^数据库失败\s+(\d+)\s+个$/);
+    if (dbFailed) return locale === "en-US" ? `Database failed ${dbFailed[1]}` : `ฐานข้อมูลล้มเหลว ${dbFailed[1]} รายการ`;
+    const recentFailed = part.match(/^最近失败\s+(\d+)\s+个$/);
+    if (recentFailed) return locale === "en-US" ? `Recent failures ${recentFailed[1]}` : `ล้มเหลวล่าสุด ${recentFailed[1]} รายการ`;
+    return part;
+  };
+  const translateQueueIssueList = (text: string) => text.split("，").map(translateQueueIssuePart).join(locale === "en-US" ? ", " : "、");
   const taskCount = value.match(/^(\d+)\s*个任务$/);
   if (taskCount) {
     return locale === "en-US" ? `${taskCount[1]} tasks` : `${taskCount[1]} งาน`;
@@ -1020,6 +1090,50 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const activeRunFailures = value.match(/^运行批次失败\s+(\d+)\s+条$/);
   if (activeRunFailures) {
     return locale === "en-US" ? `Running runs failed ${activeRunFailures[1]} items` : `รอบที่กำลังทำงานล้มเหลว ${activeRunFailures[1]} รายการ`;
+  }
+  const failureRate = value.match(/^失败率\s+([\d.]+)%$/);
+  if (failureRate) {
+    return locale === "en-US" ? `Failure rate ${failureRate[1]}%` : `อัตราล้มเหลว ${failureRate[1]}%`;
+  }
+  const taskFailureAdvice = value.match(/^失败率\s+([\d.]+)%，建议抽查错误日志和失败样本，必要时降低批次大小后重试。$/);
+  if (taskFailureAdvice) {
+    return locale === "en-US"
+      ? `Failure rate ${taskFailureAdvice[1]}%. Review error logs and failed samples, then lower batch size and retry if needed.`
+      : `อัตราล้มเหลว ${taskFailureAdvice[1]}% ควรตรวจบันทึกข้อผิดพลาดและตัวอย่างที่ล้มเหลว ลด batch แล้ว retry หากจำเป็น`;
+  }
+  const runFailureAdvice = value.match(/^失败率\s+([\d.]+)%，建议查看错误日志，必要时降低批次大小或改用更稳定模型重试。$/);
+  if (runFailureAdvice) {
+    return locale === "en-US"
+      ? `Failure rate ${runFailureAdvice[1]}%. Check error logs, then lower batch size or retry with a more stable model if needed.`
+      : `อัตราล้มเหลว ${runFailureAdvice[1]}% ควรดูบันทึกข้อผิดพลาด ลด batch หรือเปลี่ยนเป็นโมเดลที่เสถียรกว่าแล้ว retry หากจำเป็น`;
+  }
+  const requestException = value.match(/^请求异常\s+(\d+)$/);
+  if (requestException) {
+    return locale === "en-US" ? `Request error ${requestException[1]}` : `คำขอผิดปกติ ${requestException[1]}`;
+  }
+  const uncovered = value.match(/^平台仍约有\s+([\d,]+)\s+条未覆盖，可提高采集上限或用监听任务继续补采。$/);
+  if (uncovered) {
+    return locale === "en-US"
+      ? `About ${uncovered[1]} platform comments remain uncovered. Increase the crawl limit or use monitor tasks to continue collection.`
+      : `ยังมีคอมเมนต์บนแพลตฟอร์มประมาณ ${uncovered[1]} รายการที่ยังไม่ครอบคลุม เพิ่มขีดจำกัดหรือใช้การติดตามเพื่อเก็บต่อ`;
+  }
+  const queueHealthError = value.match(/^队列健康异常：(.+)$/);
+  if (queueHealthError) {
+    return locale === "en-US" ? `Queue health issue: ${translateQueueIssueList(queueHealthError[1])}` : `สถานะคิวผิดปกติ: ${translateQueueIssueList(queueHealthError[1])}`;
+  }
+  const stalledSummary = value.match(/^发现\s+(\d+)\s+个疑似卡住任务$/);
+  if (stalledSummary) {
+    return locale === "en-US" ? `Found ${stalledSummary[1]} likely stalled tasks` : `พบงานที่อาจค้าง ${stalledSummary[1]} รายการ`;
+  }
+  const queueFailureSummary = value.match(/^队列可消费，但仍有失败记录：(.+)$/);
+  if (queueFailureSummary) {
+    return locale === "en-US"
+      ? `Queue is consuming, but failures remain: ${translateQueueIssueList(queueFailureSummary[1])}`
+      : `คิวยังประมวลผลได้ แต่ยังมีประวัติล้มเหลว: ${translateQueueIssueList(queueFailureSummary[1])}`;
+  }
+  const queueActive = value.match(/^队列正在正常处理\s+(\d+)\s+个待消费任务$/);
+  if (queueActive) {
+    return locale === "en-US" ? `Queue is processing ${queueActive[1]} pending tasks normally` : `คิวกำลังประมวลผลงานรอ ${queueActive[1]} รายการตามปกติ`;
   }
   const ratePerMinute = value.match(/^([\d.]+)\/分钟$/);
   if (ratePerMinute) {
