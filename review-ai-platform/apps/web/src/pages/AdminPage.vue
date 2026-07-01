@@ -243,6 +243,11 @@
                 <div>{{ formatTime(record.lastActivityAt) }}</div>
                 <div class="member-email">已静默 {{ durationLabel(record.ageSeconds) }}</div>
               </template>
+              <template v-else-if="column.key === 'actions'">
+                <a-button size="small" type="link" :disabled="!canOpenQueueContext(record)" @click="openQueueContext(record)">
+                  {{ queueContextActionLabel(record) }}
+                </a-button>
+              </template>
             </template>
           </a-table>
           <div class="table-title workload-title">最近失败任务</div>
@@ -252,7 +257,7 @@
             :loading="loading"
             row-key="id"
             :pagination="{ pageSize: 8 }"
-            :scroll="{ x: 1180 }"
+            :scroll="{ x: 1400 }"
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'kind'">
@@ -278,6 +283,11 @@
               </template>
               <template v-else-if="column.key === 'time'">
                 {{ formatTime(record.failedAt) }}
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <a-button size="small" type="link" :disabled="!canOpenQueueContext(record)" @click="openQueueContext(record)">
+                  {{ queueContextActionLabel(record) }}
+                </a-button>
               </template>
             </template>
           </a-table>
@@ -366,6 +376,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { message } from "ant-design-vue";
 import { ArrowLeftOutlined, KeyOutlined, ReloadOutlined, UserAddOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
@@ -395,6 +406,7 @@ import { useTaskStore } from "@/composables";
 import { copyTextToClipboard } from "@/utils/clipboard";
 
 const loading = ref(false);
+const router = useRouter();
 const saving = ref(false);
 const activeTab = ref("users");
 const userModalOpen = ref(false);
@@ -464,7 +476,8 @@ const failureColumns = [
   { title: "空间", key: "workspace", width: 210 },
   { title: "渠道/模型", key: "context", width: 180 },
   { title: "错误摘要", key: "error", width: 280 },
-  { title: "失败时间", key: "time", width: 190 }
+  { title: "失败时间", key: "time", width: 190 },
+  { title: "操作", key: "actions", width: 130, fixed: "right" }
 ];
 
 const stalledColumns = [
@@ -474,7 +487,8 @@ const stalledColumns = [
   { title: "渠道/模型", key: "context", width: 180 },
   { title: "进度", key: "progress", width: 240 },
   { title: "诊断建议", key: "diagnosis", width: 360 },
-  { title: "最后活动", key: "activity", width: 190 }
+  { title: "最后活动", key: "activity", width: 190 },
+  { title: "操作", key: "actions", width: 130, fixed: "right" }
 ];
 
 async function loadAuditLogs() {
@@ -607,6 +621,7 @@ function durationLabel(seconds?: number | null) {
 }
 
 type QueueItemKind = QueueFailureDTO["kind"] | QueueStalledDTO["kind"];
+type QueueHealthItem = QueueFailureDTO | QueueStalledDTO;
 
 function failureKindLabel(kind: QueueItemKind) {
   return kind === "crawl" ? "采集" : "分析";
@@ -614,6 +629,24 @@ function failureKindLabel(kind: QueueItemKind) {
 
 function failureKindColor(kind: QueueItemKind) {
   return kind === "crawl" ? "orange" : "purple";
+}
+
+function queueContextActionLabel(record: QueueHealthItem) {
+  return record.kind === "crawl" ? "打开采集" : "查看分析";
+}
+
+function canOpenQueueContext(record: QueueHealthItem) {
+  return record.kind === "crawl" || Boolean(record.taskId);
+}
+
+function openQueueContext(record: QueueHealthItem) {
+  if (record.kind === "crawl") {
+    router.push({ path: "/crawl-jobs", query: { jobId: record.id } });
+    return;
+  }
+  if (record.taskId) {
+    router.push(`/tasks/${record.taskId}/runs`);
+  }
 }
 
 function errorSummary(value?: string | null) {

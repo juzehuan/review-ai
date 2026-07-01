@@ -220,6 +220,7 @@
         :data-source="jobs"
         :pagination="{ pageSize: 12 }"
         :loading="loading"
+        :row-class-name="crawlJobRowClassName"
         :scroll="{ x: 1480 }"
       >
         <template #bodyCell="{ column, record }">
@@ -422,7 +423,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { Modal, message } from "ant-design-vue";
 import {
   DownloadOutlined,
@@ -461,6 +462,7 @@ import {
 } from "@review-ai/shared";
 
 const router = useRouter();
+const route = useRoute();
 const jobs = ref<CrawlJobDTO[]>(readWorkspaceCache<CrawlJobDTO>("crawl-jobs"));
 const monitors = ref<CrawlMonitorDTO[]>(readWorkspaceCache<CrawlMonitorDTO>("crawl-monitors"));
 const loading = ref(false);
@@ -640,6 +642,7 @@ const latestActivityText = computed(() => {
 const latestActivityNote = computed(() => {
   return latestActivityJob.value ? shortJobName(latestActivityJob.value) : "暂无采集记录";
 });
+const highlightedCrawlJobId = computed(() => (typeof route.query.jobId === "string" ? route.query.jobId : ""));
 
 function statusLabel(status: CrawlJobStatus) {
   return {
@@ -649,6 +652,10 @@ function statusLabel(status: CrawlJobStatus) {
     failed: "失败",
     imported: "已开始分析"
   }[status];
+}
+
+function crawlJobRowClassName(record: CrawlJobDTO) {
+  return record.id === highlightedCrawlJobId.value ? "selected-crawl-job-row" : "";
 }
 
 function statusColor(status: CrawlJobStatus) {
@@ -1322,6 +1329,10 @@ onUnmounted(() => {
   color: #64748b;
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+:global(.selected-crawl-job-row) td {
+  background: #eff6ff !important;
 }
 
 .crawl-progress-headline,
