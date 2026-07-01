@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@review-ai/db";
+import { buildCrawlQueueJobId, QUEUE_JOB_CLEANUP_OPTIONS } from "@review-ai/shared";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { getCrawlQueue } from "@/lib/queue";
@@ -50,10 +51,17 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     });
   }
 
-  await getCrawlQueue().add("run-crawl", {
-    crawlJobId: updated.id,
-    workspaceId: job.workspaceId
-  });
+  await getCrawlQueue().add(
+    "run-crawl",
+    {
+      crawlJobId: updated.id,
+      workspaceId: job.workspaceId
+    },
+    {
+      jobId: buildCrawlQueueJobId(updated.id),
+      ...QUEUE_JOB_CLEANUP_OPTIONS
+    }
+  );
 
   await writeAuditLog(request, {
     workspaceId: job.workspaceId,

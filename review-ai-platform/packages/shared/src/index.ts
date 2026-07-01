@@ -7,6 +7,19 @@ export type MemberRole = "owner" | "admin" | "analyst" | "viewer";
 export type AnalysisType = "product" | "video" | "tweet";
 export type DashboardScoreKind = "nps" | "support_index" | "stance_index";
 
+export const QUEUE_JOB_CLEANUP_OPTIONS = {
+  removeOnComplete: true,
+  removeOnFail: true
+} as const;
+
+export function buildAnalysisQueueJobId(runId: string) {
+  return `analysis-run:${runId}`;
+}
+
+export function buildCrawlQueueJobId(crawlJobId: string) {
+  return `crawl-job:${crawlJobId}`;
+}
+
 export interface UserDTO {
   id: string;
   email: string;

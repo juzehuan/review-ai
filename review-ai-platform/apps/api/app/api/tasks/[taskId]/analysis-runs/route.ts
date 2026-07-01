@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { buildAnalysisQueueJobId, QUEUE_JOB_CLEANUP_OPTIONS } from "@review-ai/shared";
 import { getAnalysisQueue } from "@/lib/queue";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
@@ -126,11 +127,18 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     return createdRun;
   });
 
-  await getAnalysisQueue().add("run-analysis", {
-    runId: run.id,
-    taskId,
-    workspaceId: quotaWorkspaceId
-  });
+  await getAnalysisQueue().add(
+    "run-analysis",
+    {
+      runId: run.id,
+      taskId,
+      workspaceId: quotaWorkspaceId
+    },
+    {
+      jobId: buildAnalysisQueueJobId(run.id),
+      ...QUEUE_JOB_CLEANUP_OPTIONS
+    }
+  );
 
   await prisma.analysisRunLog.create({
     data: {

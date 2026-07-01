@@ -1,5 +1,10 @@
 import { prisma } from "@review-ai/db";
-import type { QueueIntegrityRepairResponse } from "@review-ai/shared";
+import {
+  buildAnalysisQueueJobId,
+  buildCrawlQueueJobId,
+  QUEUE_JOB_CLEANUP_OPTIONS,
+  type QueueIntegrityRepairResponse
+} from "@review-ai/shared";
 import { writeAuditLog } from "@/lib/audit-log";
 import { requireSuperAdmin } from "@/lib/auth";
 import { fail, ok } from "@/lib/http";
@@ -38,11 +43,18 @@ export async function POST(request: Request) {
     const queue = getCrawlQueue();
     const queueExists = await hasPendingQueueJobByData(queue, "crawlJobId", job.id);
     if (!queueExists) {
-      await queue.add("run-crawl", {
-        crawlJobId: job.id,
-        workspaceId: job.workspaceId,
-        ...(job.monitorId ? { monitorId: job.monitorId } : {})
-      });
+      await queue.add(
+        "run-crawl",
+        {
+          crawlJobId: job.id,
+          workspaceId: job.workspaceId,
+          ...(job.monitorId ? { monitorId: job.monitorId } : {})
+        },
+        {
+          jobId: buildCrawlQueueJobId(job.id),
+          ...QUEUE_JOB_CLEANUP_OPTIONS
+        }
+      );
       await prisma.crawlJob.update({
         where: { id: job.id },
         data: { lastError: null }
@@ -107,11 +119,18 @@ export async function POST(request: Request) {
   const queue = getAnalysisQueue();
   const queueExists = await hasPendingQueueJobByData(queue, "runId", run.id);
   if (!queueExists) {
-    await queue.add("run-analysis", {
-      runId: run.id,
-      taskId: run.taskId,
-      workspaceId: run.task.workspaceId
-    });
+    await queue.add(
+      "run-analysis",
+      {
+        runId: run.id,
+        taskId: run.taskId,
+        workspaceId: run.task.workspaceId
+      },
+      {
+        jobId: buildAnalysisQueueJobId(run.id),
+        ...QUEUE_JOB_CLEANUP_OPTIONS
+      }
+    );
     await prisma.$transaction([
       prisma.task.update({
         where: { id: run.taskId },

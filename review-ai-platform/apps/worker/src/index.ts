@@ -7,12 +7,15 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { Prisma, prisma, type Subscription } from "@review-ai/db";
 import {
+  buildAnalysisQueueJobId,
+  buildCrawlQueueJobId,
   buildDashboardSnapshot,
   DEFAULT_INSIGHTS_PROMPT,
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_USER_PROMPT_TEMPLATE,
   getAnalysisPromptProfile,
+  QUEUE_JOB_CLEANUP_OPTIONS,
   type CrawlerChannel,
   type AnalysisType,
   type DashboardDTO,
@@ -2615,11 +2618,18 @@ async function autoImportAndAnalyzeCrawlResult(
   });
 
   if (!transactionResult.reusedQueuedRun) {
-    await analysisQueue.add("run-analysis", {
-      runId: transactionResult.run.id,
-      taskId: transactionResult.taskId,
-      workspaceId: target.workspaceId
-    });
+    await analysisQueue.add(
+      "run-analysis",
+      {
+        runId: transactionResult.run.id,
+        taskId: transactionResult.taskId,
+        workspaceId: target.workspaceId
+      },
+      {
+        jobId: buildAnalysisQueueJobId(transactionResult.run.id),
+        ...QUEUE_JOB_CLEANUP_OPTIONS
+      }
+    );
   }
 }
 
@@ -2747,11 +2757,18 @@ async function scheduleDueCrawlMonitors() {
         data: { lastCrawlJobId: crawlJob.id }
       });
 
-      await crawlQueue.add("run-crawl", {
-        crawlJobId: crawlJob.id,
-        workspaceId: monitor.workspaceId,
-        monitorId: monitor.id
-      });
+      await crawlQueue.add(
+        "run-crawl",
+        {
+          crawlJobId: crawlJob.id,
+          workspaceId: monitor.workspaceId,
+          monitorId: monitor.id
+        },
+        {
+          jobId: buildCrawlQueueJobId(crawlJob.id),
+          ...QUEUE_JOB_CLEANUP_OPTIONS
+        }
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await prisma.crawlMonitor.update({

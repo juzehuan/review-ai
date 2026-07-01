@@ -1,5 +1,12 @@
 import { Prisma, prisma } from "@review-ai/db";
-import type { CrawlJobListResponse, CrawlJobStatus, CrawlJobStatusCounts, CrawlJobStatusFilter } from "@review-ai/shared";
+import {
+  buildCrawlQueueJobId,
+  QUEUE_JOB_CLEANUP_OPTIONS,
+  type CrawlJobListResponse,
+  type CrawlJobStatus,
+  type CrawlJobStatusCounts,
+  type CrawlJobStatusFilter
+} from "@review-ai/shared";
 import { getCrawlQueue } from "@/lib/queue";
 import { resolvedCrawlerSettingFromRecord, normalizeRequestedCrawlInput, supportedCrawlUrlError } from "@/lib/crawl-utils";
 import { writeAuditLog } from "@/lib/audit-log";
@@ -196,10 +203,17 @@ export async function POST(request: Request) {
     }
   });
 
-  await getCrawlQueue().add("run-crawl", {
-    crawlJobId: job.id,
-    workspaceId: context.workspace.id
-  });
+  await getCrawlQueue().add(
+    "run-crawl",
+    {
+      crawlJobId: job.id,
+      workspaceId: context.workspace.id
+    },
+    {
+      jobId: buildCrawlQueueJobId(job.id),
+      ...QUEUE_JOB_CLEANUP_OPTIONS
+    }
+  );
 
   await writeAuditLog(request, {
     workspaceId: job.workspaceId,

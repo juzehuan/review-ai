@@ -1,4 +1,5 @@
 import { Prisma, prisma, type CrawlMonitor } from "@review-ai/db";
+import { buildCrawlQueueJobId, QUEUE_JOB_CLEANUP_OPTIONS } from "@review-ai/shared";
 import { getCrawlQueue } from "@/lib/queue";
 import { parseCrawlerChannels } from "@/lib/crawler-settings";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
@@ -91,11 +92,18 @@ export async function queueCrawlMonitorRun(monitorId: string, options: { forceEn
   }
 
   try {
-    await getCrawlQueue().add("run-crawl", {
-      crawlJobId: job.id,
-      workspaceId: monitor.workspaceId,
-      monitorId: monitor.id
-    });
+    await getCrawlQueue().add(
+      "run-crawl",
+      {
+        crawlJobId: job.id,
+        workspaceId: monitor.workspaceId,
+        monitorId: monitor.id
+      },
+      {
+        jobId: buildCrawlQueueJobId(job.id),
+        ...QUEUE_JOB_CLEANUP_OPTIONS
+      }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await prisma.$transaction([

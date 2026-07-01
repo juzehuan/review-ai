@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@review-ai/db";
+import { buildAnalysisQueueJobId, QUEUE_JOB_CLEANUP_OPTIONS } from "@review-ai/shared";
 import type { CrawlResult } from "@/lib/crawl-utils";
 import { parseOptionalDate } from "@/lib/crawl-utils";
 import { defaultAiSetting, resolveApiKey } from "@/lib/ai-settings";
@@ -343,11 +344,18 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
   });
 
   if (!result.reusedRun) {
-    await getAnalysisQueue().add("run-analysis", {
-      runId: result.run.id,
-      taskId: result.taskId,
-      workspaceId: quotaWorkspaceId
-    });
+    await getAnalysisQueue().add(
+      "run-analysis",
+      {
+        runId: result.run.id,
+        taskId: result.taskId,
+        workspaceId: quotaWorkspaceId
+      },
+      {
+        jobId: buildAnalysisQueueJobId(result.run.id),
+        ...QUEUE_JOB_CLEANUP_OPTIONS
+      }
+    );
   }
 
   await writeAuditLog(request, {
