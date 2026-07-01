@@ -157,6 +157,34 @@ function buildMetricSummary(parts: Array<string | null | undefined>) {
   return values.length ? values.join(" · ") : null;
 }
 
+function buildRequestStatusInsight(status: number | null) {
+  if (status === null || status < 400) {
+    return null;
+  }
+  if (status === 401 || status === 403) {
+    return {
+      diagnosis: `平台接口返回 ${status}，疑似登录态失效、权限不足或评论区不可公开访问`,
+      nextAction: "检查平台账号登录态、Cookie/会话、目标链接权限和代理出口地区"
+    };
+  }
+  if (status === 429) {
+    return {
+      diagnosis: "平台接口返回 429，疑似请求过快或代理出口被限流",
+      nextAction: "降低单次最大采集数或采集频率，更换代理出口后重试"
+    };
+  }
+  if (status >= 500) {
+    return {
+      diagnosis: `平台接口返回 ${status}，疑似平台服务异常、代理链路异常或临时风控`,
+      nextAction: "稍后重试；若持续出现，检查代理稳定性和目标平台可访问性"
+    };
+  }
+  return {
+    diagnosis: `平台接口返回 ${status}，请求已被平台拒绝或参数不被接受`,
+    nextAction: "检查目标链接是否有效、接口签名/浏览器环境是否过期，以及是否需要登录态"
+  };
+}
+
 function buildCrawlStalledInsight(job: {
   status: string;
   fetchedRows: number;
@@ -201,6 +229,15 @@ function buildCrawlStalledInsight(job: {
       detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
       diagnosis: "排队超过阈值，疑似 worker 未消费或队列阻塞",
       nextAction: "检查 crawl-jobs 队列 active/waiting 数、worker 进程和 Redis 连接",
+      metricSummary,
+      lastError: truncateText(job.lastError) || null
+    };
+  }
+  const requestStatusInsight = buildRequestStatusInsight(lastRequestStatus);
+  if (requestStatusInsight) {
+    return {
+      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      ...requestStatusInsight,
       metricSummary,
       lastError: truncateText(job.lastError) || null
     };

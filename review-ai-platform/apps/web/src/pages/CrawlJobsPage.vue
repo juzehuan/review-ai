@@ -278,6 +278,13 @@
                 <a-tag v-if="record.partialDueToTimeout" color="orange" class="crawl-stalled-tag">
                   部分结果：采集接近超时，可能未加载完全部评论
                 </a-tag>
+                <a-tag
+                  v-if="isRequestStatusWarning(record.lastRequestStatus)"
+                  :color="requestStatusColor(record.lastRequestStatus)"
+                  class="crawl-stalled-tag"
+                >
+                  请求异常 {{ record.lastRequestStatus }}
+                </a-tag>
               </div>
               <span v-if="record.commentSortAttempted !== null" class="muted">
                 评论排序：{{ record.commentSortSwitched ? "已切换所有评论" : "未确认所有评论" }}
@@ -917,6 +924,20 @@ function crawlMetricSummary(job: CrawlJobDTO) {
     job.lastRequestStatus !== null ? `请求状态 ${job.lastRequestStatus}` : ""
   ].filter(Boolean);
   return parts.join(" · ");
+}
+
+function isRequestStatusWarning(status?: number | null) {
+  return typeof status === "number" && status >= 400;
+}
+
+function requestStatusColor(status?: number | null) {
+  if (status === 429) {
+    return "orange";
+  }
+  if (typeof status === "number" && status >= 500) {
+    return "red";
+  }
+  return "volcano";
 }
 
 function durationLabel(seconds?: number | null) {
