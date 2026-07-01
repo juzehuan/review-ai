@@ -143,6 +143,8 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "暂不支持该链接": "Unsupported link",
     "未采集到评论": "No comments collected",
     "采集超时": "Crawl timed out",
+    "部分结果：采集接近超时，可能未加载完全部评论": "Partial result: crawl neared timeout and may not have loaded all comments",
+    "部分结果超时": "Partial result timed out",
     "链接解析失败": "Link parsing failed",
     "排队中": "Queued",
     "抓取中": "Crawling",
@@ -540,6 +542,8 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "暂不支持该链接": "ยังไม่รองรับลิงก์นี้",
     "未采集到评论": "ไม่พบคอมเมนต์",
     "采集超时": "หมดเวลาเก็บข้อมูล",
+    "部分结果：采集接近超时，可能未加载完全部评论": "ผลลัพธ์บางส่วน: การเก็บข้อมูลใกล้หมดเวลาและอาจโหลดคอมเมนต์ไม่ครบ",
+    "部分结果超时": "ผลลัพธ์บางส่วนหมดเวลา",
     "链接解析失败": "แยกลิงก์ไม่สำเร็จ",
     "排队中": "รอคิว",
     "抓取中": "กำลังเก็บ",
@@ -975,6 +979,9 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
     return locale === "en-US" ? `Recent error: ${recentError[1]}` : `ข้อผิดพลาดล่าสุด: ${recentError[1]}`;
   }
   const crawlMetricPart = (part: string) => {
+    if (part === "部分结果超时") {
+      return locale === "en-US" ? "Partial result timed out" : "ผลลัพธ์บางส่วนหมดเวลา";
+    }
     const total = part.match(/^平台总量\s+(\d+)$/);
     if (total) return locale === "en-US" ? `Platform total ${total[1]}` : `ทั้งหมดบนแพลตฟอร์ม ${total[1]}`;
     const platformRemaining = part.match(/^平台剩余约\s+(\d+)\s+条$/);

@@ -252,6 +252,7 @@ export interface CrawlJobDTO {
   crawlChannel: CrawlerChannel | string | null;
   crawlChannelLabel: string | null;
   stopReason: string | null;
+  partialDueToTimeout: boolean | null;
   commentSortAttempted: boolean | null;
   commentSortSwitched: boolean | null;
   nextRequests: number | null;

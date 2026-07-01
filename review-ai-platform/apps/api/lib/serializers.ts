@@ -306,6 +306,7 @@ export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
     crawlChannel: job.crawlChannel,
     crawlChannelLabel: job.crawlChannelLabel,
     stopReason: readOptionalString(rawResult?.stopReason),
+    partialDueToTimeout: readOptionalBoolean(rawResult?.partialDueToTimeout),
     commentSortAttempted: readOptionalBoolean(rawResult?.commentSortAttempted),
     commentSortSwitched: readOptionalBoolean(rawResult?.commentSortSwitched),
     nextRequests: readOptionalNumber(rawResult?.nextRequests),

@@ -248,6 +248,9 @@
               <a-tag v-if="record.stalled" color="orange" class="crawl-stalled-tag">
                 疑似无更新 {{ durationLabel(record.updatedAgoSeconds) }}
               </a-tag>
+              <a-tag v-if="record.partialDueToTimeout" color="orange" class="crawl-stalled-tag">
+                部分结果：采集接近超时，可能未加载完全部评论
+              </a-tag>
               <span v-if="record.stopReason" class="muted">停止原因：{{ stopReasonLabel(record.stopReason) }}</span>
               <span v-if="record.commentSortAttempted !== null" class="muted">
                 评论排序：{{ record.commentSortSwitched ? "已切换所有评论" : "未确认所有评论" }}

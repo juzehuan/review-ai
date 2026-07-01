@@ -103,6 +103,7 @@ function buildCrawlStalledInsight(job: {
   const maxReviewsLabel = job.maxReviews > 0 ? String(job.maxReviews) : "不限";
   const stopReason = readOptionalString(rawResult?.stopReason);
   const progressEventAt = readOptionalString(rawResult?.progressEventAt);
+  const partialDueToTimeout = readOptionalBoolean(rawResult?.partialDueToTimeout);
   const commentSortAttempted = readOptionalBoolean(rawResult?.commentSortAttempted);
   const commentSortSwitched = readOptionalBoolean(rawResult?.commentSortSwitched);
   const totalComments = readOptionalNumber(rawResult?.totalComments);
@@ -119,6 +120,7 @@ function buildCrawlStalledInsight(job: {
     domContentTextCount !== null ? `DOM 文本 ${domContentTextCount}` : null,
     loadMoreClicks !== null ? `加载更多 ${loadMoreClicks}` : null,
     progressEventAt ? `进度回传 ${progressEventAt}` : null,
+    partialDueToTimeout ? "部分结果超时" : null,
     stopReason ? `停止原因 ${stopReason}` : null
   ]);
 
