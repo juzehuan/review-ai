@@ -23,6 +23,7 @@ import type {
   MemberRole,
   MyWorkspaceDTO,
   PromptEvalDTO,
+  QueueControlResponse,
   QueueHealthDTO,
   QueueIntegrityRepairResponse,
   ReportShareDTO,
@@ -276,6 +277,14 @@ export async function fetchAdminQueueHealth() {
 
 export async function repairQueueIntegrityAlert(payload: { kind: "crawl" | "analysis"; id: string }) {
   const { data } = await api.post<QueueIntegrityRepairResponse>("/admin/queue-health/requeue", payload);
+  return data;
+}
+
+export async function controlAdminQueue(payload: {
+  queueName: QueueControlResponse["queueName"];
+  action: QueueControlResponse["action"];
+}) {
+  const { data } = await api.post<QueueControlResponse>("/admin/queue-health/control", payload);
   return data;
 }
 

@@ -257,6 +257,12 @@ export interface QueueIntegrityRepairResponse {
   message: string;
 }
 
+export interface QueueControlResponse {
+  queueName: "analysis-runs" | "crawl-jobs";
+  action: "pause" | "resume";
+  isPaused: boolean;
+}
+
 export interface QueueHealthDTO {
   queues: QueueSnapshotDTO[];
   workloads: WorkloadHealthSnapshotDTO[];

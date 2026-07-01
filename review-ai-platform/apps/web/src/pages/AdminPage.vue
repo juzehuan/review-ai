@@ -184,7 +184,12 @@
                 等待 {{ queue.waiting }} · 运行 {{ queue.active }} · 延迟 {{ queue.delayed }} · 失败 {{ queue.failed }}
               </div>
               <a-alert v-if="queue.error" type="error" show-icon :message="queue.error" />
-              <a-tag v-else :color="queue.isPaused ? 'orange' : 'green'">{{ queue.isPaused ? "已暂停" : "消费中" }}</a-tag>
+              <div v-else class="queue-control-row">
+                <a-tag :color="queue.isPaused ? 'orange' : 'green'">{{ queue.isPaused ? "已暂停" : "消费中" }}</a-tag>
+                <a-button size="small" :loading="queueControlName === queue.name" @click="toggleQueuePause(queue.name, queue.isPaused)">
+                  {{ queue.isPaused ? "恢复队列" : "暂停队列" }}
+                </a-button>
+              </div>
             </div>
           </div>
           <div class="table-title workload-title">数据库任务健康</div>
@@ -573,6 +578,7 @@ import type {
   WorkloadHealthSnapshotDTO
 } from "@review-ai/shared";
 import {
+  controlAdminQueue,
   fetchAdminAuditLogs,
   fetchAdminQueueHealth,
   cancelRun,
@@ -607,6 +613,7 @@ const queueHealth = ref<QueueHealthDTO | null>(null);
 const forbidden = ref(false);
 const savingUserId = ref("");
 const queueRetryingId = ref("");
+const queueControlName = ref("");
 const quotaDrafts = reactive<Record<string, { monthlyReviewLimit: number; monthlyRunLimit: number }>>({});
 const { currentUser } = useTaskStore();
 let queueHealthTimer: ReturnType<typeof setInterval> | null = null;
@@ -663,6 +670,8 @@ const knownAuditActions = [
   "crawl_job.retry",
   "crawl_job.cancel",
   "crawl_job.delete",
+  "queue.pause",
+  "queue.resume",
   "queue_integrity.requeue",
   "crawl_monitor.create",
   "crawl_monitor.update",
@@ -694,6 +703,7 @@ const knownAuditTargetTypes = [
   "prompt_eval",
   "crawl_job",
   "crawl_monitor",
+  "queue",
   "analysis_run",
   "review_import",
   "review_view",
@@ -915,6 +925,27 @@ async function resetAuditFilters() {
 
 async function loadQueueHealth() {
   queueHealth.value = await fetchAdminQueueHealth();
+}
+
+function isControllableQueueName(value: string): value is "analysis-runs" | "crawl-jobs" {
+  return value === "analysis-runs" || value === "crawl-jobs";
+}
+
+async function toggleQueuePause(queueName: string, isPaused: boolean) {
+  if (!isControllableQueueName(queueName) || queueControlName.value) {
+    return;
+  }
+  queueControlName.value = queueName;
+  try {
+    await controlAdminQueue({ queueName, action: isPaused ? "resume" : "pause" });
+    message.success(isPaused ? "队列已恢复" : "队列已暂停");
+    await loadQueueHealth();
+    await loadAuditLogs();
+  } catch (error) {
+    message.error(readErrorMessage(error, isPaused ? "恢复队列失败" : "暂停队列失败"));
+  } finally {
+    queueControlName.value = "";
+  }
 }
 
 async function refreshQueueHealthSilently() {
@@ -1277,6 +1308,8 @@ function actionLabel(action: string) {
       "crawl_job.retry": "重试采集任务",
       "crawl_job.cancel": "停止采集任务",
       "crawl_job.delete": "删除采集任务",
+      "queue.pause": "暂停队列",
+      "queue.resume": "恢复队列",
       "queue_integrity.requeue": "补回队列任务",
       "crawl_monitor.create": "创建监听任务",
       "crawl_monitor.update": "更新监听任务",
@@ -1312,6 +1345,7 @@ function targetTypeLabel(type: string) {
       prompt_eval: "提示词评测",
       crawl_job: "采集任务",
       crawl_monitor: "监听任务",
+      queue: "队列",
       analysis_run: "分析批次",
       review_import: "评论导入",
       review_view: "分析视图",
@@ -1482,6 +1516,14 @@ onUnmounted(stopQueueHealthPolling);
 <style scoped>
 .workload-title {
   margin-top: 18px;
+}
+
+.queue-control-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .table-title-row {
