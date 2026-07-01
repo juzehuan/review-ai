@@ -365,7 +365,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 import { ArrowLeftOutlined, KeyOutlined, ReloadOutlined, UserAddOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
@@ -408,6 +408,8 @@ const forbidden = ref(false);
 const savingUserId = ref("");
 const quotaDrafts = reactive<Record<string, { monthlyReviewLimit: number; monthlyRunLimit: number }>>({});
 const { currentUser } = useTaskStore();
+let queueHealthTimer: ReturnType<typeof setInterval> | null = null;
+let queueHealthRefreshing = false;
 
 const userForm = reactive({
   name: "",
@@ -481,6 +483,35 @@ async function loadAuditLogs() {
 
 async function loadQueueHealth() {
   queueHealth.value = await fetchAdminQueueHealth();
+}
+
+async function refreshQueueHealthSilently() {
+  if (queueHealthRefreshing || forbidden.value) {
+    return;
+  }
+  queueHealthRefreshing = true;
+  try {
+    await loadQueueHealth();
+  } catch {
+    // Full-page refresh still surfaces errors; polling should stay quiet.
+  } finally {
+    queueHealthRefreshing = false;
+  }
+}
+
+function stopQueueHealthPolling() {
+  if (queueHealthTimer) {
+    clearInterval(queueHealthTimer);
+    queueHealthTimer = null;
+  }
+}
+
+function startQueueHealthPolling() {
+  if (queueHealthTimer || activeTab.value !== "queues" || forbidden.value) {
+    return;
+  }
+  refreshQueueHealthSilently();
+  queueHealthTimer = setInterval(refreshQueueHealthSilently, 10000);
 }
 
 async function load() {
@@ -780,7 +811,20 @@ function reviewPercent(record: AdminUserDTO) {
   return Math.min(Math.round((record.currentPeriodReviewCount / record.monthlyReviewLimit) * 100), 100);
 }
 
-onMounted(load);
+watch(activeTab, (tab) => {
+  if (tab === "queues") {
+    startQueueHealthPolling();
+  } else {
+    stopQueueHealthPolling();
+  }
+});
+
+onMounted(async () => {
+  await load();
+  startQueueHealthPolling();
+});
+
+onUnmounted(stopQueueHealthPolling);
 </script>
 
 <style scoped>
