@@ -176,6 +176,10 @@ export interface QueueStalledDTO {
   ageSeconds: number;
   progressPercent: number;
   detail: string;
+  diagnosis: string;
+  nextAction: string;
+  metricSummary: string | null;
+  lastError: string | null;
 }
 
 export interface QueueHealthDTO {

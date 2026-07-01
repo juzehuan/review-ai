@@ -206,7 +206,7 @@
             :loading="loading"
             row-key="id"
             :pagination="{ pageSize: 8 }"
-            :scroll="{ x: 1180 }"
+            :scroll="{ x: 1520 }"
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'kind'">
@@ -228,6 +228,16 @@
               <template v-else-if="column.key === 'progress'">
                 <a-progress :percent="record.progressPercent" size="small" :status="record.kind === 'crawl' ? 'active' : 'normal'" />
                 <div class="member-email">{{ record.detail }}</div>
+              </template>
+              <template v-else-if="column.key === 'diagnosis'">
+                <div class="stalled-diagnosis-cell">
+                  <a-tag :color="stalledDiagnosisColor(record)">{{ record.diagnosis }}</a-tag>
+                  <div class="member-email">{{ record.nextAction }}</div>
+                  <div v-if="record.metricSummary" class="member-email">{{ record.metricSummary }}</div>
+                  <a-tooltip v-if="record.lastError" :title="record.lastError">
+                    <div class="member-email error-summary">最近错误：{{ errorSummary(record.lastError) }}</div>
+                  </a-tooltip>
+                </div>
               </template>
               <template v-else-if="column.key === 'activity'">
                 <div>{{ formatTime(record.lastActivityAt) }}</div>
@@ -461,6 +471,7 @@ const stalledColumns = [
   { title: "空间", key: "workspace", width: 210 },
   { title: "渠道/模型", key: "context", width: 180 },
   { title: "进度", key: "progress", width: 240 },
+  { title: "诊断建议", key: "diagnosis", width: 360 },
   { title: "最后活动", key: "activity", width: 190 }
 ];
 
@@ -580,6 +591,16 @@ function errorSummary(value?: string | null) {
     return "-";
   }
   return text.length > 72 ? `${text.slice(0, 72)}...` : text;
+}
+
+function stalledDiagnosisColor(record: QueueStalledDTO) {
+  if (record.lastError) {
+    return "red";
+  }
+  if (/未|无|超过|超时|阻塞|静默/.test(record.diagnosis)) {
+    return "orange";
+  }
+  return record.kind === "crawl" ? "blue" : "purple";
 }
 
 function workloadStatusColor(workload: WorkloadHealthSnapshotDTO) {
@@ -765,5 +786,24 @@ onMounted(load);
 <style scoped>
 .workload-title {
   margin-top: 18px;
+}
+
+.stalled-diagnosis-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stalled-diagnosis-cell :deep(.ant-tag) {
+  justify-self: start;
+  margin-inline-end: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error-summary {
+  color: #b91c1c;
 }
 </style>

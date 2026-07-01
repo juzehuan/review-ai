@@ -202,6 +202,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "失败对象": "Failed target",
     "渠道/模型": "Channel / model",
     "错误摘要": "Error summary",
+    "诊断建议": "Diagnosis",
     "失败时间": "Failed at",
     "最后活动": "Last activity",
     "更新时间": "Updated at",
@@ -219,6 +220,28 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "空闲": "Idle",
     "采集": "Crawl",
     "已静默": "Silent for",
+    "排队超过阈值，疑似 worker 未消费或队列阻塞": "Queued beyond threshold; worker may not be consuming or the queue is blocked",
+    "任务仍在运行态但已有最近错误": "Task is still running but has a recent error",
+    "采集器接近或达到超时，任务未正常收尾": "Crawler is near or past timeout and did not finish cleanly",
+    "评论排序未确认切换到全部评论": "Comment sorting was not confirmed as all comments",
+    "已有评论入缓存，疑似导入或收尾阶段静默": "Comments are cached; import or finalization may be silent",
+    "采集器仍有过程指标，但暂未形成有效评论": "Crawler still reports metrics but has not produced valid comments",
+    "运行超过阈值且没有采集器进度回传": "Running beyond threshold with no crawler progress events",
+    "分析批次排队超过阈值，疑似 AI worker 未消费": "Analysis run queued beyond threshold; AI worker may not be consuming",
+    "分析批次运行中但已有最近错误": "Analysis run is active but has a recent error",
+    "已有部分评论处理完成，但最近无进度日志": "Some comments were processed, but no recent progress logs",
+    "分析批次运行超过阈值且没有处理进度": "Analysis run exceeded threshold with no processing progress",
+    "检查 crawl-jobs 队列 active/waiting 数、worker 进程和 Redis 连接": "Check crawl-jobs active/waiting counts, worker process, and Redis connection",
+    "先查看错误摘要，确认代理、登录态、平台限制或 Python 浏览器依赖": "Review the error summary first; check proxy, login state, platform limits, or Python browser dependencies",
+    "降低单次最大采集数或检查平台加载速度，必要时重试": "Lower max comments per crawl or check platform loading speed; retry if needed",
+    "检查平台登录态、页面语言和排序按钮文案，避免只抓到相关评论": "Check platform login, page language, and sort-button text to avoid only relevant comments",
+    "等待短时间自动收尾；若持续静默，查看 worker 日志后重试": "Wait briefly for finalization; if silence continues, check worker logs and retry",
+    "检查平台是否需要登录、评论区是否受限、代理是否触发风控": "Check whether login is required, comments are restricted, or proxy triggered risk control",
+    "优先检查 Python/浏览器依赖、worker 进程、代理和目标链接可访问性": "Prioritize Python/browser dependencies, worker process, proxy, and target URL accessibility",
+    "检查 analysis-runs 队列、worker 并发和 Redis 连接": "Check analysis-runs queue, worker concurrency, and Redis connection",
+    "检查 AI 配置、模型额度、网络超时和最近失败样本": "Check AI settings, model quota, network timeout, and recent failed samples",
+    "查看 worker 日志和当前批次大小，必要时降低并发或重试": "Check worker logs and current batch size; reduce concurrency or retry if needed",
+    "检查 AI worker 是否在线、模型接口是否可用、任务是否被长请求占用": "Check whether AI worker is online, model API is available, or the task is held by a long request",
     "导入": "Imported",
     "后台权限": "Console role",
     "配额调整": "Quota adjustment",
@@ -576,6 +599,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "失败对象": "เป้าหมายที่ล้มเหลว",
     "渠道/模型": "ช่องทาง / โมเดล",
     "错误摘要": "สรุปข้อผิดพลาด",
+    "诊断建议": "การวินิจฉัย",
     "失败时间": "เวลาที่ล้มเหลว",
     "最后活动": "กิจกรรมล่าสุด",
     "更新时间": "อัปเดตเมื่อ",
@@ -593,6 +617,28 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "空闲": "ว่าง",
     "采集": "เก็บข้อมูล",
     "已静默": "เงียบมา",
+    "排队超过阈值，疑似 worker 未消费或队列阻塞": "เข้าคิวนานเกินกำหนด อาจไม่มี worker รับงานหรือคิวติดขัด",
+    "任务仍在运行态但已有最近错误": "งานยังอยู่สถานะทำงานแต่มีข้อผิดพลาดล่าสุด",
+    "采集器接近或达到超时，任务未正常收尾": "ตัวเก็บข้อมูลใกล้หรือถึงเวลาหมดอายุและยังปิดงานไม่สมบูรณ์",
+    "评论排序未确认切换到全部评论": "ยังยืนยันไม่ได้ว่าเปลี่ยนการเรียงเป็นคอมเมนต์ทั้งหมด",
+    "已有评论入缓存，疑似导入或收尾阶段静默": "มีคอมเมนต์เข้าแคชแล้ว อาจเงียบในช่วงนำเข้าหรือปิดงาน",
+    "采集器仍有过程指标，但暂未形成有效评论": "ตัวเก็บข้อมูลยังส่งตัวชี้วัด แต่ยังไม่ได้คอมเมนต์ที่ใช้ได้",
+    "运行超过阈值且没有采集器进度回传": "ทำงานเกินกำหนดโดยไม่มีความคืบหน้าจากตัวเก็บข้อมูล",
+    "分析批次排队超过阈值，疑似 AI worker 未消费": "รอบวิเคราะห์เข้าคิวนานเกินกำหนด อาจไม่มี AI worker รับงาน",
+    "分析批次运行中但已有最近错误": "รอบวิเคราะห์กำลังทำงานแต่มีข้อผิดพลาดล่าสุด",
+    "已有部分评论处理完成，但最近无进度日志": "ประมวลผลบางคอมเมนต์แล้ว แต่ไม่มีบันทึกความคืบหน้าล่าสุด",
+    "分析批次运行超过阈值且没有处理进度": "รอบวิเคราะห์ทำงานเกินกำหนดโดยไม่มีความคืบหน้า",
+    "检查 crawl-jobs 队列 active/waiting 数、worker 进程和 Redis 连接": "ตรวจจำนวน active/waiting ในคิว crawl-jobs, โปรเซส worker และการเชื่อมต่อ Redis",
+    "先查看错误摘要，确认代理、登录态、平台限制或 Python 浏览器依赖": "ดูสรุปข้อผิดพลาดก่อน แล้วตรวจ proxy, สถานะล็อกอิน, ข้อจำกัดแพลตฟอร์ม หรือ dependency เบราว์เซอร์ Python",
+    "降低单次最大采集数或检查平台加载速度，必要时重试": "ลดจำนวนสูงสุดต่อครั้งหรือตรวจความเร็วโหลดของแพลตฟอร์ม แล้วลองใหม่หากจำเป็น",
+    "检查平台登录态、页面语言和排序按钮文案，避免只抓到相关评论": "ตรวจสถานะล็อกอิน ภาษาเพจ และข้อความปุ่มเรียงลำดับ เพื่อเลี่ยงการเก็บเฉพาะคอมเมนต์ที่เกี่ยวข้อง",
+    "等待短时间自动收尾；若持续静默，查看 worker 日志后重试": "รอสักครู่ให้ปิดงานอัตโนมัติ หากยังเงียบให้ดูบันทึก worker แล้วลองใหม่",
+    "检查平台是否需要登录、评论区是否受限、代理是否触发风控": "ตรวจว่าต้องล็อกอินหรือไม่ คอมเมนต์ถูกจำกัดหรือไม่ หรือ proxy กระตุ้นระบบป้องกันหรือไม่",
+    "优先检查 Python/浏览器依赖、worker 进程、代理和目标链接可访问性": "ตรวจ Python/browser dependencies, โปรเซส worker, proxy และการเข้าถึงลิงก์เป้าหมายก่อน",
+    "检查 analysis-runs 队列、worker 并发和 Redis 连接": "ตรวจคิว analysis-runs, concurrency ของ worker และการเชื่อมต่อ Redis",
+    "检查 AI 配置、模型额度、网络超时和最近失败样本": "ตรวจการตั้งค่า AI, โควตาโมเดล, timeout เครือข่าย และตัวอย่างที่ล้มเหลวล่าสุด",
+    "查看 worker 日志和当前批次大小，必要时降低并发或重试": "ดูบันทึก worker และขนาด batch ปัจจุบัน ลด concurrency หรือลองใหม่หากจำเป็น",
+    "检查 AI worker 是否在线、模型接口是否可用、任务是否被长请求占用": "ตรวจว่า AI worker ออนไลน์หรือไม่ API โมเดลใช้ได้หรือไม่ หรืองานติดคำขอยาวอยู่หรือไม่",
     "导入": "นำเข้า",
     "后台权限": "สิทธิ์คอนโซล",
     "配额调整": "ปรับโควตา",
@@ -916,6 +962,10 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
       ? `${samples[1]} related comments · ${samples[2]} samples`
       : `${samples[1]} คอมเมนต์ที่เกี่ยวข้อง · ${samples[2]} ตัวอย่าง`;
   }
+  const recentError = value.match(/^最近错误：(.+)$/);
+  if (recentError) {
+    return locale === "en-US" ? `Recent error: ${recentError[1]}` : `ข้อผิดพลาดล่าสุด: ${recentError[1]}`;
+  }
   const crawlMetricPart = (part: string) => {
     const total = part.match(/^平台总量\s+(\d+)$/);
     if (total) return locale === "en-US" ? `Platform total ${total[1]}` : `ทั้งหมดบนแพลตฟอร์ม ${total[1]}`;
@@ -939,6 +989,10 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
     if (remaining) {
       return locale === "en-US" ? `Est. remaining ${translateDuration(remaining[1])}` : `เหลือประมาณ ${translateDuration(remaining[1])}`;
     }
+    const progressEvent = part.match(/^进度回传\s+(.+)$/);
+    if (progressEvent) return locale === "en-US" ? `Progress event ${progressEvent[1]}` : `ความคืบหน้า ${progressEvent[1]}`;
+    const stopReason = part.match(/^停止原因\s+(.+)$/);
+    if (stopReason) return locale === "en-US" ? `Stop reason ${stopReason[1]}` : `เหตุผลที่หยุด ${stopReason[1]}`;
     const updated = part.match(/^更新于\s+(.+)前$/);
     if (updated) return locale === "en-US" ? `Updated ${translateDuration(updated[1])} ago` : `อัปเดตเมื่อ ${translateDuration(updated[1])}ที่แล้ว`;
     return null;
