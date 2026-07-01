@@ -75,6 +75,8 @@ type CrawlResult = {
   stopReason?: string;
   commentSortAttempted?: boolean;
   commentSortSwitched?: boolean;
+  commentSortOpened?: boolean;
+  commentSortLabel?: string;
 };
 
 type ResolvedCrawlerSetting = {
@@ -114,6 +116,8 @@ type CrawlerProgressEvent = {
   stopReason?: string;
   commentSortAttempted?: boolean;
   commentSortSwitched?: boolean;
+  commentSortOpened?: boolean;
+  commentSortLabel?: string;
   cursor?: string | number;
   totalComments?: number;
   remainingSeconds?: number;
@@ -384,6 +388,8 @@ function buildCrawlProgressRawResult(event: CrawlerProgressEvent) {
     stopReason: event.stopReason,
     commentSortAttempted: readProgressBoolean(event.commentSortAttempted),
     commentSortSwitched: readProgressBoolean(event.commentSortSwitched),
+    commentSortOpened: readProgressBoolean(event.commentSortOpened),
+    commentSortLabel: event.commentSortLabel,
     cursor: event.cursor,
     totalComments: readProgressInt(event.totalComments),
     remainingSeconds: readProgressInt(event.remainingSeconds)
@@ -2899,7 +2905,9 @@ const crawlWorker = new Worker(
               totalComments: latestEvent.totalComments,
               endReached: latestEvent.endReached,
               stopReason: latestEvent.stopReason,
-              commentSortSwitched: latestEvent.commentSortSwitched
+              commentSortSwitched: latestEvent.commentSortSwitched,
+              commentSortOpened: latestEvent.commentSortOpened,
+              commentSortLabel: latestEvent.commentSortLabel
             })
           : "";
         if (nextProgress <= lastReportedProgress && (!eventKey || eventKey === lastReportedProgressEvent)) {

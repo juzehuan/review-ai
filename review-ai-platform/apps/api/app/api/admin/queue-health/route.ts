@@ -222,6 +222,8 @@ function buildCrawlStalledInsight(job: {
   const partialDueToTimeout = readOptionalBoolean(rawResult?.partialDueToTimeout);
   const commentSortAttempted = readOptionalBoolean(rawResult?.commentSortAttempted);
   const commentSortSwitched = readOptionalBoolean(rawResult?.commentSortSwitched);
+  const commentSortOpened = readOptionalBoolean(rawResult?.commentSortOpened);
+  const commentSortLabel = readOptionalString(rawResult?.commentSortLabel);
   const totalComments = readCrawlTotalComments(rawResult);
   const nextRequests = readOptionalNumber(rawResult?.nextRequests);
   const payloadComments = readOptionalNumber(rawResult?.payloadComments);
@@ -241,6 +243,8 @@ function buildCrawlStalledInsight(job: {
     cursor ? `游标 ${cursor}` : null,
     hasMore !== null ? `还有更多 ${hasMore ? "是" : "否"}` : null,
     lastRequestStatus !== null ? `请求状态 ${lastRequestStatus}` : null,
+    commentSortLabel ? `排序标签 ${commentSortLabel}` : null,
+    commentSortOpened !== null ? `排序菜单 ${commentSortOpened ? "已打开" : "未打开"}` : null,
     progressEventAt ? `进度回传 ${progressEventAt}` : null,
     partialDueToTimeout ? "部分结果超时" : null,
     stopReason ? `停止原因 ${stopReason}` : null

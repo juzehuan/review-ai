@@ -30,6 +30,8 @@ export type CrawlResult = {
   stopReason?: string;
   commentSortAttempted?: boolean;
   commentSortSwitched?: boolean;
+  commentSortOpened?: boolean;
+  commentSortLabel?: string;
 };
 
 export type ResolvedCrawlerSetting = {

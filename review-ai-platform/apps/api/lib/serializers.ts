@@ -438,6 +438,8 @@ export function serializeCrawlJob(job: CrawlJobWithWorkspace): CrawlJobDTO {
     partialDueToTimeout: readOptionalBoolean(rawResult?.partialDueToTimeout),
     commentSortAttempted: readOptionalBoolean(rawResult?.commentSortAttempted),
     commentSortSwitched: readOptionalBoolean(rawResult?.commentSortSwitched),
+    commentSortOpened: readOptionalBoolean(rawResult?.commentSortOpened),
+    commentSortLabel: readOptionalString(rawResult?.commentSortLabel),
     nextRequests: readOptionalNumber(rawResult?.nextRequests),
     payloadComments: readOptionalNumber(rawResult?.payloadComments),
     domCommentCount: readOptionalNumber(rawResult?.domCommentCount),

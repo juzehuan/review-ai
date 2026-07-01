@@ -95,6 +95,8 @@ def emit_crawl_progress(
                 "stopReason": state.get("stop_reason"),
                 "commentSortAttempted": state.get("comment_sort_attempted"),
                 "commentSortSwitched": state.get("comment_sort_switched"),
+                "commentSortOpened": state.get("comment_sort_opened"),
+                "commentSortLabel": state.get("comment_sort_label"),
                 "cursor": state.get("cursor"),
                 "totalComments": state.get("total_comments"),
                 "remainingSeconds": remaining_seconds,
@@ -1883,6 +1885,8 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         "end_reached": False,
         "comment_sort_attempted": False,
         "comment_sort_switched": False,
+        "comment_sort_opened": None,
+        "comment_sort_label": None,
         "stop_reason": "unknown",
     }
 
@@ -1916,54 +1920,102 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         def switch_to_all_comments() -> bool:
             state["comment_sort_attempted"] = True
             try:
-                opened = bool(
-                    page.evaluate(
-                        """() => {
-                            const clean = (value) => (value || "").replace(/\\s+/g, " ").trim().toLowerCase();
-                            const triggerLabels = [
-                              "most relevant",
-                              "top comments",
-                              "relevant comments",
-                              "最相关",
-                              "热门评论",
-                              "熱門留言",
-                              "热门留言"
-                            ];
-                            const nodes = Array.from(document.querySelectorAll("div[role='button'], span[role='button'], a[role='link']"));
-                            const target = nodes.find((node) => triggerLabels.some((label) => clean(node.textContent).includes(label.toLowerCase())));
-                            if (target) {
-                              target.click();
-                              return true;
-                            }
-                            return false;
-                        }"""
-                    )
-                )
-                if (opened):
+                open_result = page.evaluate(
+                    """() => {
+                        const clean = (value) => (value || "").replace(/\\s+/g, " ").trim();
+                        const textFor = (node) => clean([
+                          node.textContent,
+                          node.getAttribute("aria-label"),
+                          node.getAttribute("title")
+                        ].filter(Boolean).join(" "));
+                        const lower = (value) => clean(value).toLowerCase();
+                        const allLabels = [
+                          "all comments",
+                          "all public comments",
+                          "所有评论",
+                          "全部评论",
+                          "所有留言",
+                          "全部留言",
+                          "所有回應",
+                          "所有回应",
+                          "ความคิดเห็นทั้งหมด"
+                        ];
+                        const triggerLabels = [
+                          "most relevant",
+                          "top comments",
+                          "relevant comments",
+                          "comment ranking",
+                          "sort comments",
+                          "最相关",
+                          "最相關",
+                          "热门评论",
+                          "熱門留言",
+                          "热门留言",
+                          "ความคิดเห็นที่เกี่ยวข้องมากที่สุด",
+                          "เกี่ยวข้องมากที่สุด"
+                        ];
+                        const isAll = (text) => allLabels.some((label) => lower(text).includes(lower(label)));
+                        const isTrigger = (text) => triggerLabels.some((label) => lower(text).includes(lower(label)));
+                        const isNoise = (text) => /view more comments|see more comments|查看更多|更多评论|more comments/i.test(text);
+                        const nodes = Array.from(document.querySelectorAll(
+                          "[aria-haspopup='menu'], [aria-haspopup='listbox'], div[role='button'], span[role='button'], a[role='link']"
+                        ));
+                        const labeledNodes = nodes
+                          .map((node) => ({ node, label: textFor(node) }))
+                          .filter((item) => item.label && item.label.length <= 120 && !isNoise(item.label));
+                        const allNode = labeledNodes.find((item) => isAll(item.label));
+                        if (allNode) {
+                          return { opened: false, alreadyAll: true, label: allNode.label };
+                        }
+                        const target = labeledNodes.find((item) => isTrigger(item.label));
+                        if (target) {
+                          target.node.click();
+                          return { opened: true, alreadyAll: false, label: target.label };
+                        }
+                        return { opened: false, alreadyAll: false, label: "" };
+                    }"""
+                ) or {}
+                if isinstance(open_result, dict):
+                    state["comment_sort_opened"] = bool(open_result.get("opened"))
+                    if open_result.get("label"):
+                        state["comment_sort_label"] = str(open_result.get("label"))
+                    if open_result.get("alreadyAll"):
+                        state["comment_sort_switched"] = True
+                        return True
+                else:
+                    state["comment_sort_opened"] = bool(open_result)
+                if state.get("comment_sort_opened"):
                     page.wait_for_timeout(1000)
-                switched = bool(
-                    page.evaluate(
-                        """() => {
-                            const clean = (value) => (value || "").replace(/\\s+/g, " ").trim().toLowerCase();
-                            const optionLabels = [
-                              "all comments",
-                              "所有评论",
-                              "全部评论",
-                              "所有留言",
-                              "全部留言",
-                              "所有回應",
-                              "所有回应"
-                            ];
-                            const nodes = Array.from(document.querySelectorAll("div[role='menuitem'], div[role='option'], div[role='button'], span[role='button']"));
-                            const target = nodes.find((node) => optionLabels.some((label) => clean(node.textContent).includes(label.toLowerCase())));
-                            if (target) {
-                              target.click();
-                              return true;
-                            }
-                            return false;
-                        }"""
-                    )
-                )
+                switch_result = page.evaluate(
+                    """() => {
+                        const clean = (value) => (value || "").replace(/\\s+/g, " ").trim();
+                        const lower = (value) => clean(value).toLowerCase();
+                        const optionLabels = [
+                          "all comments",
+                          "all public comments",
+                          "所有评论",
+                          "全部评论",
+                          "所有留言",
+                          "全部留言",
+                          "所有回應",
+                          "所有回应",
+                          "ความคิดเห็นทั้งหมด"
+                        ];
+                        const nodes = Array.from(document.querySelectorAll("div[role='menuitem'], div[role='option'], div[role='button'], span[role='button'], [aria-checked]"));
+                        const target = nodes
+                          .map((node) => ({ node, label: clean([node.textContent, node.getAttribute("aria-label"), node.getAttribute("title")].filter(Boolean).join(" ")) }))
+                          .filter((item) => item.label && item.label.length <= 120)
+                          .find((item) => optionLabels.some((label) => lower(item.label).includes(lower(label))));
+                        if (target) {
+                          target.node.click();
+                          return { switched: true, label: target.label };
+                        }
+                        return { switched: false, label: "" };
+                    }"""
+                ) or {}
+                switched = bool(switch_result.get("switched")) if isinstance(switch_result, dict) else bool(switch_result)
+                if isinstance(switch_result, dict) and switch_result.get("label"):
+                    state["comment_sort_label"] = str(switch_result.get("label"))
                 if switched:
                     state["comment_sort_switched"] = True
                     page.wait_for_timeout(1800)
@@ -2236,6 +2288,8 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         "stopReason": stop_reason,
         "commentSortAttempted": state.get("comment_sort_attempted"),
         "commentSortSwitched": state.get("comment_sort_switched"),
+        "commentSortOpened": state.get("comment_sort_opened"),
+        "commentSortLabel": state.get("comment_sort_label"),
         "rows": rows,
     }
 

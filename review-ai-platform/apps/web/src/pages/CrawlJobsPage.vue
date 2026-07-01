@@ -309,6 +309,7 @@
               </div>
               <span v-if="record.commentSortAttempted !== null" class="muted">
                 评论排序：{{ record.commentSortSwitched ? "已切换所有评论" : "未确认所有评论" }}
+                <template v-if="record.commentSortLabel"> · {{ record.commentSortLabel }}</template>
               </span>
               <span v-if="crawlMetricSummary(record)" class="muted">{{ crawlMetricSummary(record) }}</span>
               <span v-if="record.endReached !== null" class="muted">末尾状态：{{ record.endReached ? "已到达" : "未确认" }}</span>
@@ -1054,6 +1055,8 @@ function crawlMetricSummary(job: CrawlJobDTO) {
     job.domCommentCount !== null ? `DOM 评论 ${job.domCommentCount}` : "",
     job.domContentTextCount !== null ? `DOM 文本 ${job.domContentTextCount}` : "",
     job.loadMoreClicks !== null ? `加载更多 ${job.loadMoreClicks}` : "",
+    job.commentSortOpened !== null ? `排序菜单 ${job.commentSortOpened ? "已打开" : "未打开"}` : "",
+    job.commentSortLabel ? `排序标签 ${job.commentSortLabel}` : "",
     job.cursor ? `游标 ${shortCursor(job.cursor)}` : "",
     job.hasMore !== null ? `还有更多 ${job.hasMore ? "是" : "否"}` : "",
     job.lastRequestStatus !== null ? `请求状态 ${job.lastRequestStatus}` : ""
@@ -1120,6 +1123,12 @@ function crawlTelemetryStats(job: CrawlJobDTO): CrawlTelemetryStat[] {
   }
   if (job.noMoreButtonRounds !== null) {
     stats.push({ label: "未见更多", value: formatCount(job.noMoreButtonRounds), warning: job.noMoreButtonRounds >= 3 });
+  }
+  if (job.commentSortOpened !== null) {
+    stats.push({ label: "排序菜单", value: job.commentSortOpened ? "已打开" : "未打开", warning: job.commentSortAttempted === true && job.commentSortOpened === false && job.commentSortSwitched !== true });
+  }
+  if (job.commentSortLabel) {
+    stats.push({ label: "排序标签", value: job.commentSortLabel });
   }
   if (job.cursor) {
     stats.push({ label: "游标", value: shortCursor(job.cursor) });
