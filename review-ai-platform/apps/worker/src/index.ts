@@ -321,13 +321,29 @@ function readProgressNumber(value: unknown) {
   if (value === null || value === undefined || value === "") {
     return null;
   }
-  const parsed = Number(value);
+  const parsed = typeof value === "string" ? Number(value.trim().replace(/,/g, "")) : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 function readProgressInt(value: unknown) {
   const parsed = readProgressNumber(value);
   return parsed === null ? null : Math.max(0, Math.floor(parsed));
+}
+
+function readProgressBoolean(value: unknown) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "y"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "0", "no", "n"].includes(normalized)) {
+      return false;
+    }
+  }
+  return null;
 }
 
 function compactJsonObject(value: Record<string, unknown>) {
@@ -350,12 +366,12 @@ function buildCrawlProgressRawResult(event: CrawlerProgressEvent) {
     domCommentCount: readProgressInt(event.domCommentCount),
     domContentTextCount: readProgressInt(event.domContentTextCount),
     loadMoreClicks: readProgressInt(event.loadMoreClicks),
-    hasMore: event.hasMore,
+    hasMore: readProgressBoolean(event.hasMore),
     lastRequestStatus: readProgressInt(event.lastRequestStatus),
-    endReached: event.endReached,
+    endReached: readProgressBoolean(event.endReached),
     stopReason: event.stopReason,
-    commentSortAttempted: event.commentSortAttempted,
-    commentSortSwitched: event.commentSortSwitched,
+    commentSortAttempted: readProgressBoolean(event.commentSortAttempted),
+    commentSortSwitched: readProgressBoolean(event.commentSortSwitched),
     cursor: event.cursor,
     totalComments: readProgressInt(event.totalComments),
     remainingSeconds: readProgressInt(event.remainingSeconds)
