@@ -32,6 +32,9 @@ function emptyLanguageProfile(): DashboardDTO["languageProfile"] {
     nonChineseCount: 0,
     nonChineseRate: 0,
     mixedLanguageCount: 0,
+    mixedLanguageRate: 0,
+    translationCoverageCount: 0,
+    translationCoverageRate: 0,
     distribution: []
   };
 }

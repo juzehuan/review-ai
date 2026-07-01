@@ -71,10 +71,13 @@
             <div class="settings-section-title">只读报告链接</div>
             <div class="settings-help">外部访问者无需登录，只能查看当前任务的报告汇总和图表。</div>
           </div>
-          <a-button type="primary" :loading="shareCreating" @click="createShareLink">
-            <template #icon><ShareAltOutlined /></template>
-            生成链接
-          </a-button>
+          <a-space wrap>
+            <a-segmented v-model:value="shareSnapshotMode" :options="shareSnapshotModeOptions" />
+            <a-button type="primary" :loading="shareCreating" @click="createShareLink">
+              <template #icon><ShareAltOutlined /></template>
+              生成链接
+            </a-button>
+          </a-space>
         </div>
 
         <a-spin :spinning="shareLoading">
@@ -455,6 +458,7 @@ const loading = ref(false);
 const shareLoading = ref(false);
 const shareCreating = ref(false);
 const showShareModal = ref(false);
+const shareSnapshotMode = ref<ReportShareDTO["snapshotMode"]>("snapshot");
 const actionCreatingIssue = ref<string | null>(null);
 const gaugeRef = ref<HTMLDivElement | null>(null);
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -477,6 +481,11 @@ type ChartDataPayload = {
 };
 
 type QualityAlert = DashboardDTO["qualityAlerts"][number];
+
+const shareSnapshotModeOptions = [
+  { label: "固定当前版本", value: "snapshot" },
+  { label: "实时报告", value: "live" }
+];
 
 const npsColumns = [
   { title: "分类", dataIndex: "label", key: "label" },
@@ -906,12 +915,13 @@ async function createShareLink() {
   shareCreating.value = true;
   try {
     const share = await createTaskReportShare(selectedTask.value.id, {
-      title: selectedTask.value.productName || selectedTask.value.name
+      title: selectedTask.value.productName || selectedTask.value.name,
+      snapshotMode: shareSnapshotMode.value
     });
     await loadShares();
     const copied = await copyShareLink(share.shareUrl, false);
     if (copied) {
-      message.success("分享链接已生成并复制。");
+      message.success(share.snapshotMode === "snapshot" ? "固定快照链接已生成并复制。" : "实时报告链接已生成并复制。");
     } else {
       message.warning("分享链接已生成，但浏览器未允许自动复制，请手动复制输入框中的链接。");
     }

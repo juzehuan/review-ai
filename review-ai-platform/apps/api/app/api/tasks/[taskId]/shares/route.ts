@@ -71,11 +71,14 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const title = String(body.title || scoped.task.productName || scoped.task.name || "").trim();
-  const dashboardSnapshot = await buildDashboardForTask(taskId).catch(() => null);
-  const taskSnapshot = jsonSnapshot(serializeTask(scoped.task));
-  const dashboardSnapshotJson = jsonSnapshot(dashboardSnapshot);
+  const requestedSnapshotMode = body.snapshotMode === "live" ? "live" : "snapshot";
+  const shouldSnapshot = requestedSnapshotMode === "snapshot";
+  const dashboardSnapshot = shouldSnapshot ? await buildDashboardForTask(taskId).catch(() => null) : null;
+  const taskSnapshot = shouldSnapshot ? jsonSnapshot(serializeTask(scoped.task)) : undefined;
+  const dashboardSnapshotJson = shouldSnapshot ? jsonSnapshot(dashboardSnapshot) : undefined;
   const snapshotCreatedAt = dashboardSnapshot ? new Date() : null;
-  const existing = await prisma.reportShare.findFirst({
+  const actualSnapshotMode = dashboardSnapshot ? "snapshot" : "live";
+  const activeShares = await prisma.reportShare.findMany({
     where: {
       workspaceId: taskWorkspaceId,
       taskId,
@@ -84,18 +87,10 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     },
     orderBy: { createdAt: "desc" }
   });
+  const existing = activeShares.find((share) => (share.dashboardSnapshot ? "snapshot" : "live") === actualSnapshotMode);
 
   const share = existing
-    ? existing.dashboardSnapshot
-      ? existing
-      : await prisma.reportShare.update({
-          where: { id: existing.id },
-          data: {
-            dashboardSnapshot: dashboardSnapshotJson,
-            taskSnapshot,
-            snapshotCreatedAt
-          }
-        })
+    ? existing
     : await prisma.reportShare.create({
         data: {
           workspaceId: taskWorkspaceId,
@@ -120,7 +115,8 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       metadata: {
         taskId,
         expiresAt: share.expiresAt?.toISOString() || null,
-        snapshotMode: dashboardSnapshot ? "snapshot" : "live"
+        requestedSnapshotMode,
+        snapshotMode: actualSnapshotMode
       }
     });
   }

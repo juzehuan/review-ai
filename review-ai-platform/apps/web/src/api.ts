@@ -464,7 +464,10 @@ export async function fetchTaskReportShares(taskId: string) {
   return data.map(normalizeReportShare);
 }
 
-export async function createTaskReportShare(taskId: string, payload?: { title?: string; expiresAt?: string | null }) {
+export async function createTaskReportShare(
+  taskId: string,
+  payload?: { title?: string; expiresAt?: string | null; snapshotMode?: "snapshot" | "live" }
+) {
   const { data } = await api.post<ReportShareDTO>(`/tasks/${taskId}/shares`, payload || {});
   return normalizeReportShare(data);
 }
