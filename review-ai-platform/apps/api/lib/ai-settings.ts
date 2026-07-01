@@ -1,4 +1,4 @@
-import type { WorkspaceAiSetting } from "@review-ai/db";
+import { decryptSecret, type WorkspaceAiSetting } from "@review-ai/db";
 import type { WorkspaceAiSettingDTO } from "@review-ai/shared";
 import {
   AI_PROVIDER_PRESETS,
@@ -48,8 +48,9 @@ export function normalizeProviderBaseUrl(provider: string, storedBaseUrl?: strin
 }
 
 export function resolveApiKey(provider: string, storedKey?: string | null) {
-  if (storedKey) {
-    return storedKey;
+  const decryptedStoredKey = decryptSecret(storedKey);
+  if (decryptedStoredKey) {
+    return decryptedStoredKey;
   }
   for (const name of ENV_FALLBACK_KEYS[provider] || ["OPENAI_API_KEY"]) {
     if (process.env[name]) {
@@ -97,7 +98,7 @@ export function serializeAiSetting(setting: WorkspaceAiSetting | null): Workspac
     provider: setting.provider,
     apiKey: maskApiKey(resolveApiKey(setting.provider, setting.apiKey)),
     apiKeySet: Boolean(resolveApiKey(setting.provider, setting.apiKey)),
-    baseUrl: normalizeProviderBaseUrl(setting.provider, setting.baseUrl),
+    baseUrl: normalizeProviderBaseUrl(setting.provider, decryptSecret(setting.baseUrl)),
     modelName: setting.modelName,
     promptVersion: setting.promptVersion,
     systemPrompt: setting.systemPrompt,

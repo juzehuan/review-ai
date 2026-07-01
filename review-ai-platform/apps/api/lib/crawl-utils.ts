@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { decryptSecret } from "@review-ai/db";
 import { inferAnalysisType, normalizeCrawlSourceChannel, type CrawlerChannel } from "@review-ai/shared";
 import { defaultCrawlerSetting, parseCrawlerChannels } from "@/lib/crawler-settings";
 
@@ -324,11 +325,13 @@ export function resolvedCrawlerSettingFromRecord(
     | null
 ): ResolvedCrawlerSetting {
   const defaultSetting = defaultCrawlerSetting();
+  const storedProxyUrl = decryptSecret(storedCrawlerSetting?.proxyUrl);
+  const storedShopeeCookie = decryptSecret(storedCrawlerSetting?.shopeeCookie);
   return {
     enabled: storedCrawlerSetting?.enabled ?? defaultSetting.enabled,
     pythonBin: resolveCrawlerPythonBin(storedCrawlerSetting?.pythonBin, defaultSetting.pythonBin),
-    proxyUrl: storedCrawlerSetting?.proxyUrl || defaultSetting.proxyUrl,
-    shopeeCookie: null,
+    proxyUrl: storedProxyUrl || defaultSetting.proxyUrl,
+    shopeeCookie: storedShopeeCookie,
     crawlChannels: parseCrawlerChannels(storedCrawlerSetting?.crawlChannels || defaultSetting.crawlChannels.join(",")),
     defaultSourceChannel: normalizeCrawlSourceChannel(
       storedCrawlerSetting?.defaultSourceChannel,

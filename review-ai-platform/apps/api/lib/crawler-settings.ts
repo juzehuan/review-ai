@@ -1,4 +1,5 @@
 import type { WorkspaceCrawlerSetting } from "@review-ai/db";
+import { decryptSecret } from "@review-ai/db";
 import {
   CRAWLER_CHANNEL_PRESETS,
   normalizeCrawlSourceChannel,
@@ -49,9 +50,9 @@ export function serializeCrawlerSetting(setting: WorkspaceCrawlerSetting | null)
   return {
     enabled: setting.enabled,
     pythonBin: setting.pythonBin,
-    proxyUrl: setting.proxyUrl,
+    proxyUrl: decryptSecret(setting.proxyUrl),
     shopeeCookie: null,
-    shopeeCookieSet: false,
+    shopeeCookieSet: Boolean(decryptSecret(setting.shopeeCookie)),
     crawlChannels: parseCrawlerChannels(setting.crawlChannels),
     defaultSourceChannel: normalizeCrawlSourceChannel(setting.defaultSourceChannel, "YouTube"),
     defaultMaxReviews: setting.defaultMaxReviews,

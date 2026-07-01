@@ -1,4 +1,4 @@
-import { prisma } from "@review-ai/db";
+import { encryptSecret, prisma } from "@review-ai/db";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { defaultAiSetting, normalizeProviderBaseUrl, serializeAiSetting } from "@/lib/ai-settings";
@@ -51,6 +51,8 @@ export async function PATCH(request: Request) {
     typeof body.apiKey === "string" && body.apiKey.trim() && !body.apiKey.includes("*")
       ? body.apiKey.trim()
       : undefined;
+  const storedApiKey = apiKey !== undefined ? encryptSecret(apiKey) : undefined;
+  const storedBaseUrl = baseUrl ? encryptSecret(baseUrl) : null;
 
   if (
     !modelName ||
@@ -71,8 +73,8 @@ export async function PATCH(request: Request) {
     where: { workspaceId: context.workspace.id },
     update: {
       provider,
-      ...(apiKey !== undefined ? { apiKey } : {}),
-      baseUrl,
+      ...(storedApiKey !== undefined ? { apiKey: storedApiKey } : {}),
+      baseUrl: storedBaseUrl,
       modelName,
       promptVersion,
       systemPrompt,
@@ -90,8 +92,8 @@ export async function PATCH(request: Request) {
     create: {
       workspaceId: context.workspace.id,
       provider,
-      apiKey,
-      baseUrl,
+      apiKey: storedApiKey,
+      baseUrl: storedBaseUrl,
       modelName,
       promptVersion,
       systemPrompt,

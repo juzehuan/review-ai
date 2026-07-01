@@ -1,4 +1,4 @@
-import { prisma } from "@review-ai/db";
+import { encryptSecret, prisma } from "@review-ai/db";
 import { normalizeCrawlSourceChannel } from "@review-ai/shared";
 import { writeAuditLog } from "@/lib/audit-log";
 import { defaultCrawlerSetting, serializeCrawlerChannels, serializeCrawlerSetting } from "@/lib/crawler-settings";
@@ -49,6 +49,7 @@ export async function PATCH(request: Request) {
   const defaultMaxReviews = Math.min(Math.max(Number(body.defaultMaxReviews ?? defaults.defaultMaxReviews), 0), 20000);
   const requestTimeoutSec = Math.min(Math.max(Number(body.requestTimeoutSec || defaults.requestTimeoutSec), 30), 900);
   const shopeeCookie = null;
+  const storedProxyUrl = proxyUrl ? encryptSecret(proxyUrl) : null;
   const crawlChannels = serializeCrawlerChannels(body.crawlChannels || defaults.crawlChannels);
 
   if (!pythonBin) {
@@ -60,7 +61,7 @@ export async function PATCH(request: Request) {
     update: {
       enabled,
       pythonBin,
-      proxyUrl,
+      proxyUrl: storedProxyUrl,
       shopeeCookie,
       crawlChannels,
       defaultSourceChannel,
@@ -71,7 +72,7 @@ export async function PATCH(request: Request) {
       workspaceId: context.workspace.id,
       enabled,
       pythonBin,
-      proxyUrl,
+      proxyUrl: storedProxyUrl,
       shopeeCookie,
       crawlChannels,
       defaultSourceChannel,

@@ -5,7 +5,7 @@ import { Queue, Worker } from "bullmq";
 import { OpenAI } from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { Prisma, prisma, type Subscription } from "@review-ai/db";
+import { decryptSecret, Prisma, prisma, type Subscription } from "@review-ai/db";
 import {
   buildAnalysisQueueJobId,
   buildCrawlQueueJobId,
@@ -898,6 +898,8 @@ function resolveAiSetting(
 ): ResolvedAiSetting {
   const profile = getAnalysisPromptProfile(analysisType);
   const provider = setting?.provider || process.env.AI_PROVIDER || "openai";
+  const storedApiKey = decryptSecret(setting?.apiKey);
+  const storedBaseUrl = decryptSecret(setting?.baseUrl);
   const promptProfile =
     analysisType === "video"
       ? {
@@ -918,8 +920,8 @@ function resolveAiSetting(
           };
   return {
     provider,
-    apiKey: setting?.apiKey || resolveEnvKey(provider),
-    baseUrl: resolveBaseUrl(provider, setting?.baseUrl),
+    apiKey: storedApiKey || resolveEnvKey(provider),
+    baseUrl: resolveBaseUrl(provider, storedBaseUrl),
     modelName: setting?.modelName || process.env.OPENAI_MODEL || "gpt-5.4-mini",
     promptVersion: setting?.promptVersion || "v2-thai",
     systemPrompt: setting?.systemPrompt || DEFAULT_SYSTEM_PROMPT,
@@ -2862,8 +2864,8 @@ const crawlWorker = new Worker(
     const storedSetting = await getPlatformCrawlerSetting();
     const setting: ResolvedCrawlerSetting = {
       pythonBin: resolveCrawlerPythonBin(storedSetting?.pythonBin),
-      proxyUrl: storedSetting?.proxyUrl || process.env.SCRAPLING_PROXY || null,
-      shopeeCookie: storedSetting?.shopeeCookie || process.env.SHOPEE_COOKIE || null,
+      proxyUrl: decryptSecret(storedSetting?.proxyUrl) || process.env.SCRAPLING_PROXY || null,
+      shopeeCookie: decryptSecret(storedSetting?.shopeeCookie) || process.env.SHOPEE_COOKIE || null,
       crawlChannels: crawlChannelsForPlatform(crawlJob.platform, crawlJob.crawlChannels || storedSetting?.crawlChannels),
       requestTimeoutSec: storedSetting?.requestTimeoutSec || Number(process.env.SCRAPLING_TIMEOUT_SEC || 180)
     };

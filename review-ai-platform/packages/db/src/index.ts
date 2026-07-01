@@ -1,3 +1,4 @@
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
@@ -36,6 +37,60 @@ function loadWorkspaceEnv() {
 }
 
 loadWorkspaceEnv();
+
+const ENCRYPTED_SECRET_PREFIX = "enc:v1:";
+
+function secretKeyBuffer() {
+  const secret = process.env.REVIEW_AI_SECRET_KEY?.trim() || "";
+  if (!secret) {
+    return null;
+  }
+  return createHash("sha256").update(secret).digest();
+}
+
+export function isEncryptedSecret(value: string | null | undefined) {
+  return Boolean(value?.startsWith(ENCRYPTED_SECRET_PREFIX));
+}
+
+export function encryptSecret(value: string | null | undefined) {
+  if (!value || isEncryptedSecret(value)) {
+    return value || null;
+  }
+  const key = secretKeyBuffer();
+  if (!key) {
+    return value;
+  }
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return `${ENCRYPTED_SECRET_PREFIX}${iv.toString("base64url")}.${authTag.toString("base64url")}.${encrypted.toString("base64url")}`;
+}
+
+export function decryptSecret(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+  if (!isEncryptedSecret(value)) {
+    return value;
+  }
+  const key = secretKeyBuffer();
+  if (!key) {
+    return null;
+  }
+  const payload = value.slice(ENCRYPTED_SECRET_PREFIX.length);
+  const [ivPart, authTagPart, encryptedPart] = payload.split(".");
+  if (!ivPart || !authTagPart || !encryptedPart) {
+    return null;
+  }
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivPart, "base64url"));
+    decipher.setAuthTag(Buffer.from(authTagPart, "base64url"));
+    return Buffer.concat([decipher.update(Buffer.from(encryptedPart, "base64url")), decipher.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
+}
 
 declare global {
   // eslint-disable-next-line no-var
