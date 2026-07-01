@@ -286,6 +286,10 @@
                   请求异常 {{ record.lastRequestStatus }}
                 </a-tag>
               </div>
+              <div v-if="crawlJobDiagnostic(record)" class="crawl-diagnostic-tip">
+                <ExclamationCircleOutlined />
+                <span>{{ crawlJobDiagnostic(record) }}</span>
+              </div>
               <span v-if="record.commentSortAttempted !== null" class="muted">
                 评论排序：{{ record.commentSortSwitched ? "已切换所有评论" : "未确认所有评论" }}
               </span>
@@ -940,6 +944,51 @@ function requestStatusColor(status?: number | null) {
   return "volcano";
 }
 
+function requestStatusAdvice(status?: number | null) {
+  if (status === 401 || status === 403) {
+    return "平台拒绝访问，优先检查登录态、账号权限、评论区可见性和代理地区。";
+  }
+  if (status === 429) {
+    return "平台触发限流，建议降低单次采集量或频率，更换代理后再重试。";
+  }
+  if (typeof status === "number" && status >= 500) {
+    return "平台或代理链路返回服务异常，建议稍后重试并检查代理稳定性。";
+  }
+  if (typeof status === "number" && status >= 400) {
+    return "平台拒绝了本次请求，建议检查链接、接口签名、浏览器环境或登录态。";
+  }
+  return "";
+}
+
+function crawlJobDiagnostic(job: CrawlJobDTO) {
+  const statusAdvice = requestStatusAdvice(job.lastRequestStatus);
+  if (statusAdvice) {
+    return statusAdvice;
+  }
+  if (job.commentSortAttempted && job.commentSortSwitched === false) {
+    return "评论排序未确认切到全部评论，可能只抓到相关评论；建议检查登录态和页面语言后重试。";
+  }
+  if (job.partialDueToTimeout || job.stopReason === "timeout") {
+    return "采集接近超时提前返回，建议降低单次最大采集量，或改用监听任务分批采集。";
+  }
+  if (job.stopReason === "max_reviews") {
+    return "已达到本次采集上限，如需更多评论可提高最大采集条数后重新采集。";
+  }
+  if (job.platformRemainingRows !== null && job.platformRemainingRows > 0 && ["completed", "imported"].includes(job.status)) {
+    return `平台仍约有 ${formatCount(job.platformRemainingRows)} 条未覆盖，可提高采集上限或用监听任务继续补采。`;
+  }
+  if (job.stalled) {
+    return "任务长时间没有更新，可能卡在页面加载、代理访问或平台风控，建议稍后刷新或联系管理员查看后台诊断。";
+  }
+  if (job.status === "failed") {
+    return "采集失败，先看错误摘要；确认链接公开、评论区开启、代理和登录态正常后再重试。";
+  }
+  if (job.status === "completed" && job.fetchedRows === 0) {
+    return "未采集到评论，先确认链接公开可访问、评论区开启，必要时换登录态或代理再试。";
+  }
+  return "";
+}
+
 function durationLabel(seconds?: number | null) {
   if (seconds === null || seconds === undefined) {
     return "-";
@@ -1559,6 +1608,24 @@ onUnmounted(() => {
   font-size: 12px;
   line-height: 1.45;
   padding: 2px 6px;
+}
+
+.crawl-diagnostic-tip {
+  align-items: flex-start;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  max-width: 520px;
+  padding: 6px 8px;
+}
+
+.crawl-diagnostic-tip span {
+  overflow-wrap: anywhere;
 }
 
 .crawl-stalled-tag {
