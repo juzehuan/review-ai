@@ -49,6 +49,54 @@ YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtu
 TIKTOK_HOSTS = {"tiktok.com", "www.tiktok.com", "m.tiktok.com"}
 FACEBOOK_HOSTS = {"facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"}
 NESTED_URL_PARAM_NAMES = ("url", "u", "q", "target", "redirect", "redirect_url")
+CRAWL_PROGRESS_PREFIX = "__CRAWL_PROGRESS__"
+
+
+def compact_dict(value: dict[str, Any]) -> dict[str, Any]:
+    return {key: item for key, item in value.items() if item is not None}
+
+
+def emit_crawl_progress(
+    source: str,
+    crawl_channel: str,
+    rows_by_id: dict[str, dict[str, Any]],
+    state: dict[str, Any],
+    max_reviews: int,
+    deadline: float | None = None,
+) -> None:
+    try:
+        fetched_rows = len(rows_by_id)
+        coverage_percent = None
+        if max_reviews > 0:
+            coverage_percent = min(100, round((fetched_rows / max_reviews) * 100))
+        remaining_seconds = None
+        if deadline is not None:
+            remaining_seconds = max(0, int(deadline - time.time()))
+        payload = compact_dict(
+            {
+                "source": source,
+                "crawlChannel": crawl_channel,
+                "crawlChannelLabel": CHANNEL_LABELS.get(crawl_channel),
+                "fetchedRows": fetched_rows,
+                "maxReviews": max_reviews,
+                "coveragePercent": coverage_percent,
+                "nextRequests": state.get("next_requests") if state.get("next_requests") is not None else state.get("comment_requests"),
+                "payloadComments": state.get("payload_comments"),
+                "domCommentCount": state.get("dom_comment_count"),
+                "domContentTextCount": state.get("dom_content_text_count"),
+                "endReached": state.get("end_reached"),
+                "stopReason": state.get("stop_reason"),
+                "commentSortAttempted": state.get("comment_sort_attempted"),
+                "commentSortSwitched": state.get("comment_sort_switched"),
+                "cursor": state.get("cursor"),
+                "totalComments": state.get("total_comments"),
+                "remainingSeconds": remaining_seconds,
+                "emittedAt": dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+            }
+        )
+        print(f"{CRAWL_PROGRESS_PREFIX}{json.dumps(payload, ensure_ascii=True)}", file=sys.stderr, flush=True)
+    except Exception:
+        pass
 
 
 def apply_dynamic_fetcher_defaults(fetch_kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -917,6 +965,7 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
                 idle_rounds = 0
             last_count = current_count
             last_next_requests = current_next_requests
+            emit_crawl_progress("YouTube", "youtube_dom", comments_by_id, state, max_reviews, deadline)
 
             if has_end_hint():
                 state["end_reached"] = True
@@ -1374,6 +1423,7 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
                 idle_rounds = 0
             last_count = current_count
             last_requests = current_requests
+            emit_crawl_progress("TikTok Video", "tiktok_video", comments_by_id, state, max_reviews, deadline)
 
             if state.get("has_more") is False and idle_rounds >= 1:
                 break
@@ -1890,6 +1940,7 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
             else:
                 idle_rounds = 0
             last_count = current_count
+            emit_crawl_progress("Facebook", "facebook_post", comments_by_id, state, max_reviews, deadline)
             if idle_rounds >= 5:
                 state["end_reached"] = True
                 state["stop_reason"] = "no_more_comments"

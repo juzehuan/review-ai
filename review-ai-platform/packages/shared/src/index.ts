@@ -252,6 +252,9 @@ export interface CrawlJobDTO {
   payloadComments: number | null;
   domCommentCount: number | null;
   domContentTextCount: number | null;
+  totalComments: number | null;
+  remainingSeconds: number | null;
+  progressEventAt: string | null;
   endReached: boolean | null;
   channelErrors: string[];
   lastError: string | null;

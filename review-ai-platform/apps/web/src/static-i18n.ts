@@ -916,6 +916,43 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
       ? `${samples[1]} related comments · ${samples[2]} samples`
       : `${samples[1]} คอมเมนต์ที่เกี่ยวข้อง · ${samples[2]} ตัวอย่าง`;
   }
+  const crawlMetricPart = (part: string) => {
+    const total = part.match(/^平台总量\s+(\d+)$/);
+    if (total) return locale === "en-US" ? `Platform total ${total[1]}` : `ทั้งหมดบนแพลตฟอร์ม ${total[1]}`;
+    const apiRequests = part.match(/^接口请求\s+(\d+)$/);
+    if (apiRequests) return locale === "en-US" ? `API requests ${apiRequests[1]}` : `คำขอ API ${apiRequests[1]}`;
+    const apiComments = part.match(/^接口评论\s+(\d+)$/);
+    if (apiComments) return locale === "en-US" ? `API comments ${apiComments[1]}` : `คอมเมนต์จาก API ${apiComments[1]}`;
+    const domComments = part.match(/^DOM 评论\s+(\d+)$/);
+    if (domComments) return locale === "en-US" ? `DOM comments ${domComments[1]}` : `คอมเมนต์ DOM ${domComments[1]}`;
+    const domTexts = part.match(/^DOM 文本\s+(\d+)$/);
+    if (domTexts) return locale === "en-US" ? `DOM texts ${domTexts[1]}` : `ข้อความ DOM ${domTexts[1]}`;
+    const imported = part.match(/^导入\s+(\d+)$/);
+    if (imported) return locale === "en-US" ? `Imported ${imported[1]}` : `นำเข้า ${imported[1]}`;
+    const duplicate = part.match(/^重复\s+(\d+)$/);
+    if (duplicate) return locale === "en-US" ? `Duplicates ${duplicate[1]}` : `ซ้ำ ${duplicate[1]}`;
+    const elapsed = part.match(/^耗时\s+(.+)$/);
+    if (elapsed) return locale === "en-US" ? `Elapsed ${translateDuration(elapsed[1])}` : `ใช้เวลา ${translateDuration(elapsed[1])}`;
+    const speed = part.match(/^速度\s+([\d.]+)\/分钟$/);
+    if (speed) return locale === "en-US" ? `Speed ${speed[1]}/min` : `ความเร็ว ${speed[1]}/นาที`;
+    const remaining = part.match(/^预计剩余\s+(.+)$/);
+    if (remaining) {
+      return locale === "en-US" ? `Est. remaining ${translateDuration(remaining[1])}` : `เหลือประมาณ ${translateDuration(remaining[1])}`;
+    }
+    const updated = part.match(/^更新于\s+(.+)前$/);
+    if (updated) return locale === "en-US" ? `Updated ${translateDuration(updated[1])} ago` : `อัปเดตเมื่อ ${translateDuration(updated[1])}ที่แล้ว`;
+    return null;
+  };
+  const singleCrawlMetric = crawlMetricPart(value);
+  if (singleCrawlMetric) {
+    return singleCrawlMetric;
+  }
+  if (value.includes(" · ")) {
+    const translatedParts = value.split(" · ").map(crawlMetricPart);
+    if (translatedParts.every(Boolean)) {
+      return translatedParts.join(" · ");
+    }
+  }
   return null;
 }
 

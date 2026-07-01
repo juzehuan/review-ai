@@ -776,6 +776,7 @@ function shortJobName(job: CrawlJobDTO) {
 
 function crawlMetricSummary(job: CrawlJobDTO) {
   const parts = [
+    job.totalComments !== null ? `平台总量 ${job.totalComments}` : "",
     job.nextRequests !== null ? `接口请求 ${job.nextRequests}` : "",
     job.payloadComments !== null ? `接口评论 ${job.payloadComments}` : "",
     job.domCommentCount !== null ? `DOM 评论 ${job.domCommentCount}` : "",
@@ -806,6 +807,7 @@ function crawlThroughputSummary(job: CrawlJobDTO) {
     job.skippedDuplicate > 0 ? `重复 ${job.skippedDuplicate}` : "",
     job.durationSeconds !== null ? `耗时 ${durationLabel(job.durationSeconds)}` : "",
     job.fetchRatePerMinute !== null ? `速度 ${job.fetchRatePerMinute}/分钟` : "",
+    ["queued", "running"].includes(job.status) && job.remainingSeconds !== null ? `预计剩余 ${durationLabel(job.remainingSeconds)}` : "",
     ["queued", "running"].includes(job.status) ? `更新于 ${durationLabel(job.updatedAgoSeconds)}前` : ""
   ].filter(Boolean);
   return parts.join(" · ");

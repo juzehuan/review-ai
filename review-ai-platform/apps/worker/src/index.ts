@@ -77,7 +77,31 @@ type CrawlerProgress = {
   elapsedSec: number;
   timeoutSec: number;
   stderr: string;
+  latestEvent: CrawlerProgressEvent | null;
 };
+
+type CrawlerProgressEvent = {
+  source?: string;
+  crawlChannel?: string;
+  crawlChannelLabel?: string;
+  fetchedRows?: number;
+  maxReviews?: number;
+  coveragePercent?: number | null;
+  nextRequests?: number;
+  payloadComments?: number;
+  domCommentCount?: number;
+  domContentTextCount?: number;
+  endReached?: boolean;
+  stopReason?: string;
+  commentSortAttempted?: boolean;
+  commentSortSwitched?: boolean;
+  cursor?: string | number;
+  totalComments?: number;
+  remainingSeconds?: number;
+  emittedAt?: string;
+};
+
+const CRAWLER_PROGRESS_PREFIX = "__CRAWL_PROGRESS__";
 
 function isCrawlResult(value: unknown): value is CrawlResult {
   return Boolean(value && typeof value === "object" && !Array.isArray(value) && Array.isArray((value as { rows?: unknown }).rows));
@@ -91,6 +115,40 @@ function parseCrawlerOutput(stdout: string) {
   return parsed;
 }
 
+function isCrawlerProgressEvent(value: unknown): value is CrawlerProgressEvent {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function parseCrawlerProgressLine(line: string) {
+  if (!line.startsWith(CRAWLER_PROGRESS_PREFIX)) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(line.slice(CRAWLER_PROGRESS_PREFIX.length)) as unknown;
+    return isCrawlerProgressEvent(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function readLatestCrawlerProgress(stderr: string) {
+  const lines = stderr.trim().split(/\r?\n/).filter(Boolean);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const event = parseCrawlerProgressLine(lines[index]);
+    if (event) {
+      return event;
+    }
+  }
+  return null;
+}
+
+function removeCrawlerProgressLines(stderr: string) {
+  return stderr
+    .split(/\r?\n/)
+    .filter((line) => !line.startsWith(CRAWLER_PROGRESS_PREFIX))
+    .join("\n");
+}
+
 function parseCrawlerChannels(value: string | null | undefined): CrawlerChannel[] {
   return String(value || "")
     .split(",")
@@ -99,7 +157,7 @@ function parseCrawlerChannels(value: string | null | undefined): CrawlerChannel[
 }
 
 function parseCrawlerProcessError(stderr: string, fallback: string) {
-  const text = stderr.trim();
+  const text = removeCrawlerProgressLines(stderr).trim();
   if (!text) {
     return fallback;
   }
@@ -112,7 +170,7 @@ function parseCrawlerProcessError(stderr: string, fallback: string) {
 }
 
 function stderrTail(stderr: string) {
-  const text = stderr.trim();
+  const text = removeCrawlerProgressLines(stderr).trim();
   if (!text) {
     return "";
   }
@@ -179,7 +237,8 @@ function runScraplingCrawler(
       void onProgress?.({
         elapsedSec: Math.floor((Date.now() - startedAt) / 1000),
         timeoutSec: setting.requestTimeoutSec,
-        stderr
+        stderr,
+        latestEvent: readLatestCrawlerProgress(stderr)
       });
     }, 10000);
 
@@ -236,6 +295,48 @@ function buildEmptyCrawlError(result: CrawlResult) {
   ].filter(Boolean);
   const suffix = diagnostics.length ? ` (${diagnostics.join(", ")})` : "";
   return `Crawler finished but collected 0 comments${suffix}. The page may require login, be rate-limited, have comments disabled, or need another crawl retry.`;
+}
+
+function readProgressNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readProgressInt(value: unknown) {
+  const parsed = readProgressNumber(value);
+  return parsed === null ? null : Math.max(0, Math.floor(parsed));
+}
+
+function compactJsonObject(value: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as Prisma.InputJsonObject;
+}
+
+function buildCrawlProgressRawResult(event: CrawlerProgressEvent) {
+  return compactJsonObject({
+    source: event.source,
+    crawlChannel: event.crawlChannel,
+    crawlChannelLabel: event.crawlChannelLabel,
+    rows: [],
+    progressEvent: true,
+    progressEventAt: event.emittedAt,
+    fetchedRows: readProgressInt(event.fetchedRows),
+    maxReviews: readProgressInt(event.maxReviews),
+    coveragePercent: readProgressInt(event.coveragePercent),
+    nextRequests: readProgressInt(event.nextRequests),
+    payloadComments: readProgressInt(event.payloadComments),
+    domCommentCount: readProgressInt(event.domCommentCount),
+    domContentTextCount: readProgressInt(event.domContentTextCount),
+    endReached: event.endReached,
+    stopReason: event.stopReason,
+    commentSortAttempted: event.commentSortAttempted,
+    commentSortSwitched: event.commentSortSwitched,
+    cursor: event.cursor,
+    totalComments: readProgressInt(event.totalComments),
+    remainingSeconds: readProgressInt(event.remainingSeconds)
+  });
 }
 
 const TOPIC_TAXONOMY = [
@@ -2623,15 +2724,41 @@ const crawlWorker = new Worker(
 
     try {
       let lastReportedProgress = 10;
-      const result = await runScraplingCrawler(crawlJob.normalizedUrl, crawlJob.maxReviews, setting, async ({ elapsedSec, timeoutSec }) => {
+      let lastReportedProgressEvent = "";
+      const result = await runScraplingCrawler(crawlJob.normalizedUrl, crawlJob.maxReviews, setting, async ({ elapsedSec, timeoutSec, latestEvent }) => {
         const nextProgress = Math.min(85, 10 + Math.floor((elapsedSec / Math.max(timeoutSec, 1)) * 75));
-        if (nextProgress <= lastReportedProgress) {
+        const eventKey = latestEvent
+          ? JSON.stringify({
+              fetchedRows: latestEvent.fetchedRows,
+              nextRequests: latestEvent.nextRequests,
+              payloadComments: latestEvent.payloadComments,
+              domCommentCount: latestEvent.domCommentCount,
+              domContentTextCount: latestEvent.domContentTextCount,
+              endReached: latestEvent.endReached,
+              stopReason: latestEvent.stopReason,
+              commentSortSwitched: latestEvent.commentSortSwitched
+            })
+          : "";
+        if (nextProgress <= lastReportedProgress && (!eventKey || eventKey === lastReportedProgressEvent)) {
           return;
         }
         lastReportedProgress = nextProgress;
+        if (eventKey) {
+          lastReportedProgressEvent = eventKey;
+        }
+        const progressData: Prisma.CrawlJobUpdateInput = { progress: nextProgress };
+        if (latestEvent) {
+          const fetchedRows = readProgressInt(latestEvent.fetchedRows);
+          if (fetchedRows !== null) {
+            progressData.fetchedRows = fetchedRows;
+          }
+          progressData.crawlChannel = latestEvent.crawlChannel || crawlJob.crawlChannel || null;
+          progressData.crawlChannelLabel = latestEvent.crawlChannelLabel || crawlJob.crawlChannelLabel || null;
+          progressData.rawResult = buildCrawlProgressRawResult(latestEvent);
+        }
         await prisma.crawlJob.update({
           where: { id: crawlJob.id },
-          data: { progress: nextProgress }
+          data: progressData
         });
       });
       if (!result.rows.length) {
