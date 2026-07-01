@@ -49,6 +49,29 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     return scoped.response;
   }
 
+  const activeRun = await prisma.analysisRun.findFirst({
+    where: {
+      taskId,
+      status: { in: ["queued", "running"] }
+    },
+    orderBy: [{ createdAt: "desc" }, { startedAt: "desc" }],
+    include: {
+      logs: {
+        orderBy: { createdAt: "desc" },
+        take: 1
+      }
+    }
+  });
+  if (activeRun) {
+    if (scoped.task.status !== "analyzing") {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { status: "analyzing" }
+      });
+    }
+    return ok(serializeRun(activeRun));
+  }
+
   const quotaUnlimited = canBypassQuota(workspaceContext);
   const quotaWorkspaceId = scoped.task.workspaceId || workspace.id;
   const quotaResponse = await assertRunQuota(quotaWorkspaceId, quotaUnlimited);
