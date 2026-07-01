@@ -319,6 +319,7 @@ const showImport = ref(false);
 const showAppendImport = ref(false);
 const appendTask = ref<TaskListItem | null>(null);
 let timer: ReturnType<typeof setInterval> | null = null;
+const requestedRunId = computed(() => (typeof route.query.runId === "string" ? route.query.runId : ""));
 
 const currentWorkspaceRole = computed(() => {
   const slug = workspace.value?.slug;
@@ -680,7 +681,13 @@ async function loadRuns() {
   }
 
   runs.value = await fetchRuns(selectedTask.value.id);
-  if (!selectedRun.value || !runs.value.some((run) => run.id === selectedRun.value?.id)) {
+  const routeRun = requestedRunId.value ? runs.value.find((run) => run.id === requestedRunId.value) || null : null;
+  if (routeRun) {
+    if (selectedRun.value?.id !== routeRun.id) {
+      logs.value = [];
+    }
+    selectedRun.value = routeRun;
+  } else if (!selectedRun.value || !runs.value.some((run) => run.id === selectedRun.value?.id)) {
     selectedRun.value = runs.value[0] || null;
     logs.value = [];
   } else {
@@ -716,6 +723,9 @@ async function refreshAll() {
 async function selectRun(run: AnalysisRunDTO) {
   selectedRun.value = run;
   logs.value = [];
+  if (selectedTask.value) {
+    await router.replace({ path: `/tasks/${selectedTask.value.id}/runs`, query: { runId: run.id } });
+  }
   await loadLogs();
 }
 
@@ -800,6 +810,17 @@ watch(
     }
   },
   { immediate: true }
+);
+
+watch(
+  () => route.query.runId,
+  async () => {
+    if (!selectedTask.value || !requestedRunId.value || selectedRun.value?.id === requestedRunId.value) {
+      return;
+    }
+    await loadRuns();
+    await loadLogs();
+  }
 );
 
 onMounted(async () => {

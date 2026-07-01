@@ -645,7 +645,7 @@ function openQueueContext(record: QueueHealthItem) {
     return;
   }
   if (record.taskId) {
-    router.push(`/tasks/${record.taskId}/runs`);
+    router.push({ path: `/tasks/${record.taskId}/runs`, query: { runId: record.id } });
   }
 }
 
