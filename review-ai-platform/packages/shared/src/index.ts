@@ -210,9 +210,30 @@ export interface QueueStalledDTO {
   lastError: string | null;
 }
 
+export interface QueueIntegrityAlertDTO {
+  id: string;
+  kind: "crawl" | "analysis";
+  status: string;
+  label: string;
+  workspaceId: string | null;
+  workspaceName: string | null;
+  workspaceSlug: string | null;
+  taskId: string | null;
+  taskName: string | null;
+  sourceChannel: string | null;
+  modelName: string | null;
+  queueName: string;
+  queueDataKey: string;
+  lastActivityAt: string;
+  ageSeconds: number;
+  diagnosis: string;
+  nextAction: string;
+}
+
 export interface QueueHealthDTO {
   queues: QueueSnapshotDTO[];
   workloads: WorkloadHealthSnapshotDTO[];
+  integrityAlerts: QueueIntegrityAlertDTO[];
   stalledItems: QueueStalledDTO[];
   recentFailures: QueueFailureDTO[];
   updatedAt: string;

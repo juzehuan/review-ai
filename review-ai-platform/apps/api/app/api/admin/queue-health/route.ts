@@ -1,5 +1,12 @@
-import type { Queue } from "bullmq";
-import type { QueueFailureDTO, QueueHealthDTO, QueueSnapshotDTO, QueueStalledDTO, WorkloadHealthSnapshotDTO } from "@review-ai/shared";
+import type { JobType, Queue } from "bullmq";
+import type {
+  QueueFailureDTO,
+  QueueHealthDTO,
+  QueueIntegrityAlertDTO,
+  QueueSnapshotDTO,
+  QueueStalledDTO,
+  WorkloadHealthSnapshotDTO
+} from "@review-ai/shared";
 import { prisma } from "@review-ai/db";
 import { requireSuperAdmin } from "@/lib/auth";
 import { ok } from "@/lib/http";
@@ -7,6 +14,9 @@ import { getAnalysisQueue, getCrawlQueue } from "@/lib/queue";
 
 const CRAWL_STALL_SECONDS = 180;
 const ANALYSIS_STALL_SECONDS = 300;
+const QUEUE_INTEGRITY_GRACE_SECONDS = 60;
+const QUEUE_INTEGRITY_SCAN_LIMIT = 1000;
+const PENDING_QUEUE_JOB_TYPES: JobType[] = ["waiting", "active", "delayed", "prioritized", "waiting-children", "paused"];
 
 async function readQueueSnapshot(name: string, label: string, queue: Queue): Promise<QueueSnapshotDTO> {
   try {
@@ -47,6 +57,23 @@ async function readQueueSnapshot(name: string, label: string, queue: Queue): Pro
       isPaused: false,
       error: error instanceof Error ? error.message : String(error)
     };
+  }
+}
+
+async function readQueueDataValues(queue: Queue, dataKey: string) {
+  try {
+    const jobs = await queue.getJobs(PENDING_QUEUE_JOB_TYPES, 0, QUEUE_INTEGRITY_SCAN_LIMIT - 1, true);
+    const values = new Set<string>();
+    for (const job of jobs) {
+      const data = job.data as Record<string, unknown>;
+      const value = String(data[dataKey] || "").trim();
+      if (value) {
+        values.add(value);
+      }
+    }
+    return values;
+  } catch {
+    return null;
   }
 }
 
@@ -434,6 +461,102 @@ async function readStalledItems(limit = 12): Promise<QueueStalledDTO[]> {
   return [...crawlItems, ...analysisItems].sort((a, b) => b.ageSeconds - a.ageSeconds).slice(0, limit);
 }
 
+async function readQueueIntegrityAlerts(limit = 12): Promise<QueueIntegrityAlertDTO[]> {
+  const integrityBefore = secondsAgo(QUEUE_INTEGRITY_GRACE_SECONDS);
+  const now = Date.now();
+  const [analysisQueueRunIds, crawlQueueJobIds, queuedCrawlJobs, queuedAnalysisRuns] = await Promise.all([
+    readQueueDataValues(getAnalysisQueue(), "runId"),
+    readQueueDataValues(getCrawlQueue(), "crawlJobId"),
+    prisma.crawlJob.findMany({
+      where: {
+        status: "queued",
+        updatedAt: { lt: integrityBefore }
+      },
+      orderBy: { updatedAt: "asc" },
+      take: limit,
+      include: {
+        workspace: { select: { id: true, name: true, slug: true } },
+        task: { select: { id: true, name: true, productName: true } }
+      }
+    }),
+    prisma.analysisRun.findMany({
+      where: {
+        status: "queued",
+        createdAt: { lt: integrityBefore }
+      },
+      orderBy: { createdAt: "asc" },
+      take: limit,
+      include: {
+        task: {
+          select: {
+            id: true,
+            name: true,
+            productName: true,
+            sourceChannel: true,
+            workspaceId: true,
+            workspace: { select: { id: true, name: true, slug: true } }
+          }
+        }
+      }
+    })
+  ]);
+
+  const crawlAlerts: QueueIntegrityAlertDTO[] =
+    crawlQueueJobIds === null
+      ? []
+      : queuedCrawlJobs
+          .filter((job) => !crawlQueueJobIds.has(job.id))
+          .map((job) => ({
+            id: job.id,
+            kind: "crawl" as const,
+            status: job.status,
+            label: job.name || job.productName || job.normalizedUrl,
+            workspaceId: job.workspaceId,
+            workspaceName: job.workspace.name,
+            workspaceSlug: job.workspace.slug,
+            taskId: job.taskId,
+            taskName: job.task?.name || job.task?.productName || null,
+            sourceChannel: job.sourceChannel || job.platform || null,
+            modelName: null,
+            queueName: "crawl-jobs",
+            queueDataKey: "crawlJobId",
+            lastActivityAt: job.updatedAt.toISOString(),
+            ageSeconds: ageSeconds(job.updatedAt, now),
+            diagnosis: "数据库仍是排队中，但 BullMQ 待处理队列里没有对应采集 job",
+            nextAction: "优先检查任务是否曾入队失败；确认后可在采集记录里重试，或停止该记录再重新采集"
+          }));
+
+  const analysisAlerts: QueueIntegrityAlertDTO[] =
+    analysisQueueRunIds === null
+      ? []
+      : queuedAnalysisRuns
+          .filter((run) => !analysisQueueRunIds.has(run.id))
+          .map((run) => {
+            const workspace = run.task.workspace;
+            return {
+              id: run.id,
+              kind: "analysis" as const,
+              status: run.status,
+              label: run.task.name || run.task.productName || run.id,
+              workspaceId: run.task.workspaceId,
+              workspaceName: workspace?.name || null,
+              workspaceSlug: workspace?.slug || null,
+              taskId: run.taskId,
+              taskName: run.task.name || run.task.productName || null,
+              sourceChannel: run.task.sourceChannel || null,
+              modelName: run.modelName,
+              queueName: "analysis-runs",
+              queueDataKey: "runId",
+              lastActivityAt: run.createdAt.toISOString(),
+              ageSeconds: ageSeconds(run.createdAt, now),
+              diagnosis: "数据库仍是排队中，但 BullMQ 待处理队列里没有对应分析 job",
+              nextAction: "优先取消该分析批次，再重新发起分析，避免一直显示排队但 worker 无法消费"
+            };
+          });
+
+  return [...crawlAlerts, ...analysisAlerts].sort((a, b) => b.ageSeconds - a.ageSeconds).slice(0, limit);
+}
+
 type FailureRecovery = Pick<QueueFailureDTO, "recoveryStatus" | "recoveryId" | "recoveryLabel" | "recoveryAt">;
 
 const NO_FAILURE_RECOVERY: FailureRecovery = {
@@ -583,6 +706,7 @@ export async function GET(request: Request) {
 
   const workloadPromise = Promise.all([readAnalysisWorkloadSnapshot(), readCrawlWorkloadSnapshot()]);
   const recentFailuresPromise = readRecentFailures();
+  const integrityAlertsPromise = readQueueIntegrityAlerts();
   const stalledItemsPromise = readStalledItems();
   const queues = await Promise.all([
     readQueueSnapshot("analysis-runs", "AI 分析队列", getAnalysisQueue()),
@@ -591,11 +715,13 @@ export async function GET(request: Request) {
 
   const workloads = await workloadPromise;
   const recentFailures = await recentFailuresPromise;
+  const integrityAlerts = await integrityAlertsPromise;
   const stalledItems = await stalledItemsPromise;
 
   return ok<QueueHealthDTO>({
     queues,
     workloads,
+    integrityAlerts,
     stalledItems,
     recentFailures,
     updatedAt: new Date().toISOString()

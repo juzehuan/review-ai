@@ -199,6 +199,71 @@
               </a-tag>
             </div>
           </div>
+          <div class="table-title workload-title">队列一致性告警</div>
+          <a-table
+            :columns="integrityColumns"
+            :data-source="queueHealth?.integrityAlerts || []"
+            :loading="loading"
+            row-key="id"
+            :pagination="{ pageSize: 6 }"
+            :scroll="{ x: 1360 }"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'kind'">
+                <a-tag :color="failureKindColor(record.kind)">{{ failureKindLabel(record.kind) }}</a-tag>
+                <div class="member-email">{{ record.status }}</div>
+              </template>
+              <template v-else-if="column.key === 'target'">
+                <div>{{ record.label }}</div>
+                <div class="member-email">{{ record.taskName || record.taskId || record.id }}</div>
+              </template>
+              <template v-else-if="column.key === 'workspace'">
+                <div>{{ record.workspaceName || record.workspaceSlug || record.workspaceId || "-" }}</div>
+                <div class="member-email">{{ record.workspaceSlug || record.workspaceId || "-" }}</div>
+              </template>
+              <template v-else-if="column.key === 'queue'">
+                <div>{{ record.queueName }}</div>
+                <div class="member-email">{{ record.queueDataKey }}</div>
+              </template>
+              <template v-else-if="column.key === 'diagnosis'">
+                <div class="stalled-diagnosis-cell">
+                  <a-tag color="red">{{ record.diagnosis }}</a-tag>
+                  <div class="member-email">{{ record.nextAction }}</div>
+                </div>
+              </template>
+              <template v-else-if="column.key === 'activity'">
+                <div>{{ formatTime(record.lastActivityAt) }}</div>
+                <div class="member-email">已排队 {{ durationLabel(record.ageSeconds) }}</div>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <a-space size="small">
+                  <a-button size="small" type="link" :disabled="!canOpenQueueContext(record)" @click="openQueueContext(record)">
+                    {{ queueContextActionLabel(record) }}
+                  </a-button>
+                  <a-button
+                    v-if="canCancelQueueCrawl(record)"
+                    size="small"
+                    type="link"
+                    danger
+                    :loading="queueRetryingId === record.id"
+                    @click="cancelQueueCrawl(record)"
+                  >
+                    停止采集
+                  </a-button>
+                  <a-button
+                    v-if="canCancelQueueAnalysis(record)"
+                    size="small"
+                    type="link"
+                    danger
+                    :loading="queueRetryingId === record.id"
+                    @click="cancelQueueAnalysis(record)"
+                  >
+                    停止分析
+                  </a-button>
+                </a-space>
+              </template>
+            </template>
+          </a-table>
           <div class="table-title workload-title">疑似卡住任务</div>
           <a-table
             :columns="stalledColumns"
@@ -486,6 +551,7 @@ import type {
   InviteCodeDTO,
   QueueFailureDTO,
   QueueHealthDTO,
+  QueueIntegrityAlertDTO,
   QueueStalledDTO,
   WorkloadHealthSnapshotDTO
 } from "@review-ai/shared";
@@ -656,6 +722,16 @@ const failureColumns = [
   { title: "错误摘要", key: "error", width: 280 },
   { title: "失败时间", key: "time", width: 190 },
   { title: "操作", key: "actions", width: 190, fixed: "right" }
+];
+
+const integrityColumns = [
+  { title: "类型", key: "kind", width: 130 },
+  { title: "排队对象", key: "target", width: 280 },
+  { title: "空间", key: "workspace", width: 210 },
+  { title: "队列", key: "queue", width: 160 },
+  { title: "诊断建议", key: "diagnosis", width: 420 },
+  { title: "排队时间", key: "activity", width: 190 },
+  { title: "操作", key: "actions", width: 150, fixed: "right" }
 ];
 
 const stalledColumns = [
@@ -876,8 +952,8 @@ function durationLabel(seconds?: number | null) {
   return `${days} 天 ${hours % 24} 小时`;
 }
 
-type QueueItemKind = QueueFailureDTO["kind"] | QueueStalledDTO["kind"];
-type QueueHealthItem = QueueFailureDTO | QueueStalledDTO;
+type QueueItemKind = QueueFailureDTO["kind"] | QueueIntegrityAlertDTO["kind"] | QueueStalledDTO["kind"];
+type QueueHealthItem = QueueFailureDTO | QueueIntegrityAlertDTO | QueueStalledDTO;
 
 function failureKindLabel(kind: QueueItemKind) {
   return kind === "crawl" ? "采集" : "分析";
