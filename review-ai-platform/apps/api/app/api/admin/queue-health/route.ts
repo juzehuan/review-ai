@@ -184,6 +184,7 @@ function formatCrawlStopReason(value: string) {
     max_reviews: "达到采集上限",
     no_more_comments: "没有更多评论",
     cursor_stalled: "游标未推进",
+    idle_no_progress: "连续无新增",
     timeout: "采集超时",
     no_comments_found: "未发现评论"
   };
@@ -284,6 +285,15 @@ function buildCrawlStalledInsight(job: {
       detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
       diagnosis: "TikTok 接口游标未继续推进，疑似分页签名、会话或平台限制",
       nextAction: "稍后重试；若持续出现，降低单次采集上限并检查代理、浏览器参数和接口签名",
+      metricSummary,
+      lastError: truncateText(job.lastError) || null
+    };
+  }
+  if (stopReason === "idle_no_progress") {
+    return {
+      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      diagnosis: "浏览器兜底采集连续多轮无新增，疑似评论面板未继续加载、代理波动或平台风控",
+      nextAction: "检查登录态、代理稳定性和评论弹窗打开情况；必要时降低单次采集上限后重试",
       metricSummary,
       lastError: truncateText(job.lastError) || null
     };
