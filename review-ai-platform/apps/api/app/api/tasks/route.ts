@@ -52,7 +52,14 @@ function taskInclude() {
   return {
     analysisRuns: {
       orderBy: { createdAt: "desc" as const },
-      take: 1
+      take: 1,
+      include: {
+        logs: {
+          orderBy: { createdAt: "desc" as const },
+          take: 1,
+          select: { createdAt: true }
+        }
+      }
     },
     workspace: {
       include: {

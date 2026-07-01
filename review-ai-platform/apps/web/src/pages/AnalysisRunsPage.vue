@@ -67,7 +67,23 @@
             <a-tag>{{ analysisTypeLabel(record.analysisType) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'analysisStatus'">
-            <a-tag :color="runStatusColor(record.latestRunStatus)">{{ runStatusLabel(record.latestRunStatus) }}</a-tag>
+            <div class="task-analysis-cell">
+              <a-tag :color="runStatusColor(record.latestRunStatus)">{{ runStatusLabel(record.latestRunStatus) }}</a-tag>
+              <template v-if="record.latestRunStatus">
+                <a-progress
+                  :percent="record.latestRunProgressPercent"
+                  size="small"
+                  :status="taskRunProgressStatus(record)"
+                />
+                <span class="muted">{{ taskRunMetricSummary(record) }}</span>
+                <a-tag v-if="record.latestRunStalled" color="orange" class="task-run-stalled-tag">
+                  疑似无日志 {{ durationLabel(record.latestRunLastActivityAgoSeconds) }}
+                </a-tag>
+                <a-tooltip v-if="record.latestRunLastError" :title="record.latestRunLastError">
+                  <span class="task-run-error">最新错误：{{ errorSummary(record.latestRunLastError) }}</span>
+                </a-tooltip>
+              </template>
+            </div>
           </template>
           <template v-else-if="column.key === 'createdAt'">
             {{ formatTime(record.createdAt) }}
@@ -377,7 +393,7 @@ const taskColumns = computed(() => [
   { title: "来源", dataIndex: "sourceChannel", key: "sourceChannel", width: 110 },
   { title: "分析类型", key: "analysisType", width: 120 },
   { title: "导入状态", key: "taskStatus", width: 120 },
-  { title: "分析状态", key: "analysisStatus", width: 130 },
+  { title: "分析状态", key: "analysisStatus", width: 260 },
   { title: "创建时间", key: "createdAt", width: 180 },
   { title: "操作", key: "actions", width: 280 }
 ]);
@@ -506,6 +522,26 @@ function runProgress(run: AnalysisRunDTO) {
   return run.progressPercent;
 }
 
+function taskRunProgressStatus(task: TaskListItem) {
+  if (task.latestRunStatus === "failed") {
+    return "exception";
+  }
+  if (task.latestRunStatus === "completed") {
+    return "success";
+  }
+  return "active";
+}
+
+function taskRunMetricSummary(task: TaskListItem) {
+  const parts = [
+    `已处理 ${task.latestRunProcessedCount}/${task.latestRunReviewCount}`,
+    `成功 ${task.latestRunSuccessCount}`,
+    `失败 ${task.latestRunFailedCount}`,
+    task.latestRunFailureRatePercent > 0 ? `失败率 ${task.latestRunFailureRatePercent}%` : ""
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
 function progressStatus(run: AnalysisRunDTO) {
   if (run.status === "failed") {
     return "exception";
@@ -596,6 +632,11 @@ function formatTime(value?: string | null) {
 
 function formatCount(value?: number | null) {
   return value === null || value === undefined ? "-" : value.toLocaleString();
+}
+
+function errorSummary(value?: string | null) {
+  const text = String(value || "").trim();
+  return text.length > 28 ? `${text.slice(0, 28)}...` : text;
 }
 
 function formatMeta(meta: unknown) {
@@ -995,6 +1036,29 @@ onUnmounted(stopPolling);
 .task-status-filter {
   max-width: min(100%, 680px);
   overflow-x: auto;
+}
+
+.task-analysis-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.task-analysis-cell :deep(.ant-tag) {
+  justify-self: start;
+  margin-inline-end: 0;
+}
+
+.task-run-stalled-tag {
+  justify-self: start;
+}
+
+.task-run-error {
+  color: #b91c1c;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .task-actions {

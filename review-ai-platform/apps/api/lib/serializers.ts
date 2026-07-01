@@ -99,13 +99,56 @@ function roundOne(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+type LatestRunForTask = AnalysisRun & { logs?: Array<Pick<AnalysisRunLog, "createdAt">> };
+
+function latestRunSummary(run: LatestRunForTask | null) {
+  if (!run) {
+    return {
+      latestRunId: null,
+      latestRunStatus: null,
+      latestRunReviewCount: 0,
+      latestRunProcessedCount: 0,
+      latestRunSuccessCount: 0,
+      latestRunFailedCount: 0,
+      latestRunProgressPercent: 0,
+      latestRunFailureRatePercent: 0,
+      latestRunLastActivityAt: null,
+      latestRunLastActivityAgoSeconds: null,
+      latestRunStalled: false,
+      latestRunFinishedAt: null,
+      latestRunLastError: null
+    };
+  }
+
+  const now = new Date();
+  const processedCount = run.successCount + run.failedCount;
+  const lastActivityAt = run.logs?.[0]?.createdAt || run.finishedAt || run.startedAt || run.createdAt;
+  const lastActivityAgoSeconds = Math.max(0, Math.floor((now.getTime() - lastActivityAt.getTime()) / 1000));
+  return {
+    latestRunId: run.id,
+    latestRunStatus: run.status,
+    latestRunReviewCount: run.reviewCount,
+    latestRunProcessedCount: processedCount,
+    latestRunSuccessCount: run.successCount,
+    latestRunFailedCount: run.failedCount,
+    latestRunProgressPercent: run.reviewCount ? Math.min(100, Math.round((processedCount / run.reviewCount) * 100)) : 0,
+    latestRunFailureRatePercent: processedCount ? Math.round((run.failedCount / processedCount) * 100) : 0,
+    latestRunLastActivityAt: lastActivityAt.toISOString(),
+    latestRunLastActivityAgoSeconds: lastActivityAgoSeconds,
+    latestRunStalled: ["queued", "running"].includes(run.status) && lastActivityAgoSeconds >= 300,
+    latestRunFinishedAt: run.finishedAt?.toISOString() || null,
+    latestRunLastError: run.lastError || null
+  };
+}
+
 export function serializeTask(
   task: Task & {
-    analysisRuns?: AnalysisRun[];
+    analysisRuns?: LatestRunForTask[];
     workspace?: (Workspace & { memberships?: Array<WorkspaceMember & { user: User }> }) | null;
   }
 ): TaskListItem {
   const latestRun = task.analysisRuns?.[0] || null;
+  const runSummary = latestRunSummary(latestRun);
   const ownerMember = task.workspace?.memberships?.find((member) => member.role === "owner") || task.workspace?.memberships?.[0] || null;
   return {
     id: task.id,
@@ -121,8 +164,7 @@ export function serializeTask(
     sourceChannel: task.sourceChannel,
     analysisType: task.analysisType as AnalysisType,
     status: task.status,
-    latestRunStatus: latestRun?.status || null,
-    latestRunFinishedAt: latestRun?.finishedAt?.toISOString() || null,
+    ...runSummary,
     createdAt: task.createdAt.toISOString()
   };
 }
@@ -240,7 +282,7 @@ export function serializeAdminWorkspace(
   };
 }
 
-export function serializeRun(run: AnalysisRun & { logs?: AnalysisRunLog[] }): AnalysisRunDTO {
+export function serializeRun(run: AnalysisRun & { logs?: Array<Pick<AnalysisRunLog, "createdAt">> }): AnalysisRunDTO {
   const now = new Date();
   const processedCount = run.successCount + run.failedCount;
   const progressPercent = run.reviewCount ? Math.min(100, Math.round((processedCount / run.reviewCount) * 100)) : 0;

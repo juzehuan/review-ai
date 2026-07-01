@@ -18,7 +18,14 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     include: {
       analysisRuns: {
         orderBy: { createdAt: "desc" },
-        take: 1
+        take: 1,
+        include: {
+          logs: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { createdAt: true }
+          }
+        }
       },
       importRecords: {
         orderBy: { createdAt: "desc" },

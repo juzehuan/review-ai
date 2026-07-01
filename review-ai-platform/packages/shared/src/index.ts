@@ -58,8 +58,19 @@ export interface TaskListItem {
   sourceChannel: string;
   analysisType: AnalysisType;
   status: TaskStatus;
+  latestRunId: string | null;
   latestRunStatus: RunStatus | null;
+  latestRunReviewCount: number;
+  latestRunProcessedCount: number;
+  latestRunSuccessCount: number;
+  latestRunFailedCount: number;
+  latestRunProgressPercent: number;
+  latestRunFailureRatePercent: number;
+  latestRunLastActivityAt: string | null;
+  latestRunLastActivityAgoSeconds: number | null;
+  latestRunStalled: boolean;
   latestRunFinishedAt: string | null;
+  latestRunLastError: string | null;
   createdAt: string;
 }
 
