@@ -2426,6 +2426,14 @@ body {
   line-height: 1.15;
 }
 
+.quota-period-note {
+  min-width: 260px;
+  color: rgba(226, 235, 248, 0.7);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
 .workspace-overview-page .summary-grid {
   gap: 18px;
 }
@@ -2587,6 +2595,11 @@ body {
   .quota-strip {
     min-width: 0;
     grid-template-columns: 1fr;
+  }
+
+  .quota-period-note {
+    min-width: 0;
+    text-align: left;
   }
 
   .workspace-table-panel,

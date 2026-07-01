@@ -41,6 +41,7 @@
           <strong>{{ runUsage }}</strong>
         </div>
       </div>
+      <div class="quota-period-note">{{ quotaPeriodNote }}</div>
     </div>
 
     <div class="summary-grid">
@@ -157,6 +158,18 @@ const runUsage = computed(() => {
   }
   return `${workspace.value.currentPeriodRunCount}/${workspace.value.monthlyRunLimit}`;
 });
+const quotaPeriodNote = computed(() => {
+  if (currentUser.value?.isSuperAdmin) {
+    return t("workspace.quotaUnlimitedNote");
+  }
+  if (!workspace.value?.currentPeriodEndsAt) {
+    return t("workspace.quotaPeriodUnknown");
+  }
+  return t("workspace.quotaPeriodNote", {
+    days: workspace.value.currentPeriodRemainingDays ?? 0,
+    date: formatDate(workspace.value.currentPeriodEndsAt)
+  });
+});
 
 function openTask(task: TaskListItem) {
   setSelectedTask(task.id);
@@ -209,6 +222,10 @@ function runStatusColor(status?: string | null) {
 
 function formatTime(value: string) {
   return new Date(value).toLocaleString(locale.value);
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString(locale.value);
 }
 
 onMounted(refreshTasks);

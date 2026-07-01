@@ -109,6 +109,9 @@ export interface WorkspaceDTO {
   monthlyRunLimit: number;
   currentPeriodReviewCount: number;
   currentPeriodRunCount: number;
+  currentPeriodStartedAt: string | null;
+  currentPeriodEndsAt: string | null;
+  currentPeriodRemainingDays: number | null;
 }
 
 export interface MyWorkspaceDTO extends WorkspaceDTO {

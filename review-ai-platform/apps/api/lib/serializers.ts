@@ -203,6 +203,10 @@ export function serializeTask(
 
 export function serializeWorkspace(workspace: Workspace & { subscription?: Subscription | null }): WorkspaceDTO {
   const subscription = workspace.subscription;
+  const periodEndsAt = subscription?.currentPeriodEndsAt || null;
+  const periodRemainingDays = periodEndsAt
+    ? Math.max(0, Math.ceil((periodEndsAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+    : null;
   return {
     id: workspace.id,
     slug: workspace.slug,
@@ -211,7 +215,10 @@ export function serializeWorkspace(workspace: Workspace & { subscription?: Subsc
     monthlyReviewLimit: subscription?.monthlyReviewLimit || 0,
     monthlyRunLimit: subscription?.monthlyRunLimit || 0,
     currentPeriodReviewCount: subscription?.currentPeriodReviewCount || 0,
-    currentPeriodRunCount: subscription?.currentPeriodRunCount || 0
+    currentPeriodRunCount: subscription?.currentPeriodRunCount || 0,
+    currentPeriodStartedAt: subscription?.currentPeriodStartedAt.toISOString() || null,
+    currentPeriodEndsAt: periodEndsAt?.toISOString() || null,
+    currentPeriodRemainingDays: periodRemainingDays
   };
 }
 
