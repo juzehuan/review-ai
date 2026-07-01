@@ -184,6 +184,14 @@
               <template #icon><StopOutlined /></template>
               停止当前任务
             </a-button>
+            <a-button
+              v-if="selectedRun && canRetry(selectedRun)"
+              :loading="retryingRunId === selectedRun.id"
+              @click="retryOne(selectedRun)"
+            >
+              <template #icon><ReloadOutlined /></template>
+              重试当前批次
+            </a-button>
           </a-space>
         </div>
 
@@ -222,6 +230,14 @@
             <template v-else-if="column.key === 'action'">
               <a-space>
                 <a-button size="small" @click.stop="selectRun(record)">日志</a-button>
+                <a-button
+                  v-if="canRetry(record)"
+                  size="small"
+                  :loading="retryingRunId === record.id"
+                  @click.stop="retryOne(record)"
+                >
+                  重试
+                </a-button>
                 <a-button v-if="canCancel(record)" size="small" danger @click.stop="cancelOne(record)">停止</a-button>
               </a-space>
             </template>
@@ -337,6 +353,7 @@ const logs = ref<AnalysisRunLogDTO[]>([]);
 const selectedRun = ref<AnalysisRunDTO | null>(null);
 const loading = ref(false);
 const starting = ref(false);
+const retryingRunId = ref<string | null>(null);
 const deletingTaskId = ref<string | null>(null);
 const autoRefresh = ref(true);
 const logLevelFilter = ref<"all" | "warn" | "error">("all");
@@ -404,7 +421,7 @@ const runColumns = [
   { title: "服务商", dataIndex: "provider", key: "provider", width: 110 },
   { title: "进度", key: "progress", width: 320 },
   { title: "开始/结束", key: "time", width: 180 },
-  { title: "操作", key: "action", width: 130 }
+  { title: "操作", key: "action", width: 180 }
 ];
 
 const taskStatusOptions = computed(() => {
@@ -512,6 +529,10 @@ const latestRunActivityNote = computed(() => {
 
 function canCancel(run: AnalysisRunDTO) {
   return ["queued", "running"].includes(run.status);
+}
+
+function canRetry(run: AnalysisRunDTO) {
+  return canWriteWorkspace.value && ["failed", "partial_failed"].includes(run.status);
 }
 
 function canDeleteTask(task: TaskListItem) {
@@ -898,6 +919,22 @@ async function startAnalysis() {
     await selectRun(run);
   } finally {
     starting.value = false;
+  }
+}
+
+async function retryOne(run: AnalysisRunDTO) {
+  if (!selectedTask.value || !canRetry(run) || retryingRunId.value) {
+    return;
+  }
+  retryingRunId.value = run.id;
+  try {
+    const nextRun = await createRun(selectedTask.value.id);
+    message.success("分析任务已重新加入队列");
+    await loadTaskPage({ targetTaskId: selectedTask.value.id });
+    await loadRuns();
+    await selectRun(nextRun);
+  } finally {
+    retryingRunId.value = null;
   }
 }
 
