@@ -39,6 +39,7 @@
         <a-form-item v-if="!appendTask" :label="t('import.analysisType')">
           <a-select v-model:value="form.analysisType" :options="analysisTypeOptions" />
           <div class="settings-help">{{ currentAnalysisTypeDescription }}</div>
+          <div class="settings-help">{{ analysisTypeRecommendation }}</div>
         </a-form-item>
         <a-form-item :label="t('import.reviewFile')">
           <a-upload-dragger
@@ -124,6 +125,16 @@ const contentNameMeta = computed(() => {
 
 const currentAnalysisTypeDescription = computed(() => {
   return t(`analysisType.${form.analysisType}Description`);
+});
+
+const analysisTypeRecommendation = computed(() => {
+  const recommended = inferAnalysisType(form.sourceChannel);
+  const recommendedLabel = t(`analysisType.${recommended}`);
+  const currentLabel = t(`analysisType.${form.analysisType}`);
+  if (form.analysisType === recommended) {
+    return t("import.analysisTypeRecommended", { type: recommendedLabel });
+  }
+  return t("import.analysisTypeMismatch", { recommended: recommendedLabel, current: currentLabel });
 });
 
 function isSupportedFile(file: File) {

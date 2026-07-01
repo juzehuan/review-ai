@@ -395,6 +395,7 @@
           </a-form-item>
           <a-form-item label="分析类型">
             <a-select v-model:value="monitorForm.analysisType" :options="analysisTypeOptions" />
+            <div class="settings-help">{{ crawlAnalysisTypeHint(monitorForm) }}</div>
           </a-form-item>
         </div>
         <div class="monitor-form-grid">
@@ -440,6 +441,7 @@
           </a-form-item>
           <a-form-item label="分析类型">
             <a-select v-model:value="form.analysisType" :options="analysisTypeOptions" />
+            <div class="settings-help">{{ crawlAnalysisTypeHint(form) }}</div>
           </a-form-item>
         </div>
         <a-form-item label="最多采集条数">
@@ -480,6 +482,7 @@ import {
   startCrawlJobAnalysis,
   updateCrawlMonitor
 } from "@/api";
+import { useI18n } from "@/i18n";
 import {
   ANALYSIS_TYPE_PRESETS,
   CRAWL_SOURCE_CHANNEL_PRESETS,
@@ -496,6 +499,7 @@ import {
 
 const router = useRouter();
 const route = useRoute();
+const { t } = useI18n();
 const jobs = ref<CrawlJobDTO[]>(readWorkspaceCache<CrawlJobDTO>("crawl-jobs"));
 const monitors = ref<CrawlMonitorDTO[]>(readWorkspaceCache<CrawlMonitorDTO>("crawl-monitors"));
 const loading = ref(false);
@@ -771,6 +775,40 @@ function progressStatus(status: CrawlJobStatus) {
 
 function analysisTypeLabel(value: string) {
   return value === "video" ? "视频评论" : value === "tweet" ? "社媒评论" : "商品评论";
+}
+
+function inferCrawlAnalysisType(sourceChannel?: string | null, productUrl?: string | null): AnalysisType {
+  const channel = String(sourceChannel || "").trim();
+  const text = String(productUrl || "").trim().toLowerCase();
+  if (channel === "Facebook" || text.includes("facebook.")) {
+    if (/(\/reel\/|\/videos\/|\/watch\/|[?&]v=|\/share\/v)/i.test(text)) {
+      return "video";
+    }
+    return "tweet";
+  }
+  return inferAnalysisType(channel);
+}
+
+function analysisTypeI18nLabel(value: AnalysisType) {
+  return t(`analysisType.${value}`);
+}
+
+function crawlAnalysisTypeHint(target: { sourceChannel: string; productUrl: string; analysisType: AnalysisType }) {
+  const recommended = inferCrawlAnalysisType(target.sourceChannel, target.productUrl);
+  const recommendedLabel = analysisTypeI18nLabel(recommended);
+  if (target.analysisType !== recommended) {
+    return t("crawl.analysisTypeMismatch", {
+      recommended: recommendedLabel,
+      current: analysisTypeI18nLabel(target.analysisType)
+    });
+  }
+  if (target.sourceChannel === "Facebook" && recommended === "video") {
+    return t("crawl.facebookVideoAnalysisHint");
+  }
+  if (target.sourceChannel === "Facebook") {
+    return t("crawl.facebookPostAnalysisHint");
+  }
+  return t("crawl.analysisTypeRecommended", { type: recommendedLabel });
 }
 
 function platformLabel(value?: string | null) {
@@ -1236,7 +1274,7 @@ function applyUrlInference(target: typeof form | typeof monitorForm, productUrl?
     return;
   }
   target.sourceChannel = sourceChannel;
-  target.analysisType = inferAnalysisType(sourceChannel);
+  target.analysisType = inferCrawlAnalysisType(sourceChannel, productUrl);
   if (sourceChannel === "TikTok Video" || sourceChannel === "Facebook") {
     target.maxReviews = 0;
   }
@@ -1248,14 +1286,14 @@ function applyUrlInference(target: typeof form | typeof monitorForm, productUrl?
 watch(
   () => form.sourceChannel,
   (sourceChannel) => {
-    form.analysisType = inferAnalysisType(sourceChannel);
+    form.analysisType = inferCrawlAnalysisType(sourceChannel, form.productUrl);
   }
 );
 
 watch(
   () => monitorForm.sourceChannel,
   (sourceChannel) => {
-    monitorForm.analysisType = inferAnalysisType(sourceChannel);
+    monitorForm.analysisType = inferCrawlAnalysisType(sourceChannel, monitorForm.productUrl);
   }
 );
 
