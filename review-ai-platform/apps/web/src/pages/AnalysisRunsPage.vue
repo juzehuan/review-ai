@@ -268,6 +268,10 @@
             <span class="summary-label">进度</span>
             <strong>{{ selectedRun.processedCount }}/{{ selectedRun.reviewCount }}</strong>
           </div>
+          <div v-if="selectedRun.queuePosition !== null">
+            <span class="summary-label">排队</span>
+            <strong>第 {{ selectedRun.queuePosition }} 位</strong>
+          </div>
           <div>
             <span class="summary-label">失败</span>
             <strong>{{ selectedRun.failedCount }} · {{ selectedRun.failureRatePercent }}%</strong>
@@ -687,6 +691,7 @@ function shortRunName(run: AnalysisRunDTO) {
 
 function runMetricSummary(run: AnalysisRunDTO) {
   const parts = [
+    run.queuePosition !== null ? `排队第 ${run.queuePosition} 位` : "",
     `耗时 ${durationLabel(run.durationSeconds)}`,
     run.throughputPerMinute !== null ? `速度 ${run.throughputPerMinute}/分钟` : "",
     run.estimatedRemainingSeconds !== null ? `预计剩余 ${durationLabel(run.estimatedRemainingSeconds)}` : "",

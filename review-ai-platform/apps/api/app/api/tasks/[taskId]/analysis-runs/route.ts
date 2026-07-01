@@ -1,5 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { buildAnalysisQueueJobId, QUEUE_JOB_CLEANUP_OPTIONS } from "@review-ai/shared";
+import { attachAnalysisQueuePosition, attachAnalysisQueuePositions } from "@/lib/analysis-run-queue";
 import { getAnalysisQueue } from "@/lib/queue";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
@@ -30,7 +31,8 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
       }
     }
   });
-  return ok(runs.map(serializeRun));
+  const runsWithQueuePositions = await attachAnalysisQueuePositions(runs);
+  return ok(runsWithQueuePositions.map(serializeRun));
 }
 
 export async function POST(request: Request, context: { params: Promise<{ taskId: string }> }) {
@@ -70,7 +72,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
         data: { status: "analyzing" }
       });
     }
-    return ok(serializeRun(activeRun));
+    return ok(serializeRun(await attachAnalysisQueuePosition(activeRun)));
   }
 
   const quotaUnlimited = canBypassQuota(workspaceContext);
@@ -165,5 +167,5 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     }
   });
 
-  return ok(serializeRun(run), 201);
+  return ok(serializeRun(await attachAnalysisQueuePosition(run)), 201);
 }

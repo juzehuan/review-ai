@@ -1117,6 +1117,7 @@ export interface AnalysisRunDTO {
   modelName: string;
   promptVersion: string;
   status: RunStatus;
+  queuePosition: number | null;
   reviewCount: number;
   successCount: number;
   failedCount: number;

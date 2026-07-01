@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { attachAnalysisQueuePosition } from "@/lib/analysis-run-queue";
 import { ok } from "@/lib/http";
 import { serializeRun, serializeRunLog } from "@/lib/serializers";
 import { getWorkspaceContext, requireScopedTask } from "@/lib/workspace";
@@ -45,7 +46,7 @@ export async function GET(
   });
 
   return ok({
-    run: serializeRun(run),
+    run: serializeRun(await attachAnalysisQueuePosition(run)),
     logs: logs.map(serializeRunLog)
   });
 }

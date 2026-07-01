@@ -282,7 +282,12 @@ export function serializeAdminWorkspace(
   };
 }
 
-export function serializeRun(run: AnalysisRun & { logs?: Array<Pick<AnalysisRunLog, "createdAt">> }): AnalysisRunDTO {
+type SerializableAnalysisRun = AnalysisRun & {
+  logs?: Array<Pick<AnalysisRunLog, "createdAt">>;
+  queuePosition?: number | null;
+};
+
+export function serializeRun(run: SerializableAnalysisRun): AnalysisRunDTO {
   const now = new Date();
   const processedCount = run.successCount + run.failedCount;
   const progressPercent = run.reviewCount ? Math.min(100, Math.round((processedCount / run.reviewCount) * 100)) : 0;
@@ -305,6 +310,7 @@ export function serializeRun(run: AnalysisRun & { logs?: Array<Pick<AnalysisRunL
     modelName: run.modelName,
     promptVersion: run.promptVersion,
     status: run.status,
+    queuePosition: run.queuePosition ?? null,
     reviewCount: run.reviewCount,
     successCount: run.successCount,
     failedCount: run.failedCount,

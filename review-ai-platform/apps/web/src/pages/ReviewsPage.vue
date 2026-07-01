@@ -49,6 +49,7 @@
       <a-progress :percent="progressPercent" :status="progressStatus" />
       <div class="analysis-progress-metrics">
         <span>失败率 {{ latestRun.failureRatePercent }}%</span>
+        <span v-if="latestRun.queuePosition !== null">排队第 {{ latestRun.queuePosition }} 位</span>
         <span v-if="latestRun.throughputPerMinute !== null">速度 {{ latestRun.throughputPerMinute }}/分钟</span>
         <span v-if="latestRun.estimatedRemainingSeconds !== null">预计剩余 {{ durationLabel(latestRun.estimatedRemainingSeconds) }}</span>
         <span v-if="latestRun.lastActivityAt">最后日志 {{ durationLabel(latestRun.lastActivityAgoSeconds) }}前</span>
