@@ -331,8 +331,8 @@ export async function createCrawlJob(payload: {
   return data.job;
 }
 
-export async function fetchCrawlJobs() {
-  const { data } = await api.get<CrawlJobDTO[]>("/crawl-jobs");
+export async function fetchCrawlJobs(params?: { jobId?: string }) {
+  const { data } = await api.get<CrawlJobDTO[]>("/crawl-jobs", { params });
   return data;
 }
 

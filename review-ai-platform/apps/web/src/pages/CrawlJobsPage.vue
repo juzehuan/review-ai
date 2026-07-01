@@ -881,7 +881,7 @@ function hasActiveMonitorJob(monitor: CrawlMonitorDTO) {
 }
 
 async function loadJobs() {
-  const rows = await fetchCrawlJobs();
+  const rows = await fetchCrawlJobs(highlightedCrawlJobId.value ? { jobId: highlightedCrawlJobId.value } : undefined);
   jobs.value = rows;
   writeWorkspaceCache("crawl-jobs", rows);
 }
@@ -1079,6 +1079,15 @@ watch(
 watch(
   () => monitorForm.productUrl,
   (productUrl) => applyUrlInference(monitorForm, productUrl)
+);
+
+watch(
+  () => route.query.jobId,
+  async () => {
+    if (!loading.value) {
+      await loadJobs();
+    }
+  }
 );
 
 async function submitCrawlJob() {
