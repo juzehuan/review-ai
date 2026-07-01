@@ -19,7 +19,7 @@ export function useTaskStore() {
       const [workspaceResult, workspaceListResult, taskResult] = await Promise.all([
         fetchWorkspace(),
         fetchMyWorkspaces(),
-        fetchTasks()
+        fetchTasks({ taskId: selectedTaskId.value || undefined })
       ]);
       workspace.value = workspaceResult;
       workspaces.value = workspaceListResult;

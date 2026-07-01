@@ -24,19 +24,28 @@
           <div class="panel-label">Tasks</div>
           <div class="settings-section-title">全部任务列表</div>
         </div>
-        <a-tag>{{ tasks.length }} 个任务</a-tag>
+        <a-space class="task-list-toolbar" wrap>
+          <a-segmented
+            v-model:value="taskStatusFilter"
+            class="task-status-filter"
+            :options="taskStatusOptions"
+            @change="handleTaskStatusChange"
+          />
+          <a-tag>{{ taskListTotal }} 个任务</a-tag>
+        </a-space>
       </div>
 
       <a-table
         row-key="id"
         size="middle"
         :columns="taskColumns"
-        :data-source="tasks"
-        :pagination="{ pageSize: 10 }"
+        :data-source="taskRows"
+        :pagination="taskPagination"
         :loading="loadingTasks"
         :scroll="{ x: currentUser?.isSuperAdmin ? 1650 : 1440 }"
         :row-class-name="taskRowClassName"
         @row="taskRowProps"
+        @change="handleTaskTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'task'">
@@ -290,9 +299,9 @@ import {
   StopOutlined,
   TableOutlined
 } from "@ant-design/icons-vue";
-import type { AnalysisRunDTO, AnalysisRunLogDTO, TaskListItem } from "@review-ai/shared";
+import type { AnalysisRunDTO, AnalysisRunLogDTO, TaskListItem, TaskStatusCounts, TaskStatusFilter } from "@review-ai/shared";
 import TaskImportModal from "@/components/TaskImportModal.vue";
-import { cancelRun, createRun, deleteTask, fetchRunLogs, fetchRuns } from "@/api";
+import { cancelRun, createRun, deleteTask, fetchRunLogs, fetchRuns, fetchTaskList } from "@/api";
 import { useTaskStore } from "@/composables";
 
 const router = useRouter();
@@ -300,11 +309,11 @@ const route = useRoute();
 const {
   tasks,
   selectedTask,
+  selectedTaskId,
   loadingTasks,
   workspace,
   workspaces,
   currentUser,
-  refreshTasks,
   setSelectedTask
 } = useTaskStore();
 const runs = ref<AnalysisRunDTO[]>([]);
@@ -320,6 +329,33 @@ const showAppendImport = ref(false);
 const appendTask = ref<TaskListItem | null>(null);
 let timer: ReturnType<typeof setInterval> | null = null;
 const requestedRunId = computed(() => (typeof route.query.runId === "string" ? route.query.runId : ""));
+const taskRows = ref<TaskListItem[]>(tasks.value);
+const taskListPage = ref(1);
+const taskListPageSize = ref(10);
+const taskListTotal = ref(tasks.value.length);
+
+function emptyTaskStatusCounts(): TaskStatusCounts {
+  return {
+    all: 0,
+    draft: 0,
+    imported: 0,
+    analyzing: 0,
+    completed: 0,
+    failed: 0
+  };
+}
+
+function taskStatusCountsFromRows(rows: TaskListItem[]): TaskStatusCounts {
+  const counts = emptyTaskStatusCounts();
+  for (const row of rows) {
+    counts[row.status] += 1;
+    counts.all += 1;
+  }
+  return counts;
+}
+
+const taskStatusFilter = ref<TaskStatusFilter>("all");
+const taskStatusCounts = ref<TaskStatusCounts>(taskStatusCountsFromRows(tasks.value));
 
 const currentWorkspaceRole = computed(() => {
   const slug = workspace.value?.slug;
@@ -354,6 +390,27 @@ const runColumns = [
   { title: "开始/结束", key: "time", width: 180 },
   { title: "操作", key: "action", width: 130 }
 ];
+
+const taskStatusOptions = computed(() => {
+  const counts = taskStatusCounts.value;
+  return [
+    { label: `全部 ${formatCount(counts.all)}`, value: "all" },
+    { label: `草稿 ${formatCount(counts.draft)}`, value: "draft" },
+    { label: `已导入 ${formatCount(counts.imported)}`, value: "imported" },
+    { label: `分析中 ${formatCount(counts.analyzing)}`, value: "analyzing" },
+    { label: `已完成 ${formatCount(counts.completed)}`, value: "completed" },
+    { label: `失败 ${formatCount(counts.failed)}`, value: "failed" }
+  ];
+});
+
+const taskPagination = computed(() => ({
+  current: taskListPage.value,
+  pageSize: taskListPageSize.value,
+  total: taskListTotal.value,
+  showSizeChanger: true,
+  pageSizeOptions: ["10", "20", "50", "100"],
+  showTotal: (total: number) => `共 ${formatCount(total)} 个任务`
+}));
 
 const logLevelOptions = [
   { label: "全部", value: "all" },
@@ -537,6 +594,10 @@ function formatTime(value?: string | null) {
   return new Date(value).toLocaleString();
 }
 
+function formatCount(value?: number | null) {
+  return value === null || value === undefined ? "-" : value.toLocaleString();
+}
+
 function formatMeta(meta: unknown) {
   return JSON.stringify(meta, null, 2);
 }
@@ -643,7 +704,9 @@ async function removeTask(task: TaskListItem) {
       selectedRun.value = null;
       logs.value = [];
     }
-    await refreshTasks();
+    tasks.value = tasks.value.filter((item) => item.id !== task.id);
+    taskRows.value = taskRows.value.filter((item) => item.id !== task.id);
+    await loadTaskPage();
     if (selectedTask.value) {
       router.replace(`/tasks/${selectedTask.value.id}/runs`);
     } else {
@@ -670,6 +733,58 @@ function confirmRemoveTask(task: TaskListItem) {
       await removeTask(task);
     }
   });
+}
+
+function mergeTaskRowsIntoStore(rows: TaskListItem[]) {
+  const rowIds = new Set(rows.map((task) => task.id));
+  tasks.value = [...rows, ...tasks.value.filter((task) => !rowIds.has(task.id))];
+}
+
+async function loadTaskPage(options: { targetTaskId?: string; resetPage?: boolean } = {}) {
+  if (options.resetPage) {
+    taskListPage.value = 1;
+  }
+  loadingTasks.value = true;
+  try {
+    const result = await fetchTaskList({
+      taskId: options.targetTaskId || selectedTaskId.value || undefined,
+      status: taskStatusFilter.value,
+      page: taskListPage.value,
+      pageSize: taskListPageSize.value
+    });
+    if (result.items.length === 0 && result.total > 0 && result.page > 1) {
+      taskListPage.value = result.page - 1;
+      await loadTaskPage(options);
+      return;
+    }
+
+    taskRows.value = result.items;
+    taskListPage.value = result.page;
+    taskListPageSize.value = result.pageSize;
+    taskListTotal.value = result.total;
+    taskStatusCounts.value = result.statusCounts;
+    mergeTaskRowsIntoStore(result.items);
+
+    if (options.targetTaskId && result.items.some((task) => task.id === options.targetTaskId)) {
+      setSelectedTask(options.targetTaskId);
+    } else if (!selectedTask.value && result.items[0]) {
+      setSelectedTask(result.items[0].id);
+    }
+  } finally {
+    loadingTasks.value = false;
+  }
+}
+
+async function handleTaskStatusChange() {
+  taskListPage.value = 1;
+  await loadTaskPage();
+}
+
+async function handleTaskTableChange(pagination: { current?: number; pageSize?: number }) {
+  const nextPageSize = pagination.pageSize || taskListPageSize.value;
+  taskListPage.value = nextPageSize === taskListPageSize.value ? pagination.current || 1 : 1;
+  taskListPageSize.value = nextPageSize;
+  await loadTaskPage();
 }
 
 async function loadRuns() {
@@ -712,7 +827,7 @@ async function loadLogs(incremental = false) {
 async function refreshAll() {
   loading.value = true;
   try {
-    await refreshTasks();
+    await loadTaskPage();
     await loadRuns();
     await loadLogs();
   } finally {
@@ -737,7 +852,7 @@ async function startAnalysis() {
   try {
     const run = await createRun(selectedTask.value.id);
     message.success("分析任务已加入队列");
-    await refreshTasks();
+    await loadTaskPage({ targetTaskId: selectedTask.value.id });
     await loadRuns();
     await selectRun(run);
   } finally {
@@ -768,8 +883,10 @@ async function handleImportSuccess(taskId: string) {
     router.replace("/crawl-jobs");
     return;
   }
-  await refreshTasks();
+  taskStatusFilter.value = "all";
+  taskListPage.value = 1;
   setSelectedTask(taskId);
+  await loadTaskPage({ targetTaskId: taskId });
   router.replace(`/tasks/${taskId}/runs`);
   await refreshAll();
 }
@@ -803,10 +920,13 @@ watch(
 
 watch(
   () => [route.params.taskId, route.query.taskId],
-  ([paramTaskId, queryTaskId]) => {
+  async ([paramTaskId, queryTaskId]) => {
     const taskId = typeof paramTaskId === "string" ? paramTaskId : typeof queryTaskId === "string" ? queryTaskId : "";
     if (taskId && taskId !== selectedTask.value?.id) {
+      taskStatusFilter.value = "all";
+      taskListPage.value = 1;
       setSelectedTask(taskId);
+      await loadTaskPage({ targetTaskId: taskId });
     }
   },
   { immediate: true }
@@ -824,9 +944,7 @@ watch(
 );
 
 onMounted(async () => {
-  if (!tasks.value.length) {
-    await refreshTasks();
-  }
+  await loadTaskPage({ targetTaskId: selectedTaskId.value || undefined });
   startPolling();
 });
 onUnmounted(stopPolling);
@@ -868,6 +986,15 @@ onUnmounted(stopPolling);
 .task-name-cell span {
   color: #64748b;
   font-size: 12px;
+}
+
+.task-list-toolbar {
+  justify-content: flex-end;
+}
+
+.task-status-filter {
+  max-width: min(100%, 680px);
+  overflow-x: auto;
 }
 
 .task-actions {

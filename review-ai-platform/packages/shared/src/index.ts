@@ -63,6 +63,19 @@ export interface TaskListItem {
   createdAt: string;
 }
 
+export type TaskStatusFilter = TaskStatus | "all";
+export type TaskStatusCounts = Record<TaskStatus | "all", number>;
+
+export interface TaskListResponse {
+  items: TaskListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  status: TaskStatusFilter;
+  statusCounts: TaskStatusCounts;
+  updatedAt: string;
+}
+
 export interface WorkspaceDTO {
   id: string;
   slug: string;

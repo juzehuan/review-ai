@@ -32,7 +32,9 @@ import type {
   SharedReportDTO,
   StartCrawlAnalysisResponse,
   TaskCompareDTO,
+  TaskListResponse,
   TaskListItem,
+  TaskStatusFilter,
   WorkspaceAiSettingDTO,
   WorkspaceCrawlerSettingDTO,
   WorkspaceDTO,
@@ -143,9 +145,17 @@ export async function changePassword(payload: { oldPassword: string; newPassword
   return data;
 }
 
-export async function fetchTasks() {
-  const { data } = await api.get<TaskListItem[]>("/tasks");
+export async function fetchTaskList(params?: { taskId?: string; status?: TaskStatusFilter; page?: number; pageSize?: number }) {
+  const { data } = await api.get<TaskListResponse>("/tasks", { params });
   return data;
+}
+
+export async function fetchTasks(params?: { taskId?: string; pageSize?: number }) {
+  const data = await fetchTaskList({
+    taskId: params?.taskId,
+    pageSize: params?.pageSize ?? 500
+  });
+  return data.items;
 }
 
 export async function deleteTask(taskId: string) {
