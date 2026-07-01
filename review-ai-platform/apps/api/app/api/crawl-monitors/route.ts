@@ -2,6 +2,7 @@ import { prisma } from "@review-ai/db";
 import type { CreateCrawlMonitorResponse } from "@review-ai/shared";
 import { normalizeCrawlMonitorIntervalMinutes, queueCrawlMonitorRun } from "@/lib/crawl-monitor-runs";
 import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord, supportedCrawlUrlError } from "@/lib/crawl-utils";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlMonitor } from "@/lib/serializers";
@@ -84,7 +85,28 @@ export async function POST(request: Request) {
     }
   });
 
-  const result = enabled ? await queueCrawlMonitorRun(monitor.id, { forceEnable: true }) : { monitor };
+  const result = enabled
+    ? await queueCrawlMonitorRun(monitor.id, { forceEnable: true })
+    : { monitor, jobId: null, queued: false, alreadyActive: false };
+
+  await writeAuditLog(request, {
+    workspaceId: monitor.workspaceId,
+    actor: context.user,
+    action: "crawl_monitor.create",
+    targetType: "crawl_monitor",
+    targetId: monitor.id,
+    targetLabel: monitor.name,
+    metadata: {
+      productUrl: monitor.normalizedUrl,
+      sourceChannel: monitor.sourceChannel,
+      platform: monitor.platform,
+      intervalMinutes: monitor.intervalMinutes,
+      autoAnalyze: monitor.autoAnalyze,
+      enabled,
+      jobId: result.jobId,
+      queued: result.queued
+    }
+  });
 
   return ok({ monitor: serializeCrawlMonitor(result.monitor) } satisfies CreateCrawlMonitorResponse, 201);
 }

@@ -737,6 +737,10 @@ function actionLabel(action: string) {
       "settings.ai.update": "更新 AI 设置",
       "settings.crawler.update": "更新爬虫设置",
       "crawl_job.retry": "重试采集任务",
+      "crawl_monitor.create": "创建监听任务",
+      "crawl_monitor.update": "更新监听任务",
+      "crawl_monitor.run_now": "手动运行监听",
+      "crawl_monitor.delete": "删除监听任务",
       "task.delete": "删除任务",
       "report_share.create": "创建分享",
       "report_share.revoke": "撤销分享"
@@ -752,6 +756,7 @@ function targetTypeLabel(type: string) {
       workspace_ai_setting: "AI 设置",
       workspace_crawler_setting: "爬虫设置",
       crawl_job: "采集任务",
+      crawl_monitor: "监听任务",
       task: "分析任务",
       report_share: "报告分享"
     }[type] || type

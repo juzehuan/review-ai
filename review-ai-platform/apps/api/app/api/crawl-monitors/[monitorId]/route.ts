@@ -1,6 +1,7 @@
 import { prisma } from "@review-ai/db";
 import { normalizeCrawlMonitorIntervalMinutes, queueCrawlMonitorRun } from "@/lib/crawl-monitor-runs";
 import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord, supportedCrawlUrlError } from "@/lib/crawl-utils";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlMonitor } from "@/lib/serializers";
@@ -26,6 +27,22 @@ export async function POST(request: Request, context: { params: Promise<{ monito
   }
 
   const result = await queueCrawlMonitorRun(monitor.id, { forceEnable: true });
+  await writeAuditLog(request, {
+    workspaceId: monitor.workspaceId,
+    actor: workspaceContext.user,
+    action: "crawl_monitor.run_now",
+    targetType: "crawl_monitor",
+    targetId: monitor.id,
+    targetLabel: monitor.name,
+    metadata: {
+      productUrl: monitor.normalizedUrl,
+      sourceChannel: monitor.sourceChannel,
+      platform: monitor.platform,
+      jobId: result.jobId,
+      queued: result.queued,
+      alreadyActive: result.alreadyActive
+    }
+  });
 
   return ok(serializeCrawlMonitor(result.monitor));
 }
@@ -87,8 +104,49 @@ export async function PATCH(request: Request, context: { params: Promise<{ monit
 
   if (body.enabled === true) {
     const result = await queueCrawlMonitorRun(updated.id, { forceEnable: true });
+    await writeAuditLog(request, {
+      workspaceId: existing.workspaceId,
+      actor: workspaceContext.user,
+      action: "crawl_monitor.update",
+      targetType: "crawl_monitor",
+      targetId: existing.id,
+      targetLabel: updated.name,
+      metadata: {
+        previousEnabled: existing.enabled,
+        nextEnabled: result.monitor.enabled,
+        previousIntervalMinutes: existing.intervalMinutes,
+        nextIntervalMinutes: result.monitor.intervalMinutes,
+        previousAutoAnalyze: existing.autoAnalyze,
+        nextAutoAnalyze: result.monitor.autoAnalyze,
+        productUrl: result.monitor.normalizedUrl,
+        sourceChannel: result.monitor.sourceChannel,
+        platform: result.monitor.platform,
+        jobId: result.jobId,
+        queued: result.queued
+      }
+    });
     return ok(serializeCrawlMonitor(result.monitor));
   }
+
+  await writeAuditLog(request, {
+    workspaceId: existing.workspaceId,
+    actor: workspaceContext.user,
+    action: "crawl_monitor.update",
+    targetType: "crawl_monitor",
+    targetId: existing.id,
+    targetLabel: updated.name,
+    metadata: {
+      previousEnabled: existing.enabled,
+      nextEnabled: updated.enabled,
+      previousIntervalMinutes: existing.intervalMinutes,
+      nextIntervalMinutes: updated.intervalMinutes,
+      previousAutoAnalyze: existing.autoAnalyze,
+      nextAutoAnalyze: updated.autoAnalyze,
+      productUrl: updated.normalizedUrl,
+      sourceChannel: updated.sourceChannel,
+      platform: updated.platform
+    }
+  });
 
   return ok(serializeCrawlMonitor(updated));
 }
@@ -105,12 +163,32 @@ export async function DELETE(request: Request, context: { params: Promise<{ moni
   }
   const allowGlobalAccess = canAccessAllWorkspaces(workspaceContext);
 
-  const deleted = await prisma.crawlMonitor.deleteMany({
+  const monitor = await prisma.crawlMonitor.findFirst({
     where: allowGlobalAccess ? { id: monitorId } : { id: monitorId, workspaceId: workspaceContext.workspace.id }
   });
-  if (!deleted.count) {
+  if (!monitor) {
     return fail("监听任务不存在或不属于当前账号。", 404);
   }
+
+  await prisma.crawlMonitor.delete({
+    where: { id: monitor.id }
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: monitor.workspaceId,
+    actor: workspaceContext.user,
+    action: "crawl_monitor.delete",
+    targetType: "crawl_monitor",
+    targetId: monitor.id,
+    targetLabel: monitor.name,
+    metadata: {
+      productUrl: monitor.normalizedUrl,
+      sourceChannel: monitor.sourceChannel,
+      platform: monitor.platform,
+      lastCrawlJobId: monitor.lastCrawlJobId,
+      taskId: monitor.taskId
+    }
+  });
 
   return ok({ success: true });
 }
