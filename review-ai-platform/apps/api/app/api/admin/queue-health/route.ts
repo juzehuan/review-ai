@@ -180,6 +180,7 @@ function buildCrawlStalledInsight(job: {
   const loadMoreClicks = readOptionalNumber(rawResult?.loadMoreClicks);
   const cursor = readOptionalScalarString(rawResult?.cursor);
   const hasMore = readOptionalBoolean(rawResult?.hasMore);
+  const lastRequestStatus = readOptionalNumber(rawResult?.lastRequestStatus);
   const metricSummary = buildMetricSummary([
     totalComments !== null ? `平台总量 ${totalComments}` : null,
     nextRequests !== null ? `接口请求 ${nextRequests}` : null,
@@ -189,6 +190,7 @@ function buildCrawlStalledInsight(job: {
     loadMoreClicks !== null ? `加载更多 ${loadMoreClicks}` : null,
     cursor ? `游标 ${cursor}` : null,
     hasMore !== null ? `还有更多 ${hasMore ? "是" : "否"}` : null,
+    lastRequestStatus !== null ? `请求状态 ${lastRequestStatus}` : null,
     progressEventAt ? `进度回传 ${progressEventAt}` : null,
     partialDueToTimeout ? "部分结果超时" : null,
     stopReason ? `停止原因 ${stopReason}` : null

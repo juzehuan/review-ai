@@ -1139,6 +1139,8 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
       const value = hasMore[1] === "是";
       return locale === "en-US" ? `Has more ${value ? "yes" : "no"}` : `ยังมีต่อ ${value ? "ใช่" : "ไม่ใช่"}`;
     }
+    const requestStatus = part.match(/^请求状态\s+(\d+)$/);
+    if (requestStatus) return locale === "en-US" ? `HTTP status ${requestStatus[1]}` : `สถานะ HTTP ${requestStatus[1]}`;
     const imported = part.match(/^导入\s+(\d+)$/);
     if (imported) return locale === "en-US" ? `Imported ${imported[1]}` : `นำเข้า ${imported[1]}`;
     const duplicate = part.match(/^重复\s+(\d+)$/);

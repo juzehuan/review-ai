@@ -66,6 +66,7 @@ type CrawlResult = {
   domContentTextCount?: number;
   loadMoreClicks?: number;
   hasMore?: boolean;
+  lastRequestStatus?: number;
   endReached?: boolean;
   stopReason?: string;
   commentSortAttempted?: boolean;
@@ -100,6 +101,7 @@ type CrawlerProgressEvent = {
   domContentTextCount?: number;
   loadMoreClicks?: number;
   hasMore?: boolean;
+  lastRequestStatus?: number;
   endReached?: boolean;
   stopReason?: string;
   commentSortAttempted?: boolean;
@@ -349,6 +351,7 @@ function buildCrawlProgressRawResult(event: CrawlerProgressEvent) {
     domContentTextCount: readProgressInt(event.domContentTextCount),
     loadMoreClicks: readProgressInt(event.loadMoreClicks),
     hasMore: event.hasMore,
+    lastRequestStatus: readProgressInt(event.lastRequestStatus),
     endReached: event.endReached,
     stopReason: event.stopReason,
     commentSortAttempted: event.commentSortAttempted,
@@ -2839,6 +2842,7 @@ const crawlWorker = new Worker(
               domContentTextCount: latestEvent.domContentTextCount,
               loadMoreClicks: latestEvent.loadMoreClicks,
               hasMore: latestEvent.hasMore,
+              lastRequestStatus: latestEvent.lastRequestStatus,
               cursor: latestEvent.cursor,
               totalComments: latestEvent.totalComments,
               endReached: latestEvent.endReached,

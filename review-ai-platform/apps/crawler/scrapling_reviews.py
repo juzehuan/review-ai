@@ -86,6 +86,7 @@ def emit_crawl_progress(
                 "domContentTextCount": state.get("dom_content_text_count"),
                 "loadMoreClicks": state.get("load_more_clicks"),
                 "hasMore": state.get("has_more"),
+                "lastRequestStatus": state.get("last_request_status"),
                 "endReached": state.get("end_reached"),
                 "stopReason": state.get("stop_reason"),
                 "commentSortAttempted": state.get("comment_sort_attempted"),
@@ -254,6 +255,17 @@ def tiktok_comment_image_urls(comment: dict[str, Any]) -> list[str]:
         if url:
             urls.append(url)
     return urls
+
+
+def response_status(response: Any) -> int | None:
+    try:
+        status = getattr(response, "status", None)
+        if callable(status):
+            status = status()
+        parsed = int(status)
+        return parsed if parsed > 0 else None
+    except Exception:
+        return None
 
 
 def stable_facebook_comment_id(post_id: str, author: str, content: str, index: int) -> str:
@@ -540,6 +552,11 @@ def request_json(url: str, referer: str, proxy: str | None, timeout: int = 30) -
 
 
 def request_tiktok_json(url: str, referer: str, proxy: str | None, timeout: int = 30) -> dict[str, Any]:
+    payload, _status = request_tiktok_json_with_status(url, referer, proxy, timeout)
+    return payload
+
+
+def request_tiktok_json_with_status(url: str, referer: str, proxy: str | None, timeout: int = 30) -> tuple[dict[str, Any], int | None]:
     headers = {
         "accept": "application/json, text/plain, */*",
         "accept-language": "en-US,en;q=0.9,zh-CN;q=0.7,zh;q=0.6",
@@ -555,9 +572,10 @@ def request_tiktok_json(url: str, referer: str, proxy: str | None, timeout: int 
     if proxy:
         kwargs["proxy"] = proxy
     page = Fetcher.get(url, **kwargs)
-    if getattr(page, "status", 200) >= 400:
-        raise RuntimeError(f"HTTP {page.status} from {url}")
-    return page.json()
+    status = response_status(page) or 200
+    if status >= 400:
+        raise RuntimeError(f"HTTP {status} from {url}")
+    return page.json(), status
 
 
 def build_ratings_url(shop_id: str, item_id: str, offset: int, limit: int, channel: str) -> str:
@@ -835,6 +853,7 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
             try:
                 if "/youtubei/v1/next" in response.url:
                     state["next_requests"] = int(state.get("next_requests") or 0) + 1
+                    state["last_request_status"] = response_status(response)
                     try:
                         payload = json.loads(response.text())
                         payload_added = collect_youtube_payload_comments(
@@ -1110,6 +1129,7 @@ def fetch_youtube_comments(video_url: str, max_reviews: int, proxy: str | None, 
         "domCommentCount": state.get("dom_comment_count"),
         "domContentTextCount": state.get("dom_content_text_count"),
         "continuationCount": state.get("continuation_count"),
+        "lastRequestStatus": state.get("last_request_status"),
         "scrollY": state.get("scroll_y"),
         "scrollHeight": state.get("scroll_height"),
         "partialDueToTimeout": state.get("crawl_deadline_reached"),
@@ -1237,9 +1257,10 @@ def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: 
             state["stop_reason"] = "max_reviews"
             break
         url = build_tiktok_comment_url(video_id, cursor, count)
-        payload = request_tiktok_json(url, video_url, proxy, min(30, max(5, timeout)))
+        payload, request_status = request_tiktok_json_with_status(url, video_url, proxy, min(30, max(5, timeout)))
         page_count += 1
         state["comment_requests"] = page_count
+        state["last_request_status"] = request_status
         comments = payload.get("comments")
         if not isinstance(comments, list):
             data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
@@ -1294,6 +1315,7 @@ def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: 
         "domCommentCount": 0,
         "cursor": cursor,
         "hasMore": has_more,
+        "lastRequestStatus": state.get("last_request_status"),
         "totalComments": total_count,
         "endReached": bool(state.get("end_reached")),
         "stopReason": state.get("stop_reason"),
@@ -1333,6 +1355,7 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
                 if "/api/comment/list/" not in response.url or "/api/comment/list/reply/" in response.url:
                     return
                 state["comment_requests"] = int(state.get("comment_requests") or 0) + 1
+                state["last_request_status"] = response_status(response)
                 try:
                     payload = json.loads(response.text())
                     added = collect_tiktok_api_comments(payload, video_id, video_url, comments_by_id, max_reviews)
@@ -1592,6 +1615,7 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
         "domCommentCount": state.get("dom_comment_count"),
         "cursor": state.get("cursor"),
         "hasMore": state.get("has_more"),
+        "lastRequestStatus": state.get("last_request_status"),
         "totalComments": state.get("total_comments"),
         "endReached": state.get("has_more") is False,
         "rows": rows,
@@ -1602,6 +1626,7 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
             try:
                 if "/youtubei/v1/next" in response.url:
                     state["next_requests"] = int(state.get("next_requests") or 0) + 1
+                    state["last_request_status"] = response_status(response)
                     try:
                         payload = json.loads(response.text())
                         payload_added = collect_youtube_payload_comments(
@@ -1862,6 +1887,7 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
                 if "/api/graphql/" not in response.url and "/graphql/" not in response.url:
                     return
                 state["next_requests"] = int(state.get("next_requests") or 0) + 1
+                state["last_request_status"] = response_status(response)
                 added = 0
                 for payload in parse_json_documents(response.text()):
                     added += collect_facebook_graphql_comments(payload, post_id, post_url, comments_by_id, max_reviews)
@@ -2186,6 +2212,7 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         "domCommentCount": state.get("dom_comment_count"),
         "totalComments": state.get("total_comments"),
         "loadMoreClicks": state.get("load_more_clicks"),
+        "lastRequestStatus": state.get("last_request_status"),
         "endReached": state.get("end_reached"),
         "stopReason": stop_reason,
         "commentSortAttempted": state.get("comment_sort_attempted"),

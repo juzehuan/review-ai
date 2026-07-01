@@ -913,7 +913,8 @@ function crawlMetricSummary(job: CrawlJobDTO) {
     job.domContentTextCount !== null ? `DOM 文本 ${job.domContentTextCount}` : "",
     job.loadMoreClicks !== null ? `加载更多 ${job.loadMoreClicks}` : "",
     job.cursor ? `游标 ${shortCursor(job.cursor)}` : "",
-    job.hasMore !== null ? `还有更多 ${job.hasMore ? "是" : "否"}` : ""
+    job.hasMore !== null ? `还有更多 ${job.hasMore ? "是" : "否"}` : "",
+    job.lastRequestStatus !== null ? `请求状态 ${job.lastRequestStatus}` : ""
   ].filter(Boolean);
   return parts.join(" · ");
 }
