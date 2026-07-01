@@ -1,6 +1,7 @@
 import { prisma } from "@review-ai/db";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
+import { getCrawlQueue, removePendingQueueJobsByData } from "@/lib/queue";
 import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function DELETE(request: Request, context: { params: Promise<{ jobId: string }> }) {
@@ -103,6 +104,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ jobId
     }
     return nextJob;
   });
+  const removedQueueJobs = await removePendingQueueJobsByData(getCrawlQueue(), "crawlJobId", job.id);
 
   await writeAuditLog(request, {
     workspaceId: job.workspaceId,
@@ -120,7 +122,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ jobId
       importedRows: job.importedRows,
       taskId: job.taskId,
       monitorId: job.monitorId,
-      lastError: job.lastError
+      lastError: job.lastError,
+      removedQueueJobs
     }
   });
 

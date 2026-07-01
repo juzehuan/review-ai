@@ -1,6 +1,7 @@
 import { prisma } from "@review-ai/db";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
+import { getAnalysisQueue, removePendingQueueJobsByData } from "@/lib/queue";
 import { serializeRun } from "@/lib/serializers";
 import { getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -59,6 +60,8 @@ export async function PATCH(
     data: { status: "imported" }
   });
 
+  const removedQueueJobs = await removePendingQueueJobsByData(getAnalysisQueue(), "runId", run.id);
+
   await writeAuditLog(request, {
     workspaceId: scoped.task?.workspaceId || workspaceContext.workspace.id,
     actor: workspaceContext.user,
@@ -74,7 +77,8 @@ export async function PATCH(
       failedCount: run.failedCount,
       provider: run.provider,
       modelName: run.modelName,
-      lastError: run.lastError
+      lastError: run.lastError,
+      removedQueueJobs
     }
   });
 
