@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeActionItem } from "@/lib/serializers";
 import { getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
@@ -68,6 +69,27 @@ export async function PATCH(
     include: { assignee: true }
   });
 
+  await writeAuditLog(request, {
+    workspaceId: taskWorkspaceId,
+    actor: workspaceContext.user,
+    action: "review_action.update",
+    targetType: "review_action",
+    targetId: updated.id,
+    targetLabel: updated.title,
+    metadata: {
+      taskId,
+      previousStatus: existing.status,
+      nextStatus: updated.status,
+      previousPriority: existing.priority,
+      nextPriority: updated.priority,
+      previousAssigneeUserId: existing.assigneeUserId,
+      nextAssigneeUserId: updated.assigneeUserId,
+      previousDueAt: existing.dueAt?.toISOString() || null,
+      nextDueAt: updated.dueAt?.toISOString() || null,
+      relatedReviewCount: updated.relatedReviewIds.length
+    }
+  });
+
   return ok(serializeActionItem(updated));
 }
 
@@ -85,10 +107,33 @@ export async function DELETE(
     return roleResponse;
   }
   const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
-  if (scoped.response) {
+  if (scoped.response || !scoped.task) {
     return scoped.response;
   }
+  const taskWorkspaceId = scoped.task.workspaceId || workspaceContext.workspace.id;
 
-  await prisma.reviewActionItem.deleteMany({ where: { id: actionId, taskId } });
+  const existing = await prisma.reviewActionItem.findFirst({ where: { id: actionId, taskId } });
+  if (!existing) {
+    return fail("行动项不存在", 404);
+  }
+
+  await prisma.reviewActionItem.delete({ where: { id: existing.id } });
+  await writeAuditLog(request, {
+    workspaceId: taskWorkspaceId,
+    actor: workspaceContext.user,
+    action: "review_action.delete",
+    targetType: "review_action",
+    targetId: existing.id,
+    targetLabel: existing.title,
+    metadata: {
+      taskId,
+      runId: existing.runId,
+      status: existing.status,
+      priority: existing.priority,
+      source: existing.source,
+      assigneeUserId: existing.assigneeUserId,
+      relatedReviewCount: existing.relatedReviewIds.length
+    }
+  });
   return ok({ deleted: true });
 }

@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeActionItem } from "@/lib/serializers";
 import { getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
@@ -97,6 +98,25 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       completedAt: status === "resolved" ? new Date() : null
     },
     include: { assignee: true }
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: taskWorkspaceId,
+    actor: workspaceContext.user,
+    action: "review_action.create",
+    targetType: "review_action",
+    targetId: created.id,
+    targetLabel: created.title,
+    metadata: {
+      taskId,
+      runId: created.runId,
+      status: created.status,
+      priority: created.priority,
+      source: created.source,
+      assigneeUserId: created.assigneeUserId,
+      relatedReviewCount: created.relatedReviewIds.length,
+      dueAt: created.dueAt?.toISOString() || null
+    }
   });
 
   return ok(serializeActionItem(created), 201);
