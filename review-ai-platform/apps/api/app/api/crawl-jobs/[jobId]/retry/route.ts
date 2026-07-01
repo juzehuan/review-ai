@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@review-ai/db";
 import { buildCrawlQueueJobId, QUEUE_JOB_CLEANUP_OPTIONS } from "@review-ai/shared";
 import { writeAuditLog } from "@/lib/audit-log";
+import { attachCrawlQueuePosition } from "@/lib/crawl-job-queue";
 import { fail, ok } from "@/lib/http";
 import { getCrawlQueue } from "@/lib/queue";
 import { serializeCrawlJob } from "@/lib/serializers";
@@ -77,5 +78,5 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     }
   });
 
-  return ok(serializeCrawlJob(updated));
+  return ok(serializeCrawlJob(await attachCrawlQueuePosition(updated)));
 }

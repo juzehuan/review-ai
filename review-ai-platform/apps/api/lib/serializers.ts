@@ -344,6 +344,7 @@ export function serializeRunLog(log: AnalysisRunLog): AnalysisRunLogDTO {
 type CrawlJobWithWorkspace = CrawlJob & {
   workspace?: Pick<Workspace, "name" | "slug"> | null;
   task?: { analysisRuns?: Array<Pick<AnalysisRun, "id">> } | null;
+  queuePosition?: number | null;
 };
 
 export function serializeCrawlJob(job: CrawlJobWithWorkspace): CrawlJobDTO {
@@ -377,6 +378,7 @@ export function serializeCrawlJob(job: CrawlJobWithWorkspace): CrawlJobDTO {
     maxReviews: job.maxReviews,
     crawlChannels: parseCrawlerChannels(job.crawlChannels),
     status: job.status,
+    queuePosition: job.queuePosition ?? null,
     progress: job.progress,
     fetchedRows: job.fetchedRows,
     importedRows: job.importedRows,

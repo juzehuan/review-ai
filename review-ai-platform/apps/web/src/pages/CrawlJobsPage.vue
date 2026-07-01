@@ -931,6 +931,7 @@ function durationLabel(seconds?: number | null) {
 function crawlRunSignals(job: CrawlJobDTO) {
   const isActive = ["queued", "running"].includes(job.status);
   const parts = [
+    job.queuePosition !== null ? `排队第 ${job.queuePosition} 位` : "",
     job.durationSeconds !== null ? `耗时 ${durationLabel(job.durationSeconds)}` : "",
     job.fetchRatePerMinute !== null ? `速度 ${job.fetchRatePerMinute}/分钟` : "",
     isActive && job.remainingSeconds !== null ? `预计剩余 ${durationLabel(job.remainingSeconds)}` : "",

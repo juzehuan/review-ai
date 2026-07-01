@@ -1,7 +1,9 @@
 import { prisma } from "@review-ai/db";
 import { writeAuditLog } from "@/lib/audit-log";
+import { attachCrawlQueuePosition } from "@/lib/crawl-job-queue";
 import { fail, ok } from "@/lib/http";
 import { getCrawlQueue, removePendingQueueJobsByData } from "@/lib/queue";
+import { serializeCrawlJob } from "@/lib/serializers";
 import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function DELETE(request: Request, context: { params: Promise<{ jobId: string }> }) {
@@ -127,5 +129,5 @@ export async function PATCH(request: Request, context: { params: Promise<{ jobId
     }
   });
 
-  return ok({ job: updated });
+  return ok({ job: serializeCrawlJob(await attachCrawlQueuePosition(updated)) });
 }

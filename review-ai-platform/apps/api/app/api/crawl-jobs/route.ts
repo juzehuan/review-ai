@@ -7,6 +7,7 @@ import {
   type CrawlJobStatusCounts,
   type CrawlJobStatusFilter
 } from "@review-ai/shared";
+import { attachCrawlQueuePosition, attachCrawlQueuePositions } from "@/lib/crawl-job-queue";
 import { getCrawlQueue } from "@/lib/queue";
 import { resolvedCrawlerSettingFromRecord, normalizeRequestedCrawlInput, supportedCrawlUrlError } from "@/lib/crawl-utils";
 import { writeAuditLog } from "@/lib/audit-log";
@@ -139,8 +140,10 @@ export async function GET(request: Request) {
     }
   }
 
+  const jobsWithQueuePositions = await attachCrawlQueuePositions(jobs);
+
   return ok<CrawlJobListResponse>({
-    items: jobs.map(serializeCrawlJob),
+    items: jobsWithQueuePositions.map(serializeCrawlJob),
     total,
     page,
     pageSize,
@@ -231,5 +234,5 @@ export async function POST(request: Request) {
     }
   });
 
-  return ok({ job: serializeCrawlJob(job) }, 201);
+  return ok({ job: serializeCrawlJob(await attachCrawlQueuePosition(job)) }, 201);
 }

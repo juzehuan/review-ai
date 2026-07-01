@@ -311,6 +311,7 @@ export interface CrawlJobDTO {
   maxReviews: number;
   crawlChannels: CrawlerChannel[];
   status: CrawlJobStatus;
+  queuePosition: number | null;
   progress: number;
   fetchedRows: number;
   importedRows: number;
