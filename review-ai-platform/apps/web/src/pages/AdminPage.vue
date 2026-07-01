@@ -307,8 +307,54 @@
 
       <a-tab-pane key="audit" tab="操作日志">
         <div class="table-shell">
-          <div class="table-title">最近操作</div>
-          <a-table :columns="auditColumns" :data-source="auditLogs" :loading="loading" row-key="id" :pagination="{ pageSize: 12 }" :scroll="{ x: 1120 }">
+          <div class="table-title-row">
+            <div>
+              <div class="table-title">最近操作</div>
+              <div class="member-email">按动作、对象、操作人和空间定位审计记录</div>
+            </div>
+            <a-button @click="refreshAuditLogs" :loading="loading">
+              <template #icon><ReloadOutlined /></template>
+              刷新日志
+            </a-button>
+          </div>
+          <div class="audit-filter-row">
+            <a-select
+              v-model:value="auditFilters.action"
+              allow-clear
+              show-search
+              option-filter-prop="label"
+              placeholder="操作类型"
+              :options="auditActionOptions"
+            />
+            <a-select
+              v-model:value="auditFilters.targetType"
+              allow-clear
+              show-search
+              option-filter-prop="label"
+              placeholder="对象类型"
+              :options="auditTargetTypeOptions"
+            />
+            <a-select
+              v-model:value="auditFilters.actorUserId"
+              allow-clear
+              show-search
+              option-filter-prop="label"
+              placeholder="操作人"
+              :options="auditActorOptions"
+            />
+            <a-select
+              v-model:value="auditFilters.workspaceId"
+              allow-clear
+              show-search
+              option-filter-prop="label"
+              placeholder="空间"
+              :options="auditWorkspaceOptions"
+            />
+            <a-input-number v-model:value="auditFilters.limit" class="audit-limit-input" :min="20" :max="300" :step="20" placeholder="条数" />
+            <a-button type="primary" ghost @click="refreshAuditLogs" :loading="loading">筛选</a-button>
+            <a-button @click="resetAuditFilters">重置</a-button>
+          </div>
+          <a-table :columns="auditColumns" :data-source="auditLogs" :loading="loading" row-key="id" :pagination="{ pageSize: 12 }" :scroll="{ x: 1340 }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'action'">
                 <a-tag color="blue">{{ actionLabel(record.action) }}</a-tag>
@@ -321,6 +367,10 @@
               <template v-else-if="column.key === 'target'">
                 <div>{{ targetTypeLabel(record.targetType) }}</div>
                 <div class="member-email">{{ record.targetLabel || record.targetId || "-" }}</div>
+              </template>
+              <template v-else-if="column.key === 'workspace'">
+                <div>{{ workspaceLabel(record.workspaceId) }}</div>
+                <div class="member-email">{{ record.workspaceId || "平台级" }}</div>
               </template>
               <template v-else-if="column.key === 'metadata'">
                 <a-tooltip :title="metadataText(record.metadata)">
@@ -386,7 +436,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { message } from "ant-design-vue";
 import { ArrowLeftOutlined, KeyOutlined, ReloadOutlined, UserAddOutlined } from "@ant-design/icons-vue";
@@ -395,6 +445,7 @@ import type { Dayjs } from "dayjs";
 import type {
   AdminOverviewDTO,
   AdminUserDTO,
+  AdminWorkspaceDTO,
   AuditLogDTO,
   InviteCodeDTO,
   QueueFailureDTO,
@@ -409,6 +460,7 @@ import {
   createInviteCode,
   fetchAdminOverview,
   fetchAdminUsers,
+  fetchAdminWorkspaces,
   fetchInviteCodes,
   retryCrawlJob,
   resetAdminUserPassword,
@@ -425,6 +477,7 @@ const userModalOpen = ref(false);
 const inviteModalOpen = ref(false);
 const overview = ref<AdminOverviewDTO | null>(null);
 const users = ref<AdminUserDTO[]>([]);
+const workspaces = ref<AdminWorkspaceDTO[]>([]);
 const inviteCodes = ref<InviteCodeDTO[]>([]);
 const auditLogs = ref<AuditLogDTO[]>([]);
 const queueHealth = ref<QueueHealthDTO | null>(null);
@@ -454,6 +507,77 @@ const inviteForm = reactive<{
   expiresAt: null
 });
 
+const auditFilters = reactive<{
+  action?: string;
+  targetType?: string;
+  actorUserId?: string;
+  workspaceId?: string;
+  limit: number | null;
+}>({
+  action: undefined,
+  targetType: undefined,
+  actorUserId: undefined,
+  workspaceId: undefined,
+  limit: 120
+});
+
+const knownAuditActions = [
+  "admin.user.upsert",
+  "admin.user.update",
+  "admin.user.reset_password",
+  "auth.password.change",
+  "workspace_member.upsert",
+  "workspace_member.update",
+  "workspace_member.delete",
+  "workspace.create",
+  "workspace.delete",
+  "admin.invite_code.create",
+  "settings.ai.update",
+  "settings.crawler.update",
+  "prompt_eval.run",
+  "crawl_job.create",
+  "crawl_job.start_analysis",
+  "crawl_job.retry",
+  "crawl_job.delete",
+  "crawl_monitor.create",
+  "crawl_monitor.update",
+  "crawl_monitor.run_now",
+  "crawl_monitor.delete",
+  "analysis_run.create",
+  "analysis_run.cancel",
+  "review_import.create_task",
+  "review_import.append",
+  "review_view.create",
+  "review_view.update",
+  "review_view.delete",
+  "review_correction.create",
+  "review_action.create",
+  "review_action.update",
+  "review_action.delete",
+  "task.delete",
+  "report_share.create",
+  "report_share.revoke"
+];
+
+const knownAuditTargetTypes = [
+  "user",
+  "workspace_member",
+  "workspace",
+  "invite_code",
+  "workspace_ai_setting",
+  "workspace_crawler_setting",
+  "prompt_eval",
+  "crawl_job",
+  "crawl_monitor",
+  "analysis_run",
+  "review_import",
+  "review_view",
+  "review_correction",
+  "review_action",
+  "task",
+  "report_share"
+];
+
 const userColumns = [
   { title: "用户", key: "user", width: 280 },
   { title: "后台权限", key: "role", width: 150 },
@@ -479,6 +603,7 @@ const auditColumns = [
   { title: "操作", key: "action", width: 210 },
   { title: "操作人", key: "actor", width: 220 },
   { title: "对象", key: "target", width: 260 },
+  { title: "空间", key: "workspace", width: 220 },
   { title: "IP", dataIndex: "ipAddress", key: "ipAddress", width: 150 },
   { title: "详情", key: "metadata", width: 260 }
 ];
@@ -504,8 +629,84 @@ const stalledColumns = [
   { title: "操作", key: "actions", width: 130, fixed: "right" }
 ];
 
+const auditActionOptions = computed(() =>
+  buildAuditOptions(knownAuditActions, auditLogs.value.map((item) => item.action), actionLabel)
+);
+
+const auditTargetTypeOptions = computed(() =>
+  buildAuditOptions(knownAuditTargetTypes, auditLogs.value.map((item) => item.targetType), targetTypeLabel)
+);
+
+const auditActorOptions = computed(() => {
+  const options = new Map<string, { value: string; label: string }>();
+  for (const user of users.value) {
+    options.set(user.id, { value: user.id, label: `${user.name || user.email} (${user.email})` });
+  }
+  for (const log of auditLogs.value) {
+    if (log.actorUserId && !options.has(log.actorUserId)) {
+      options.set(log.actorUserId, {
+        value: log.actorUserId,
+        label: `${log.actorName || log.actorEmail || log.actorUserId}${log.actorEmail ? ` (${log.actorEmail})` : ""}`
+      });
+    }
+  }
+  return Array.from(options.values()).sort((a, b) => a.label.localeCompare(b.label));
+});
+
+const auditWorkspaceOptions = computed(() => {
+  const options = new Map<string, { value: string; label: string }>();
+  options.set("__platform", { value: "__platform", label: "平台级" });
+  for (const workspace of workspaces.value) {
+    options.set(workspace.id, { value: workspace.id, label: `${workspace.name} (${workspace.slug})` });
+  }
+  for (const log of auditLogs.value) {
+    if (log.workspaceId && !options.has(log.workspaceId)) {
+      options.set(log.workspaceId, { value: log.workspaceId, label: log.workspaceId });
+    }
+  }
+  return Array.from(options.values()).sort((a, b) => (a.value === "__platform" ? -1 : b.value === "__platform" ? 1 : a.label.localeCompare(b.label)));
+});
+
+function buildAuditOptions(values: string[], extraValues: string[], labeler: (value: string) => string) {
+  const uniqueValues = new Set([...values, ...extraValues.filter(Boolean)]);
+  return Array.from(uniqueValues)
+    .map((value) => ({ value, label: labeler(value) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function buildAuditLogParams() {
+  const limit = Math.min(Math.max(Math.floor(Number(auditFilters.limit || 120)), 1), 300);
+  return {
+    limit,
+    action: auditFilters.action || undefined,
+    targetType: auditFilters.targetType || undefined,
+    actorUserId: auditFilters.actorUserId || undefined,
+    workspaceId: auditFilters.workspaceId || undefined
+  };
+}
+
 async function loadAuditLogs() {
-  auditLogs.value = await fetchAdminAuditLogs({ limit: 120 });
+  auditLogs.value = await fetchAdminAuditLogs(buildAuditLogParams());
+}
+
+async function refreshAuditLogs() {
+  loading.value = true;
+  try {
+    await loadAuditLogs();
+  } catch (error) {
+    message.error(readErrorMessage(error, "加载操作日志失败"));
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function resetAuditFilters() {
+  auditFilters.action = undefined;
+  auditFilters.targetType = undefined;
+  auditFilters.actorUserId = undefined;
+  auditFilters.workspaceId = undefined;
+  auditFilters.limit = 120;
+  await refreshAuditLogs();
 }
 
 async function loadQueueHealth() {
@@ -545,15 +746,17 @@ async function load() {
   loading.value = true;
   forbidden.value = false;
   try {
-    const [overviewResult, userResult, inviteResult, queueResult, auditResult] = await Promise.all([
+    const [overviewResult, userResult, workspaceResult, inviteResult, queueResult, auditResult] = await Promise.all([
       fetchAdminOverview(),
       fetchAdminUsers(),
+      fetchAdminWorkspaces(),
       fetchInviteCodes(),
       loadQueueHealth().then(() => queueHealth.value),
       loadAuditLogs().then(() => auditLogs.value)
     ]);
     overview.value = overviewResult;
     users.value = userResult;
+    workspaces.value = workspaceResult;
     inviteCodes.value = inviteResult;
     queueHealth.value = queueResult;
     auditLogs.value = auditResult;
@@ -792,6 +995,14 @@ function targetTypeLabel(type: string) {
   );
 }
 
+function workspaceLabel(workspaceId?: string | null) {
+  if (!workspaceId) {
+    return "平台级";
+  }
+  const workspace = workspaces.value.find((item) => item.id === workspaceId);
+  return workspace ? workspace.name : workspaceId;
+}
+
 function metadataText(value: unknown) {
   if (!value) {
     return "-";
@@ -935,6 +1146,26 @@ onUnmounted(stopQueueHealthPolling);
   margin-top: 18px;
 }
 
+.table-title-row {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.audit-filter-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(150px, 1fr)) minmax(88px, 112px) auto auto;
+  margin-bottom: 12px;
+}
+
+.audit-limit-input {
+  width: 100%;
+}
+
 .stalled-diagnosis-cell {
   display: grid;
   gap: 4px;
@@ -952,5 +1183,21 @@ onUnmounted(stopQueueHealthPolling);
 
 .error-summary {
   color: #b91c1c;
+}
+
+@media (max-width: 1100px) {
+  .audit-filter-row {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .table-title-row {
+    flex-direction: column;
+  }
+
+  .audit-filter-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

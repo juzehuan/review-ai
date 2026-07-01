@@ -245,7 +245,13 @@ export async function fetchInviteCodes() {
   return data;
 }
 
-export async function fetchAdminAuditLogs(params?: { limit?: number }) {
+export async function fetchAdminAuditLogs(params?: {
+  limit?: number;
+  action?: string;
+  targetType?: string;
+  actorUserId?: string;
+  workspaceId?: string;
+}) {
   const { data } = await api.get<AuditLogDTO[]>("/admin/audit-logs", { params });
   return data;
 }

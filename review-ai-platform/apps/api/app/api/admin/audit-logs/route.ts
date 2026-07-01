@@ -20,11 +20,12 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
+  const workspaceId = url.searchParams.get("workspaceId");
   const where: Prisma.AuditLogWhereInput = {
     ...(url.searchParams.get("action") ? { action: url.searchParams.get("action") || undefined } : {}),
     ...(url.searchParams.get("targetType") ? { targetType: url.searchParams.get("targetType") || undefined } : {}),
     ...(url.searchParams.get("actorUserId") ? { actorUserId: url.searchParams.get("actorUserId") || undefined } : {}),
-    ...(url.searchParams.get("workspaceId") ? { workspaceId: url.searchParams.get("workspaceId") || undefined } : {})
+    ...(workspaceId ? { workspaceId: workspaceId === "__platform" ? null : workspaceId } : {})
   };
 
   const logs = await prisma.auditLog.findMany({
