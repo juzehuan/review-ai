@@ -1,9 +1,17 @@
 import { Prisma, prisma } from "@review-ai/db";
-import type { ImportTaskResponse } from "@review-ai/shared";
+import type { AnalysisType, ImportTaskResponse } from "@review-ai/shared";
 import { inferAnalysisType } from "@review-ai/shared";
 import { parseReviewFile } from "@/lib/csv";
 import { fail, ok } from "@/lib/http";
 import { assertReviewQuota, canBypassQuota, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+
+function normalizeImportAnalysisType(sourceChannel: string, rawAnalysisType: string): AnalysisType {
+  const inferredType = inferAnalysisType(sourceChannel);
+  if (inferredType !== "product") {
+    return inferredType;
+  }
+  return ["product", "video", "tweet"].includes(rawAnalysisType) ? (rawAnalysisType as AnalysisType) : inferredType;
+}
 
 export async function POST(request: Request) {
   const context = await getWorkspaceContext(request);
@@ -20,9 +28,7 @@ export async function POST(request: Request) {
   const productName = String(formData.get("productName") || "").trim();
   const sourceChannel = String(formData.get("sourceChannel") || "Shopee").trim();
   const rawAnalysisType = String(formData.get("analysisType") || "").trim();
-  const analysisType = ["product", "video", "tweet"].includes(rawAnalysisType)
-    ? rawAnalysisType
-    : inferAnalysisType(sourceChannel);
+  const analysisType = normalizeImportAnalysisType(sourceChannel, rawAnalysisType);
   const file = formData.get("file");
 
   if (!(file instanceof File)) {
