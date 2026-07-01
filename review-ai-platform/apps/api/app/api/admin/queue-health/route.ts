@@ -105,7 +105,17 @@ function readOptionalBoolean(value: unknown) {
 }
 
 function readOptionalNumber(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/,/g, "");
+    if (/^-?\d+(?:\.\d+)?$/.test(normalized)) {
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+  return null;
 }
 
 function readOptionalScalarString(value: unknown) {
