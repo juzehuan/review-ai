@@ -89,6 +89,17 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "暂无分析批次": "No analysis runs",
     "运行批次正常写入日志": "Running runs are writing logs normally",
     "最长无日志": "Longest without logs",
+    "任务仍在排队": "Task is still queued",
+    "如果长时间只有 queued 记录，且没有 Worker picked up analysis run，通常说明 worker 没有运行、Redis 队列未连通，或 worker 还没有消费到该任务。": "If only queued logs appear for a long time and there is no Worker picked up analysis run log, the worker is usually offline, Redis is not connected, or the worker has not consumed this task yet.",
+    "所属用户/空间": "Owner / workspace",
+    "未设置负责人": "Owner not set",
+    "推文评论": "Post comments",
+    "尚未分析": "Not analyzed yet",
+    "删除分析任务": "Delete analysis task",
+    "评论、分析结果、报告分享和行动项都会被删除。": "Comments, analysis results, report shares, and action items will all be deleted.",
+    "分析任务已删除": "Analysis task deleted",
+    "分析任务已加入队列": "Analysis task added to the queue",
+    "已发送停止请求": "Stop request sent",
     "请选择一个分析任务查看行动项": "Select an analysis task to view action items",
     "帮助中心": "Help center",
     "用户后台": "User console",
@@ -649,6 +660,17 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "暂无分析批次": "ยังไม่มีรอบวิเคราะห์",
     "运行批次正常写入日志": "รอบที่กำลังทำงานเขียนบันทึกปกติ",
     "最长无日志": "ไม่มีบันทึกนานสุด",
+    "任务仍在排队": "งานยังรอคิวอยู่",
+    "如果长时间只有 queued 记录，且没有 Worker picked up analysis run，通常说明 worker 没有运行、Redis 队列未连通，或 worker 还没有消费到该任务。": "หากมีแต่บันทึก queued เป็นเวลานานและไม่มี Worker picked up analysis run มักหมายถึง worker ไม่ทำงาน Redis ไม่เชื่อมต่อ หรือ worker ยังไม่ได้รับงานนี้",
+    "所属用户/空间": "เจ้าของ / workspace",
+    "未设置负责人": "ยังไม่ได้ตั้งเจ้าของ",
+    "推文评论": "คอมเมนต์โพสต์",
+    "尚未分析": "ยังไม่ได้วิเคราะห์",
+    "删除分析任务": "ลบงานวิเคราะห์",
+    "评论、分析结果、报告分享和行动项都会被删除。": "คอมเมนต์ ผลวิเคราะห์ ลิงก์แชร์รายงาน และ action item จะถูกลบทั้งหมด",
+    "分析任务已删除": "ลบงานวิเคราะห์แล้ว",
+    "分析任务已加入队列": "เพิ่มงานวิเคราะห์เข้าคิวแล้ว",
+    "已发送停止请求": "ส่งคำขอหยุดแล้ว",
     "请选择一个分析任务查看行动项": "เลือกงานวิเคราะห์เพื่อดูงานติดตาม",
     "帮助中心": "ศูนย์ช่วยเหลือ",
     "用户后台": "คอนโซลผู้ใช้",
@@ -1203,6 +1225,36 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   if (activeRunFailures) {
     return locale === "en-US" ? `Running runs failed ${activeRunFailures[1]} items` : `รอบที่กำลังทำงานล้มเหลว ${activeRunFailures[1]} รายการ`;
   }
+  const analysisStatusFilter = value.match(/^(全部|草稿|已导入|分析中|已完成|失败)\s+([\d,]+)$/);
+  if (analysisStatusFilter) {
+    const labels: Record<string, Record<Exclude<AppLocale, "zh-CN">, string>> = {
+      全部: { "en-US": "All", "th-TH": "ทั้งหมด" },
+      草稿: { "en-US": "Draft", "th-TH": "ฉบับร่าง" },
+      已导入: { "en-US": "Imported", "th-TH": "นำเข้าแล้ว" },
+      分析中: { "en-US": "Analyzing", "th-TH": "กำลังวิเคราะห์" },
+      已完成: { "en-US": "Completed", "th-TH": "เสร็จแล้ว" },
+      失败: { "en-US": "Failed", "th-TH": "ล้มเหลว" }
+    };
+    return `${labels[analysisStatusFilter[1]][locale]} ${analysisStatusFilter[2]}`;
+  }
+  const processedProgress = value.match(/^已处理\s+([\d,]+)\/([\d,]+)$/);
+  if (processedProgress) {
+    return locale === "en-US"
+      ? `Processed ${processedProgress[1]}/${processedProgress[2]}`
+      : `ประมวลผลแล้ว ${processedProgress[1]}/${processedProgress[2]}`;
+  }
+  const successCount = value.match(/^成功\s+([\d,]+)$/);
+  if (successCount) {
+    return locale === "en-US" ? `Succeeded ${successCount[1]}` : `สำเร็จ ${successCount[1]}`;
+  }
+  const failedCount = value.match(/^失败\s+([\d,]+)$/);
+  if (failedCount) {
+    return locale === "en-US" ? `Failed ${failedCount[1]}` : `ล้มเหลว ${failedCount[1]}`;
+  }
+  const queuePosition = value.match(/^排队第\s+([\d,]+)\s+位$/);
+  if (queuePosition) {
+    return locale === "en-US" ? `Queue position ${queuePosition[1]}` : `ลำดับคิว ${queuePosition[1]}`;
+  }
   const failureRate = value.match(/^失败率\s+([\d.]+)%$/);
   if (failureRate) {
     return locale === "en-US" ? `Failure rate ${failureRate[1]}%` : `อัตราล้มเหลว ${failureRate[1]}%`;
@@ -1288,6 +1340,14 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   if (durationAgo) {
     const duration = translateDuration(durationAgo[1]);
     return locale === "en-US" ? `${duration} ago` : `${duration}ที่แล้ว`;
+  }
+  const bareDuration = value.match(/^(\d+\s*(?:秒|分钟|小时|天)(?:\s+\d+\s*(?:秒|分钟|小时|天))?)$/);
+  if (bareDuration) {
+    return translateDuration(bareDuration[1]);
+  }
+  const lastLog = value.match(/^最后日志\s+(.+)前$/);
+  if (lastLog) {
+    return locale === "en-US" ? `Last log ${translateDuration(lastLog[1])} ago` : `บันทึกล่าสุด ${translateDuration(lastLog[1])}ที่แล้ว`;
   }
   const silentFor = value.match(/^已静默\s+(.+)$/);
   if (silentFor) {
