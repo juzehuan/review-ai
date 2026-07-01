@@ -55,6 +55,16 @@ function readOptionalNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function readOptionalScalarString(value: unknown) {
+  if (typeof value === "string") {
+    return value.trim() || null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
 function readCrawlTotalComments(rawResult: Record<string, unknown> | null) {
   const directTotal = readOptionalNumber(rawResult?.totalComments);
   if (directTotal !== null) {
@@ -401,6 +411,7 @@ export function serializeCrawlJob(job: CrawlJobWithWorkspace): CrawlJobDTO {
     domCommentCount: readOptionalNumber(rawResult?.domCommentCount),
     domContentTextCount: readOptionalNumber(rawResult?.domContentTextCount),
     loadMoreClicks: readOptionalNumber(rawResult?.loadMoreClicks),
+    cursor: readOptionalScalarString(rawResult?.cursor),
     totalComments,
     remainingSeconds: readOptionalNumber(rawResult?.remainingSeconds),
     progressEventAt: readOptionalString(rawResult?.progressEventAt),

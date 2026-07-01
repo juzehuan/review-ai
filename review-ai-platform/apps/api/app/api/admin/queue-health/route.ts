@@ -108,6 +108,16 @@ function readOptionalNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function readOptionalScalarString(value: unknown) {
+  if (typeof value === "string") {
+    return value.trim() || null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
 function readCrawlTotalComments(rawResult: Record<string, unknown> | null) {
   const directTotal = readOptionalNumber(rawResult?.totalComments);
   if (directTotal !== null) {
@@ -168,6 +178,7 @@ function buildCrawlStalledInsight(job: {
   const domCommentCount = readOptionalNumber(rawResult?.domCommentCount);
   const domContentTextCount = readOptionalNumber(rawResult?.domContentTextCount);
   const loadMoreClicks = readOptionalNumber(rawResult?.loadMoreClicks);
+  const cursor = readOptionalScalarString(rawResult?.cursor);
   const metricSummary = buildMetricSummary([
     totalComments !== null ? `平台总量 ${totalComments}` : null,
     nextRequests !== null ? `接口请求 ${nextRequests}` : null,
@@ -175,6 +186,7 @@ function buildCrawlStalledInsight(job: {
     domCommentCount !== null ? `DOM 评论 ${domCommentCount}` : null,
     domContentTextCount !== null ? `DOM 文本 ${domContentTextCount}` : null,
     loadMoreClicks !== null ? `加载更多 ${loadMoreClicks}` : null,
+    cursor ? `游标 ${cursor}` : null,
     progressEventAt ? `进度回传 ${progressEventAt}` : null,
     partialDueToTimeout ? "部分结果超时" : null,
     stopReason ? `停止原因 ${stopReason}` : null

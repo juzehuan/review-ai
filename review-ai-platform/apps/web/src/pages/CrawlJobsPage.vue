@@ -882,6 +882,10 @@ function formatCount(value?: number | null) {
   return value === null || value === undefined ? "-" : value.toLocaleString();
 }
 
+function shortCursor(value: string) {
+  return value.length > 24 ? `${value.slice(0, 12)}...${value.slice(-8)}` : value;
+}
+
 function crawlCoverageStats(job: CrawlJobDTO) {
   const stats = [
     { label: "目标上限", value: job.maxReviews > 0 ? formatCount(job.maxReviews) : "不限" }
@@ -907,7 +911,8 @@ function crawlMetricSummary(job: CrawlJobDTO) {
     job.payloadComments !== null ? `接口评论 ${job.payloadComments}` : "",
     job.domCommentCount !== null ? `DOM 评论 ${job.domCommentCount}` : "",
     job.domContentTextCount !== null ? `DOM 文本 ${job.domContentTextCount}` : "",
-    job.loadMoreClicks !== null ? `加载更多 ${job.loadMoreClicks}` : ""
+    job.loadMoreClicks !== null ? `加载更多 ${job.loadMoreClicks}` : "",
+    job.cursor ? `游标 ${shortCursor(job.cursor)}` : ""
   ].filter(Boolean);
   return parts.join(" · ");
 }

@@ -1132,6 +1132,8 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
     if (domTexts) return locale === "en-US" ? `DOM texts ${domTexts[1]}` : `ข้อความ DOM ${domTexts[1]}`;
     const loadMore = part.match(/^加载更多\s+(\d+)$/);
     if (loadMore) return locale === "en-US" ? `Load more clicks ${loadMore[1]}` : `คลิกโหลดเพิ่ม ${loadMore[1]}`;
+    const cursor = part.match(/^游标\s+(.+)$/);
+    if (cursor) return locale === "en-US" ? `Cursor ${cursor[1]}` : `เคอร์เซอร์ ${cursor[1]}`;
     const imported = part.match(/^导入\s+(\d+)$/);
     if (imported) return locale === "en-US" ? `Imported ${imported[1]}` : `นำเข้า ${imported[1]}`;
     const duplicate = part.match(/^重复\s+(\d+)$/);
