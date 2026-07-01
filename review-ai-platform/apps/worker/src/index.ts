@@ -26,6 +26,7 @@ const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
 const analysisQueue = new Queue("analysis-runs", { connection });
 const crawlQueue = new Queue("crawl-jobs", { connection });
 const CRAWLER_CHANNELS = new Set<CrawlerChannel>(["api_exporter", "api_basic", "browser_intercept"]);
+const DEFAULT_CRAWLER_CHANNELS: CrawlerChannel[] = ["api_exporter", "api_basic", "browser_intercept"];
 
 function readPositiveIntEnv(name: string, fallback: number, options: { min?: number; max?: number } = {}) {
   const parsed = Number(process.env[name]);
@@ -156,6 +157,14 @@ function parseCrawlerChannels(value: string | null | undefined): CrawlerChannel[
     .split(",")
     .map((item) => item.trim())
     .filter((item): item is CrawlerChannel => CRAWLER_CHANNELS.has(item as CrawlerChannel));
+}
+
+function crawlChannelsForPlatform(platform: string | null | undefined, configuredChannels: string | null | undefined) {
+  if (platform === "youtube" || platform === "tiktok-video" || platform === "facebook-post") {
+    return ["browser_intercept"] as CrawlerChannel[];
+  }
+  const channels = parseCrawlerChannels(configuredChannels);
+  return channels.length ? channels : DEFAULT_CRAWLER_CHANNELS;
 }
 
 function parseCrawlerProcessError(stderr: string, fallback: string) {
@@ -2602,6 +2611,7 @@ async function autoImportAndAnalyzeFromCrawlJob(
 
 async function scheduleDueCrawlMonitors() {
   const now = new Date();
+  const storedCrawlerSetting = await getPlatformCrawlerSetting();
   const dueMonitors = await prisma.crawlMonitor.findMany({
     where: {
       enabled: true,
@@ -2662,7 +2672,7 @@ async function scheduleDueCrawlMonitors() {
           normalizedUrl: monitor.normalizedUrl,
           platform: monitor.platform,
           maxReviews: monitor.maxReviews,
-          crawlChannels: "browser_intercept",
+          crawlChannels: crawlChannelsForPlatform(monitor.platform, storedCrawlerSetting?.crawlChannels).join(","),
           status: "queued",
           progress: 0,
           rawResult: Prisma.JsonNull
@@ -2712,12 +2722,7 @@ const crawlWorker = new Worker(
       pythonBin: resolveCrawlerPythonBin(storedSetting?.pythonBin),
       proxyUrl: storedSetting?.proxyUrl || process.env.SCRAPLING_PROXY || null,
       shopeeCookie: storedSetting?.shopeeCookie || process.env.SHOPEE_COOKIE || null,
-      crawlChannels:
-        crawlJob.platform === "youtube" || crawlJob.platform === "tiktok-video" || crawlJob.platform === "facebook-post"
-          ? ["browser_intercept"]
-          : parseCrawlerChannels(crawlJob.crawlChannels || storedSetting?.crawlChannels).length
-            ? parseCrawlerChannels(crawlJob.crawlChannels || storedSetting?.crawlChannels)
-            : ["api_exporter", "api_basic", "browser_intercept"],
+      crawlChannels: crawlChannelsForPlatform(crawlJob.platform, crawlJob.crawlChannels || storedSetting?.crawlChannels),
       requestTimeoutSec: storedSetting?.requestTimeoutSec || Number(process.env.SCRAPLING_TIMEOUT_SEC || 180)
     };
 

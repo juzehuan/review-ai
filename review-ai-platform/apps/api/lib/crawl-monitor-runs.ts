@@ -1,5 +1,7 @@
 import { Prisma, prisma, type CrawlMonitor } from "@review-ai/db";
 import { getCrawlQueue } from "@/lib/queue";
+import { parseCrawlerChannels } from "@/lib/crawler-settings";
+import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 
 export function normalizeCrawlMonitorIntervalMinutes(value: unknown) {
   const numberValue = Number(value || 360);
@@ -13,7 +15,13 @@ function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
-function crawlJobDataFromMonitor(monitor: CrawlMonitor) {
+function crawlChannelsForMonitor(platform: string, configuredChannels: string | null | undefined) {
+  return platform === "youtube" || platform === "tiktok-video" || platform === "facebook-post"
+    ? "browser_intercept"
+    : parseCrawlerChannels(configuredChannels).join(",");
+}
+
+function crawlJobDataFromMonitor(monitor: CrawlMonitor, configuredChannels: string | null | undefined) {
   return {
     workspaceId: monitor.workspaceId,
     taskId: monitor.taskId,
@@ -26,7 +34,7 @@ function crawlJobDataFromMonitor(monitor: CrawlMonitor) {
     normalizedUrl: monitor.normalizedUrl,
     platform: monitor.platform,
     maxReviews: monitor.maxReviews,
-    crawlChannels: "browser_intercept",
+    crawlChannels: crawlChannelsForMonitor(monitor.platform, configuredChannels),
     status: "queued" as const,
     progress: 0,
     rawResult: Prisma.JsonNull
@@ -35,6 +43,7 @@ function crawlJobDataFromMonitor(monitor: CrawlMonitor) {
 
 export async function queueCrawlMonitorRun(monitorId: string, options: { forceEnable?: boolean } = {}) {
   const now = new Date();
+  const crawlerSetting = await getPlatformCrawlerSetting();
   const { monitor, job, activeJobId } = await prisma.$transaction(async (tx) => {
     const current = await tx.crawlMonitor.findUnique({ where: { id: monitorId } });
     if (!current) {
@@ -61,7 +70,7 @@ export async function queueCrawlMonitorRun(monitorId: string, options: { forceEn
 
     const nextRunAt = addMinutes(now, current.intervalMinutes);
     const job = await tx.crawlJob.create({
-      data: crawlJobDataFromMonitor(current)
+      data: crawlJobDataFromMonitor(current, crawlerSetting?.crawlChannels)
     });
     const monitor = await tx.crawlMonitor.update({
       where: { id: current.id },
