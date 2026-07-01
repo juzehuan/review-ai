@@ -1940,19 +1940,27 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
                     """() => {
                         const clean = (value) => (value || "").replace(/\\s+/g, " ").trim();
                         const toNumber = (raw, unit) => {
-                          const base = Number(String(raw || "").replace(/,/g, ""));
+                          const rawText = String(raw || "").replace(/\\s/g, "");
+                          const normalizedRaw = unit && /^\\d+,\\d{1,2}$/.test(rawText) ? rawText.replace(",", ".") : rawText.replace(/,/g, "");
+                          const base = Number(normalizedRaw);
                           if (!Number.isFinite(base)) return null;
                           const normalizedUnit = String(unit || "").toLowerCase();
-                          if (normalizedUnit === "k" || unit === "千") return Math.round(base * 1000);
+                          if (normalizedUnit === "k" || unit === "千" || unit === "พัน") return Math.round(base * 1000);
+                          if (unit === "万" || unit === "萬" || unit === "หมื่น") return Math.round(base * 10000);
+                          if (unit === "แสน") return Math.round(base * 100000);
                           if (normalizedUnit === "m") return Math.round(base * 1000000);
-                          if (unit === "万") return Math.round(base * 10000);
+                          if (unit === "ล้าน") return Math.round(base * 1000000);
                           return Math.round(base);
                         };
-                        const pattern = /(\\d+(?:[,.]\\d+)?)\\s*([kKmM]|万|千)?\\s*(?:条|則|个)?\\s*(?:comments?|评论|評論|留言)/gi;
+                        const commentWords = "comments?|评论|評論|留言|ความคิดเห็น|คอมเมนต์";
+                        const pattern = new RegExp(
+                          "(\\\\d+(?:[,.]\\\\d+)*)\\\\s*([kKmM]|万|萬|千|พัน|หมื่น|แสน|ล้าน)?\\\\s*(?:条|則|个)?\\\\s*(?:" + commentWords + ")",
+                          "gi"
+                        );
                         const nodes = Array.from(document.querySelectorAll("span, div, a"))
                           .map((node) => clean(node.textContent))
                           .filter((text, index, all) => text && text.length <= 140 && all.indexOf(text) === index)
-                          .filter((text) => /comment|评论|評論|留言/i.test(text));
+                          .filter((text) => new RegExp(commentWords, "i").test(text));
                         let best = null;
                         for (const text of nodes) {
                           for (const match of text.matchAll(pattern)) {
