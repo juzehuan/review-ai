@@ -82,6 +82,10 @@
                 <a-tooltip v-if="record.latestRunLastError" :title="record.latestRunLastError">
                   <span class="task-run-error">最新错误：{{ errorSummary(record.latestRunLastError) }}</span>
                 </a-tooltip>
+                <div v-if="taskRunDiagnostic(record)" class="analysis-diagnostic-tip analysis-diagnostic-compact">
+                  <ExclamationCircleOutlined />
+                  <span>{{ taskRunDiagnostic(record) }}</span>
+                </div>
               </template>
             </div>
           </template>
@@ -221,6 +225,10 @@
                 <a-tag v-if="record.stalled" color="orange" class="analysis-stalled-tag">
                   疑似无日志 {{ durationLabel(record.lastActivityAgoSeconds) }}
                 </a-tag>
+                <div v-if="analysisRunDiagnostic(record)" class="analysis-diagnostic-tip">
+                  <ExclamationCircleOutlined />
+                  <span>{{ analysisRunDiagnostic(record) }}</span>
+                </div>
               </div>
             </template>
             <template v-else-if="column.key === 'time'">
@@ -283,6 +291,14 @@
         </div>
 
         <a-alert
+          v-if="selectedRun && analysisRunDiagnostic(selectedRun)"
+          type="warning"
+          show-icon
+          class="queue-alert"
+          :message="analysisRunDiagnostic(selectedRun)"
+        />
+
+        <a-alert
           v-if="selectedRun?.status === 'queued' && !hasWorkerLog"
           type="warning"
           show-icon
@@ -326,6 +342,7 @@ import {
   CloudUploadOutlined,
   CheckSquareOutlined,
   DeleteOutlined,
+  ExclamationCircleOutlined,
   FileAddOutlined,
   FileSearchOutlined,
   FileTextOutlined,
@@ -567,6 +584,27 @@ function taskRunMetricSummary(task: TaskListItem) {
   return parts.join(" · ");
 }
 
+function taskRunDiagnostic(task: TaskListItem) {
+  if (!task.latestRunStatus) {
+    return "";
+  }
+  if (task.latestRunLastError) {
+    return "最新批次已有错误，先打开分析日志并筛选错误，再确认模型额度、网络超时或提示词返回格式。";
+  }
+  if (task.latestRunStalled) {
+    return task.latestRunStatus === "queued"
+      ? "分析批次排队后长时间无日志，可能是 AI worker 未消费或队列阻塞。"
+      : "分析批次长时间无新日志，建议查看 worker、模型接口和当前并发配置。";
+  }
+  if (task.latestRunFailedCount > 0 && task.latestRunFailureRatePercent >= 30) {
+    return `失败率 ${task.latestRunFailureRatePercent}%，建议抽查错误日志和失败样本，必要时降低批次大小后重试。`;
+  }
+  if (task.latestRunStatus === "partial_failed") {
+    return "批次已部分失败，报告可参考但需要复核失败样本，必要时重新分析。";
+  }
+  return "";
+}
+
 function progressStatus(run: AnalysisRunDTO) {
   if (run.status === "failed") {
     return "exception";
@@ -662,6 +700,30 @@ function formatCount(value?: number | null) {
 function errorSummary(value?: string | null) {
   const text = String(value || "").trim();
   return text.length > 28 ? `${text.slice(0, 28)}...` : text;
+}
+
+function analysisRunDiagnostic(run: AnalysisRunDTO) {
+  if (run.lastError) {
+    return "批次已有最近错误，先筛选错误日志，再检查 AI 配置、模型额度、网络超时和提示词返回格式。";
+  }
+  if (run.stalled) {
+    return run.status === "queued"
+      ? "排队后长时间没有日志，疑似 AI worker 未消费、Redis 队列异常或前面任务积压。"
+      : "运行中长时间没有新日志，可能卡在模型请求、网络超时或 worker 并发占用。";
+  }
+  if (run.status === "running" && run.processedCount === 0 && run.durationSeconds >= 300) {
+    return "运行超过 5 分钟仍未处理评论，建议检查模型接口是否响应，以及 worker 是否被长请求占用。";
+  }
+  if (run.failedCount > 0 && run.failureRatePercent >= 30) {
+    return `失败率 ${run.failureRatePercent}%，建议查看错误日志，必要时降低批次大小或改用更稳定模型重试。`;
+  }
+  if (run.status === "partial_failed") {
+    return "批次部分失败，已成功的评论可用于报告，但失败样本需要复核或重试。";
+  }
+  if (run.status === "failed") {
+    return "批次失败，确认模型额度、API Key、网络和提示词返回格式后再重试。";
+  }
+  return "";
 }
 
 function formatMeta(meta: unknown) {
@@ -1198,6 +1260,28 @@ onUnmounted(stopPolling);
 .analysis-stalled-tag {
   justify-self: start;
   margin-inline-end: 0;
+}
+
+.analysis-diagnostic-tip {
+  align-items: flex-start;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  max-width: 520px;
+  padding: 6px 8px;
+}
+
+.analysis-diagnostic-tip span {
+  overflow-wrap: anywhere;
+}
+
+.analysis-diagnostic-compact {
+  max-width: 340px;
 }
 
 .run-log-panel {
