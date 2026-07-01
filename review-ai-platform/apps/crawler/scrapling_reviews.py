@@ -56,6 +56,10 @@ def compact_dict(value: dict[str, Any]) -> dict[str, Any]:
     return {key: item for key, item in value.items() if item is not None}
 
 
+def compact_metric_parts(parts: list[str | None]) -> str:
+    return "，".join([part for part in parts if part])
+
+
 def emit_crawl_progress(
     source: str,
     crawl_channel: str,
@@ -1253,6 +1257,20 @@ def tiktok_payload_comments(payload: dict[str, Any]) -> list[Any]:
     return comments if isinstance(comments, list) else []
 
 
+def summarize_empty_tiktok_direct_result(result: dict[str, Any]) -> str:
+    reason = str(result.get("stopReason") or "no_rows")
+    details = compact_metric_parts(
+        [
+            f"请求 {result.get('nextRequests')}" if result.get("nextRequests") is not None else None,
+            f"接口评论 {result.get('payloadComments')}" if result.get("payloadComments") is not None else None,
+            f"HTTP {result.get('lastRequestStatus')}" if result.get("lastRequestStatus") is not None else None,
+            f"游标 {result.get('cursor')}" if result.get("cursor") else None,
+            f"还有更多 {'是' if result.get('hasMore') else '否'}" if result.get("hasMore") is not None else None,
+        ]
+    )
+    return f"直连接口未返回有效评论（{reason}{'，' + details if details else ''}），已切换浏览器兜底"
+
+
 def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: str | None, timeout: int) -> dict[str, Any]:
     video_id = parse_tiktok_video_id(video_url)
     comments_by_id: dict[str, dict[str, Any]] = {}
@@ -1368,12 +1386,14 @@ def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: 
 
 
 def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | None, timeout: int) -> dict[str, Any]:
+    channel_errors: list[str] = []
     try:
         direct_result = fetch_tiktok_video_comments_direct(video_url, max_reviews, proxy, timeout)
         if direct_result["rows"]:
             return direct_result
-    except Exception:
-        pass
+        channel_errors.append(f"TikTok 直连接口：{summarize_empty_tiktok_direct_result(direct_result)}")
+    except Exception as exc:
+        channel_errors.append(f"TikTok 直连接口：{exc}")
 
     if DynamicFetcher is None:
         raise RuntimeError("Scrapling DynamicFetcher is not available. Reinstall with: pip install 'scrapling[fetchers]'")
@@ -1693,6 +1713,7 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
         "partialDueToTimeout": state.get("crawl_deadline_reached"),
         "endReached": state.get("end_reached"),
         "stopReason": state.get("stop_reason"),
+        "channelErrors": channel_errors,
         "rows": rows,
     }
 

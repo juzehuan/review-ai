@@ -2229,6 +2229,10 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   if (recentError) {
     return locale === "en-US" ? `Recent error: ${recentError[1]}` : `ข้อผิดพลาดล่าสุด: ${recentError[1]}`;
   }
+  const channelErrors = value.match(/^通道异常\s+(\d+)\s+条$/);
+  if (channelErrors) {
+    return locale === "en-US" ? `${channelErrors[1]} channel issues` : `ปัญหาช่องทาง ${channelErrors[1]} รายการ`;
+  }
   const crawlMetricPart = (part: string) => {
     if (part === "部分结果超时") {
       return locale === "en-US" ? "Partial result timed out" : "ผลลัพธ์บางส่วนหมดเวลา";

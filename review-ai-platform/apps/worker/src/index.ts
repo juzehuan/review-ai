@@ -71,8 +71,12 @@ type CrawlResult = {
   lastLoadMoreClicked?: boolean;
   hasMore?: boolean;
   lastRequestStatus?: number;
+  cursor?: string | number;
+  totalComments?: number;
+  partialDueToTimeout?: boolean;
   endReached?: boolean;
   stopReason?: string;
+  channelErrors?: string[];
   commentSortAttempted?: boolean;
   commentSortSwitched?: boolean;
   commentSortOpened?: boolean;
@@ -323,10 +327,17 @@ function buildEmptyCrawlError(result: CrawlResult) {
     result.domCommentCount === undefined ? null : `domCommentCount=${result.domCommentCount}`,
     result.domContentTextCount === undefined ? null : `domContentTextCount=${result.domContentTextCount}`,
     result.loadMoreClicks === undefined ? null : `loadMoreClicks=${result.loadMoreClicks}`,
+    result.idleRounds === undefined ? null : `idleRounds=${result.idleRounds}`,
+    result.lastAddedRows === undefined ? null : `lastAddedRows=${result.lastAddedRows}`,
+    result.lastRequestStatus === undefined ? null : `lastRequestStatus=${result.lastRequestStatus}`,
+    result.cursor === undefined ? null : `cursor=${result.cursor}`,
+    result.hasMore === undefined ? null : `hasMore=${result.hasMore}`,
+    result.stopReason === undefined ? null : `stopReason=${result.stopReason}`,
     result.endReached === undefined ? null : `endReached=${result.endReached}`
   ].filter(Boolean);
+  const channelSuffix = result.channelErrors?.length ? ` Channel errors: ${result.channelErrors.join(" | ")}` : "";
   const suffix = diagnostics.length ? ` (${diagnostics.join(", ")})` : "";
-  return `Crawler finished but collected 0 comments${suffix}. The page may require login, be rate-limited, have comments disabled, or need another crawl retry.`;
+  return `Crawler finished but collected 0 comments${suffix}.${channelSuffix} The page may require login, be rate-limited, have comments disabled, or need another crawl retry.`;
 }
 
 function readProgressNumber(value: unknown) {
