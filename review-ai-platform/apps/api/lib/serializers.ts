@@ -293,7 +293,10 @@ export function serializeRunLog(log: AnalysisRunLog): AnalysisRunLogDTO {
   };
 }
 
-type CrawlJobWithWorkspace = CrawlJob & { workspace?: Pick<Workspace, "name" | "slug"> | null };
+type CrawlJobWithWorkspace = CrawlJob & {
+  workspace?: Pick<Workspace, "name" | "slug"> | null;
+  task?: { analysisRuns?: Array<Pick<AnalysisRun, "id">> } | null;
+};
 
 export function serializeCrawlJob(job: CrawlJobWithWorkspace): CrawlJobDTO {
   const rawResult = rawObject(job.rawResult);
@@ -315,6 +318,7 @@ export function serializeCrawlJob(job: CrawlJobWithWorkspace): CrawlJobDTO {
     workspaceName: job.workspace?.name || null,
     workspaceSlug: job.workspace?.slug || null,
     taskId: job.taskId,
+    latestRunId: job.task?.analysisRuns?.[0]?.id || null,
     name: job.name,
     productName: job.productName,
     sourceChannel: job.sourceChannel,

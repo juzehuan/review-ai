@@ -230,6 +230,7 @@ export interface CrawlJobDTO {
   workspaceName?: string | null;
   workspaceSlug?: string | null;
   taskId: string | null;
+  latestRunId: string | null;
   name: string;
   productName: string;
   sourceChannel: string;

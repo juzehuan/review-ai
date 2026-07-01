@@ -922,7 +922,7 @@ async function startAnalysis(job: CrawlJobDTO) {
     const result = await startCrawlJobAnalysis(job.id);
     message.success("已导入评论并加入分析队列");
     await loadJobs();
-    router.push(`/tasks/${result.taskId}/runs`);
+    openTaskById(result.taskId, result.run.id);
   } finally {
     startingId.value = null;
   }
@@ -976,12 +976,12 @@ function confirmRemoveJob(job: CrawlJobDTO) {
 
 function openTask(job: CrawlJobDTO) {
   if (job.taskId) {
-    openTaskById(job.taskId);
+    openTaskById(job.taskId, job.latestRunId);
   }
 }
 
-function openTaskById(taskId: string) {
-  router.push(`/tasks/${taskId}/runs`);
+function openTaskById(taskId: string, runId?: string | null) {
+  router.push({ path: `/tasks/${taskId}/runs`, query: runId ? { runId } : undefined });
 }
 
 function resetCreateForm() {

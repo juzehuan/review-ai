@@ -20,13 +20,35 @@ export async function GET(request: Request) {
     where,
     orderBy: { createdAt: "desc" },
     take: 100,
-    include: { workspace: { select: { name: true, slug: true } } }
+    include: {
+      workspace: { select: { name: true, slug: true } },
+      task: {
+        select: {
+          analysisRuns: {
+            select: { id: true },
+            orderBy: { createdAt: "desc" },
+            take: 1
+          }
+        }
+      }
+    }
   });
 
   if (targetJobId && !jobs.some((job) => job.id === targetJobId)) {
     const targetJob = await prisma.crawlJob.findFirst({
       where: { ...where, id: targetJobId },
-      include: { workspace: { select: { name: true, slug: true } } }
+      include: {
+        workspace: { select: { name: true, slug: true } },
+        task: {
+          select: {
+            analysisRuns: {
+              select: { id: true },
+              orderBy: { createdAt: "desc" },
+              take: 1
+            }
+          }
+        }
+      }
     });
     if (targetJob) {
       jobs.unshift(targetJob);
