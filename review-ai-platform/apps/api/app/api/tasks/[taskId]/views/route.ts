@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeSavedView } from "@/lib/serializers";
 import { getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
@@ -10,7 +11,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     return workspaceContext.response;
   }
   const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
-  if (scoped.response) {
+  if (scoped.response || !scoped.task) {
     return scoped.response;
   }
 
@@ -32,7 +33,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     return roleResponse;
   }
   const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
-  if (scoped.response) {
+  if (scoped.response || !scoped.task) {
     return scoped.response;
   }
 
@@ -60,6 +61,28 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
         isDefault
       }
     });
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: scoped.task.workspaceId || workspaceContext.workspace.id,
+    actor: workspaceContext.user,
+    action: "review_view.create",
+    targetType: "review_view",
+    targetId: created.id,
+    targetLabel: created.name,
+    metadata: {
+      taskId,
+      taskName: scoped.task.name,
+      viewId: created.id,
+      name: created.name,
+      filters: created.filters,
+      groupBy: created.groupBy,
+      viewMode: created.viewMode,
+      sortBy: created.sortBy,
+      sortOrder: created.sortOrder,
+      visibleColumnKeys: created.visibleColumnKeys,
+      isDefault: created.isDefault
+    }
   });
 
   return ok(serializeSavedView(created), 201);

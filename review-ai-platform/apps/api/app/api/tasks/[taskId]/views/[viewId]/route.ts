@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeSavedView } from "@/lib/serializers";
 import { getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
@@ -17,7 +18,7 @@ export async function PATCH(
     return roleResponse;
   }
   const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
-  if (scoped.response) {
+  if (scoped.response || !scoped.task) {
     return scoped.response;
   }
 
@@ -46,6 +47,30 @@ export async function PATCH(
     });
   });
 
+  await writeAuditLog(request, {
+    workspaceId: scoped.task.workspaceId || workspaceContext.workspace.id,
+    actor: workspaceContext.user,
+    action: "review_view.update",
+    targetType: "review_view",
+    targetId: updated.id,
+    targetLabel: updated.name,
+    metadata: {
+      taskId,
+      taskName: scoped.task.name,
+      viewId: updated.id,
+      previousName: existing.name,
+      name: updated.name,
+      previousIsDefault: existing.isDefault,
+      isDefault: updated.isDefault,
+      filters: updated.filters,
+      groupBy: updated.groupBy,
+      viewMode: updated.viewMode,
+      sortBy: updated.sortBy,
+      sortOrder: updated.sortOrder,
+      visibleColumnKeys: updated.visibleColumnKeys
+    }
+  });
+
   return ok(serializeSavedView(updated));
 }
 
@@ -63,10 +88,37 @@ export async function DELETE(
     return roleResponse;
   }
   const scoped = await requireScopedTask(taskId, workspaceContext.workspace.id, workspaceContext.user?.isSuperAdmin);
-  if (scoped.response) {
+  if (scoped.response || !scoped.task) {
     return scoped.response;
   }
 
-  await prisma.savedReviewView.deleteMany({ where: { id: viewId, taskId } });
+  const existing = await prisma.savedReviewView.findFirst({ where: { id: viewId, taskId } });
+  if (!existing) {
+    return fail("视图不存在", 404);
+  }
+
+  await prisma.savedReviewView.delete({ where: { id: existing.id } });
+  await writeAuditLog(request, {
+    workspaceId: scoped.task.workspaceId || workspaceContext.workspace.id,
+    actor: workspaceContext.user,
+    action: "review_view.delete",
+    targetType: "review_view",
+    targetId: existing.id,
+    targetLabel: existing.name,
+    metadata: {
+      taskId,
+      taskName: scoped.task.name,
+      viewId: existing.id,
+      name: existing.name,
+      filters: existing.filters,
+      groupBy: existing.groupBy,
+      viewMode: existing.viewMode,
+      sortBy: existing.sortBy,
+      sortOrder: existing.sortOrder,
+      visibleColumnKeys: existing.visibleColumnKeys,
+      isDefault: existing.isDefault
+    }
+  });
+
   return ok({ deleted: true });
 }
