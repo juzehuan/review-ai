@@ -4,7 +4,7 @@ import { resolvedCrawlerSettingFromRecord, normalizeRequestedCrawlInput, support
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlJob } from "@/lib/serializers";
-import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function GET(request: Request) {
   const context = await getWorkspaceContext(request);
@@ -12,10 +12,12 @@ export async function GET(request: Request) {
     return context.response;
   }
 
+  const canViewAllJobs = canAccessAllWorkspaces(context);
   const jobs = await prisma.crawlJob.findMany({
-    where: { workspaceId: context.workspace.id },
+    where: canViewAllJobs ? {} : { workspaceId: context.workspace.id },
     orderBy: { createdAt: "desc" },
-    take: 100
+    take: 100,
+    include: { workspace: { select: { name: true, slug: true } } }
   });
 
   return ok(jobs.map(serializeCrawlJob));

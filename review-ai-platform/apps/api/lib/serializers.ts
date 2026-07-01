@@ -293,7 +293,9 @@ export function serializeRunLog(log: AnalysisRunLog): AnalysisRunLogDTO {
   };
 }
 
-export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
+type CrawlJobWithWorkspace = CrawlJob & { workspace?: Pick<Workspace, "name" | "slug"> | null };
+
+export function serializeCrawlJob(job: CrawlJobWithWorkspace): CrawlJobDTO {
   const rawResult = rawObject(job.rawResult);
   const now = new Date();
   const isActive = job.status === "queued" || job.status === "running";
@@ -310,6 +312,8 @@ export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
   return {
     id: job.id,
     workspaceId: job.workspaceId,
+    workspaceName: job.workspace?.name || null,
+    workspaceSlug: job.workspace?.slug || null,
     taskId: job.taskId,
     name: job.name,
     productName: job.productName,

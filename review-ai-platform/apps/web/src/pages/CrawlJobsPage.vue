@@ -276,6 +276,9 @@
           <template v-else-if="column.key === 'meta'">
             <div>{{ record.sourceChannel }} / {{ analysisTypeLabel(record.analysisType) }}</div>
             <div class="muted">{{ record.crawlChannelLabel || platformLabel(record.platform) }}</div>
+            <div v-if="record.workspaceName || record.workspaceSlug" class="muted">
+              空间：{{ record.workspaceName || record.workspaceSlug }}
+            </div>
           </template>
           <template v-else-if="column.key === 'time'">
             <div>{{ formatTime(record.createdAt) }}</div>
@@ -552,7 +555,7 @@ const columns = [
   { title: "任务", key: "job", width: 360 },
   { title: "状态", key: "status", width: 110 },
   { title: "进度", key: "progress", width: 380 },
-  { title: "来源", key: "meta", width: 160 },
+  { title: "来源", key: "meta", width: 190 },
   { title: "时间", key: "time", width: 170 },
   { title: "错误", key: "error" },
   { title: "操作", key: "actions", width: 260 }

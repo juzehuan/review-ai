@@ -1,6 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { fail, ok } from "@/lib/http";
-import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function DELETE(request: Request, context: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await context.params;
@@ -13,8 +13,9 @@ export async function DELETE(request: Request, context: { params: Promise<{ jobI
     return roleResponse;
   }
 
+  const allowGlobalAccess = canAccessAllWorkspaces(workspaceContext);
   const job = await prisma.crawlJob.findFirst({
-    where: { id: jobId, workspaceId: workspaceContext.workspace.id }
+    where: allowGlobalAccess ? { id: jobId } : { id: jobId, workspaceId: workspaceContext.workspace.id }
   });
   if (!job) {
     return fail("采集任务不存在或不属于当前空间", 404);
@@ -25,7 +26,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ jobI
 
   await prisma.$transaction(async (tx) => {
     await tx.crawlMonitor.updateMany({
-      where: { workspaceId: workspaceContext.workspace!.id, lastCrawlJobId: job.id },
+      where: { workspaceId: job.workspaceId, lastCrawlJobId: job.id },
       data: { lastCrawlJobId: null }
     });
     await tx.crawlJob.delete({

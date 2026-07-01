@@ -2,7 +2,7 @@ import { Prisma, prisma } from "@review-ai/db";
 import { fail, ok } from "@/lib/http";
 import { getCrawlQueue } from "@/lib/queue";
 import { serializeCrawlJob } from "@/lib/serializers";
-import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await context.params;
@@ -15,8 +15,9 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     return roleResponse;
   }
 
+  const allowGlobalAccess = canAccessAllWorkspaces(workspaceContext);
   const job = await prisma.crawlJob.findFirst({
-    where: { id: jobId, workspaceId: workspaceContext.workspace.id }
+    where: allowGlobalAccess ? { id: jobId } : { id: jobId, workspaceId: workspaceContext.workspace.id }
   });
   if (!job) {
     return fail("爬取任务不存在或不属于当前空间", 404);
@@ -43,14 +44,14 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
   });
   if (job.monitorId) {
     await prisma.crawlMonitor.updateMany({
-      where: { id: job.monitorId, workspaceId: workspaceContext.workspace.id },
+      where: { id: job.monitorId, workspaceId: job.workspaceId },
       data: { lastError: null }
     });
   }
 
   await getCrawlQueue().add("run-crawl", {
     crawlJobId: updated.id,
-    workspaceId: workspaceContext.workspace.id
+    workspaceId: job.workspaceId
   });
 
   return ok(serializeCrawlJob(updated));
