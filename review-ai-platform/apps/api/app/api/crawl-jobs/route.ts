@@ -228,6 +228,7 @@ export async function POST(request: Request) {
     metadata: {
       productUrl: job.normalizedUrl,
       sourceChannel: job.sourceChannel,
+      analysisType: job.analysisType,
       platform: job.platform,
       maxReviews: job.maxReviews,
       crawlChannels: input.crawlChannels

@@ -99,6 +99,7 @@ export async function POST(request: Request) {
     metadata: {
       productUrl: monitor.normalizedUrl,
       sourceChannel: monitor.sourceChannel,
+      analysisType: monitor.analysisType,
       platform: monitor.platform,
       intervalMinutes: monitor.intervalMinutes,
       autoAnalyze: monitor.autoAnalyze,

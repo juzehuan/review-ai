@@ -37,6 +37,7 @@ export async function POST(request: Request, context: { params: Promise<{ monito
     metadata: {
       productUrl: monitor.normalizedUrl,
       sourceChannel: monitor.sourceChannel,
+      analysisType: monitor.analysisType,
       platform: monitor.platform,
       jobId: result.jobId,
       queued: result.queued,
@@ -120,6 +121,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ monit
         nextAutoAnalyze: result.monitor.autoAnalyze,
         productUrl: result.monitor.normalizedUrl,
         sourceChannel: result.monitor.sourceChannel,
+        analysisType: result.monitor.analysisType,
         platform: result.monitor.platform,
         jobId: result.jobId,
         queued: result.queued
@@ -144,6 +146,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ monit
       nextAutoAnalyze: updated.autoAnalyze,
       productUrl: updated.normalizedUrl,
       sourceChannel: updated.sourceChannel,
+      analysisType: updated.analysisType,
       platform: updated.platform
     }
   });
@@ -184,6 +187,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ moni
     metadata: {
       productUrl: monitor.normalizedUrl,
       sourceChannel: monitor.sourceChannel,
+      analysisType: monitor.analysisType,
       platform: monitor.platform,
       lastCrawlJobId: monitor.lastCrawlJobId,
       taskId: monitor.taskId

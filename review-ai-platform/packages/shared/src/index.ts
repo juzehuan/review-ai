@@ -477,8 +477,16 @@ export const ANALYSIS_TYPE_PRESETS: Array<{ label: string; value: AnalysisType; 
   { label: "推文类评论", value: "tweet", description: "关注舆情立场、传播情绪、争议焦点和回应策略。" }
 ];
 
-export function inferAnalysisType(sourceChannel?: string | null): AnalysisType {
+function isFacebookVideoLikeUrl(value?: string | null) {
+  const text = String(value || "").trim().toLowerCase();
+  return Boolean(text && text.includes("facebook.") && /(\/reel\/|\/videos\/|\/watch\/|[?&]v=|\/share\/v)/i.test(text));
+}
+
+export function inferAnalysisType(sourceChannel?: string | null, sourceUrl?: string | null): AnalysisType {
   const channel = String(sourceChannel || "").toLowerCase();
+  if (isFacebookVideoLikeUrl(sourceUrl)) {
+    return "video";
+  }
   if (channel.includes("youtube") || channel.includes("video") || channel.includes("bilibili")) {
     return "video";
   }

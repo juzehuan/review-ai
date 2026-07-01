@@ -777,24 +777,12 @@ function analysisTypeLabel(value: string) {
   return value === "video" ? "视频评论" : value === "tweet" ? "社媒评论" : "商品评论";
 }
 
-function inferCrawlAnalysisType(sourceChannel?: string | null, productUrl?: string | null): AnalysisType {
-  const channel = String(sourceChannel || "").trim();
-  const text = String(productUrl || "").trim().toLowerCase();
-  if (channel === "Facebook" || text.includes("facebook.")) {
-    if (/(\/reel\/|\/videos\/|\/watch\/|[?&]v=|\/share\/v)/i.test(text)) {
-      return "video";
-    }
-    return "tweet";
-  }
-  return inferAnalysisType(channel);
-}
-
 function analysisTypeI18nLabel(value: AnalysisType) {
   return t(`analysisType.${value}`);
 }
 
 function crawlAnalysisTypeHint(target: { sourceChannel: string; productUrl: string; analysisType: AnalysisType }) {
-  const recommended = inferCrawlAnalysisType(target.sourceChannel, target.productUrl);
+  const recommended = inferAnalysisType(target.sourceChannel, target.productUrl);
   const recommendedLabel = analysisTypeI18nLabel(recommended);
   if (target.analysisType !== recommended) {
     return t("crawl.analysisTypeMismatch", {
@@ -1274,7 +1262,7 @@ function applyUrlInference(target: typeof form | typeof monitorForm, productUrl?
     return;
   }
   target.sourceChannel = sourceChannel;
-  target.analysisType = inferCrawlAnalysisType(sourceChannel, productUrl);
+  target.analysisType = inferAnalysisType(sourceChannel, productUrl);
   if (sourceChannel === "TikTok Video" || sourceChannel === "Facebook") {
     target.maxReviews = 0;
   }
@@ -1286,14 +1274,14 @@ function applyUrlInference(target: typeof form | typeof monitorForm, productUrl?
 watch(
   () => form.sourceChannel,
   (sourceChannel) => {
-    form.analysisType = inferCrawlAnalysisType(sourceChannel, form.productUrl);
+    form.analysisType = inferAnalysisType(sourceChannel, form.productUrl);
   }
 );
 
 watch(
   () => monitorForm.sourceChannel,
   (sourceChannel) => {
-    monitorForm.analysisType = inferCrawlAnalysisType(sourceChannel, monitorForm.productUrl);
+    monitorForm.analysisType = inferAnalysisType(sourceChannel, monitorForm.productUrl);
   }
 );
 
