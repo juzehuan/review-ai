@@ -2734,6 +2734,8 @@ const crawlWorker = new Worker(
               payloadComments: latestEvent.payloadComments,
               domCommentCount: latestEvent.domCommentCount,
               domContentTextCount: latestEvent.domContentTextCount,
+              cursor: latestEvent.cursor,
+              totalComments: latestEvent.totalComments,
               endReached: latestEvent.endReached,
               stopReason: latestEvent.stopReason,
               commentSortSwitched: latestEvent.commentSortSwitched
