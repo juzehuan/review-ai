@@ -110,12 +110,14 @@ function buildCrawlStalledInsight(job: {
   const payloadComments = readOptionalNumber(rawResult?.payloadComments);
   const domCommentCount = readOptionalNumber(rawResult?.domCommentCount);
   const domContentTextCount = readOptionalNumber(rawResult?.domContentTextCount);
+  const loadMoreClicks = readOptionalNumber(rawResult?.loadMoreClicks);
   const metricSummary = buildMetricSummary([
     totalComments !== null ? `平台总量 ${totalComments}` : null,
     nextRequests !== null ? `接口请求 ${nextRequests}` : null,
     payloadComments !== null ? `接口评论 ${payloadComments}` : null,
     domCommentCount !== null ? `DOM 评论 ${domCommentCount}` : null,
     domContentTextCount !== null ? `DOM 文本 ${domContentTextCount}` : null,
+    loadMoreClicks !== null ? `加载更多 ${loadMoreClicks}` : null,
     progressEventAt ? `进度回传 ${progressEventAt}` : null,
     stopReason ? `停止原因 ${stopReason}` : null
   ]);
@@ -165,7 +167,7 @@ function buildCrawlStalledInsight(job: {
       lastError: null
     };
   }
-  if (progressEventAt || nextRequests !== null || domCommentCount !== null) {
+  if (progressEventAt || nextRequests !== null || domCommentCount !== null || loadMoreClicks !== null) {
     return {
       detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
       diagnosis: "采集器仍有过程指标，但暂未形成有效评论",

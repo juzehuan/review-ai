@@ -59,6 +59,7 @@ type CrawlResult = {
   payloadComments?: number;
   domCommentCount?: number;
   domContentTextCount?: number;
+  loadMoreClicks?: number;
   endReached?: boolean;
   stopReason?: string;
   commentSortAttempted?: boolean;
@@ -91,6 +92,7 @@ type CrawlerProgressEvent = {
   payloadComments?: number;
   domCommentCount?: number;
   domContentTextCount?: number;
+  loadMoreClicks?: number;
   endReached?: boolean;
   stopReason?: string;
   commentSortAttempted?: boolean;
@@ -291,6 +293,7 @@ function buildEmptyCrawlError(result: CrawlResult) {
     result.payloadComments === undefined ? null : `payloadComments=${result.payloadComments}`,
     result.domCommentCount === undefined ? null : `domCommentCount=${result.domCommentCount}`,
     result.domContentTextCount === undefined ? null : `domContentTextCount=${result.domContentTextCount}`,
+    result.loadMoreClicks === undefined ? null : `loadMoreClicks=${result.loadMoreClicks}`,
     result.endReached === undefined ? null : `endReached=${result.endReached}`
   ].filter(Boolean);
   const suffix = diagnostics.length ? ` (${diagnostics.join(", ")})` : "";
@@ -329,6 +332,7 @@ function buildCrawlProgressRawResult(event: CrawlerProgressEvent) {
     payloadComments: readProgressInt(event.payloadComments),
     domCommentCount: readProgressInt(event.domCommentCount),
     domContentTextCount: readProgressInt(event.domContentTextCount),
+    loadMoreClicks: readProgressInt(event.loadMoreClicks),
     endReached: event.endReached,
     stopReason: event.stopReason,
     commentSortAttempted: event.commentSortAttempted,
@@ -2734,6 +2738,7 @@ const crawlWorker = new Worker(
               payloadComments: latestEvent.payloadComments,
               domCommentCount: latestEvent.domCommentCount,
               domContentTextCount: latestEvent.domContentTextCount,
+              loadMoreClicks: latestEvent.loadMoreClicks,
               cursor: latestEvent.cursor,
               totalComments: latestEvent.totalComments,
               endReached: latestEvent.endReached,

@@ -84,6 +84,7 @@ def emit_crawl_progress(
                 "payloadComments": state.get("payload_comments"),
                 "domCommentCount": state.get("dom_comment_count"),
                 "domContentTextCount": state.get("dom_content_text_count"),
+                "loadMoreClicks": state.get("load_more_clicks"),
                 "endReached": state.get("end_reached"),
                 "stopReason": state.get("stop_reason"),
                 "commentSortAttempted": state.get("comment_sort_attempted"),
@@ -1741,6 +1742,8 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
     state: dict[str, Any] = {
         "title": "",
         "dom_comment_count": 0,
+        "total_comments": None,
+        "load_more_clicks": 0,
         "end_reached": False,
         "comment_sort_attempted": False,
         "comment_sort_switched": False,
@@ -1815,9 +1818,43 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
             except Exception:
                 return False
 
+        def refresh_total_comments() -> None:
+            try:
+                total = page.evaluate(
+                    """() => {
+                        const clean = (value) => (value || "").replace(/\\s+/g, " ").trim();
+                        const toNumber = (raw, unit) => {
+                          const base = Number(String(raw || "").replace(/,/g, ""));
+                          if (!Number.isFinite(base)) return null;
+                          const normalizedUnit = String(unit || "").toLowerCase();
+                          if (normalizedUnit === "k" || unit === "千") return Math.round(base * 1000);
+                          if (normalizedUnit === "m") return Math.round(base * 1000000);
+                          if (unit === "万") return Math.round(base * 10000);
+                          return Math.round(base);
+                        };
+                        const pattern = /(\\d+(?:[,.]\\d+)?)\\s*([kKmM]|万|千)?\\s*(?:条|則|个)?\\s*(?:comments?|评论|評論|留言)/gi;
+                        const nodes = Array.from(document.querySelectorAll("span, div, a"))
+                          .map((node) => clean(node.textContent))
+                          .filter((text, index, all) => text && text.length <= 140 && all.indexOf(text) === index)
+                          .filter((text) => /comment|评论|評論|留言/i.test(text));
+                        let best = null;
+                        for (const text of nodes) {
+                          for (const match of text.matchAll(pattern)) {
+                            const value = toNumber(match[1], match[2]);
+                            if (value && value > (best || 0)) best = value;
+                          }
+                        }
+                        return best;
+                    }"""
+                )
+                if total:
+                    state["total_comments"] = int(total)
+            except Exception:
+                return
+
         def click_more_comments() -> bool:
             try:
-                return bool(
+                clicked = bool(
                     page.evaluate(
                         """() => {
                             const clean = (value) => (value || "").replace(/\\s+/g, " ").trim().toLowerCase();
@@ -1841,6 +1878,9 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
                         }"""
                     )
                 )
+                if clicked:
+                    state["load_more_clicks"] = int(state.get("load_more_clicks") or 0) + 1
+                return clicked
             except Exception:
                 return False
 
@@ -1910,6 +1950,7 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
             scroll_comments()
             page.wait_for_timeout(1800)
             switch_to_all_comments()
+            refresh_total_comments()
         except Exception:
             page.wait_for_timeout(1200)
 
@@ -1922,6 +1963,7 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
                 page.wait_for_timeout(1200)
 
             try:
+                refresh_total_comments()
                 dom_items = extract_dom_comments()
                 state["dom_comment_count"] = len(dom_items)
             except Exception:
@@ -2010,6 +2052,8 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         "itemId": post_id,
         "postId": post_id,
         "domCommentCount": state.get("dom_comment_count"),
+        "totalComments": state.get("total_comments"),
+        "loadMoreClicks": state.get("load_more_clicks"),
         "endReached": state.get("end_reached"),
         "stopReason": stop_reason,
         "commentSortAttempted": state.get("comment_sort_attempted"),

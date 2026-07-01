@@ -256,6 +256,7 @@ export interface CrawlJobDTO {
   payloadComments: number | null;
   domCommentCount: number | null;
   domContentTextCount: number | null;
+  loadMoreClicks: number | null;
   totalComments: number | null;
   remainingSeconds: number | null;
   progressEventAt: string | null;

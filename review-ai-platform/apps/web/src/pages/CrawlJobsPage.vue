@@ -780,7 +780,8 @@ function crawlMetricSummary(job: CrawlJobDTO) {
     job.nextRequests !== null ? `接口请求 ${job.nextRequests}` : "",
     job.payloadComments !== null ? `接口评论 ${job.payloadComments}` : "",
     job.domCommentCount !== null ? `DOM 评论 ${job.domCommentCount}` : "",
-    job.domContentTextCount !== null ? `DOM 文本 ${job.domContentTextCount}` : ""
+    job.domContentTextCount !== null ? `DOM 文本 ${job.domContentTextCount}` : "",
+    job.loadMoreClicks !== null ? `加载更多 ${job.loadMoreClicks}` : ""
   ].filter(Boolean);
   return parts.join(" · ");
 }
