@@ -216,7 +216,15 @@
           <div class="panel-label">Crawler Queue</div>
           <div class="settings-section-title">采集记录</div>
         </div>
-        <a-tag>{{ jobs.length }} 个任务</a-tag>
+        <a-space class="crawl-job-toolbar" wrap>
+          <a-segmented
+            v-model:value="crawlJobStatusFilter"
+            class="crawl-job-status-filter"
+            :options="crawlJobStatusOptions"
+            @change="handleCrawlJobStatusChange"
+          />
+          <a-tag>{{ crawlJobTotal }} 个任务</a-tag>
+        </a-space>
       </div>
 
       <a-table
@@ -225,10 +233,11 @@
         size="middle"
         :columns="columns"
         :data-source="jobs"
-        :pagination="{ pageSize: 12 }"
+        :pagination="crawlJobPagination"
         :loading="loading"
         :row-class-name="crawlJobRowClassName"
         :scroll="{ x: 1480 }"
+        @change="handleCrawlJobTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'job'">
@@ -468,6 +477,8 @@ import {
   type AnalysisType,
   type CrawlJobDTO,
   type CrawlJobStatus,
+  type CrawlJobStatusCounts,
+  type CrawlJobStatusFilter,
   type CrawlMonitorDTO,
   type CrawlerChannel
 } from "@review-ai/shared";
@@ -489,6 +500,39 @@ const monitorCreating = ref(false);
 const crawlerEnabled = ref(true);
 const browserExtensionDownloadUrl = "/downloads/review-exporter.zip";
 let timer: ReturnType<typeof setInterval> | null = null;
+
+function emptyCrawlJobStatusCounts(): CrawlJobStatusCounts {
+  return {
+    all: 0,
+    active: 0,
+    queued: 0,
+    running: 0,
+    completed: 0,
+    failed: 0,
+    imported: 0
+  };
+}
+
+function crawlJobStatusCountsFromRows(rows: CrawlJobDTO[]): CrawlJobStatusCounts {
+  const counts = emptyCrawlJobStatusCounts();
+  for (const row of rows) {
+    counts[row.status] += 1;
+    counts.all += 1;
+  }
+  counts.active = counts.queued + counts.running;
+  return counts;
+}
+
+const crawlJobStatusFilter = ref<CrawlJobStatusFilter>("all");
+const crawlJobPage = ref(1);
+const crawlJobPageSize = ref(12);
+const crawlJobTotal = ref(jobs.value.length);
+const crawlJobStatusCounts = ref<CrawlJobStatusCounts>(crawlJobStatusCountsFromRows(jobs.value));
+const crawlJobTotals = ref({
+  fetchedRows: jobs.value.reduce((total, job) => total + job.fetchedRows, 0),
+  importedRows: jobs.value.reduce((total, job) => total + job.importedRows, 0),
+  skippedDuplicate: jobs.value.reduce((total, job) => total + job.skippedDuplicate, 0)
+});
 
 function workspaceCacheKey(kind: string) {
   return `reviewiq:${kind}:${getWorkspaceSlug() || "default"}`;
@@ -579,12 +623,34 @@ const monitorColumns = [
   { title: "操作", key: "actions", width: 220 }
 ];
 
+const crawlJobStatusOptions = computed(() => {
+  const counts = crawlJobStatusCounts.value;
+  return [
+    { label: `全部 ${formatCount(counts.all)}`, value: "all" },
+    { label: `运行中 ${formatCount(counts.active)}`, value: "active" },
+    { label: `排队 ${formatCount(counts.queued)}`, value: "queued" },
+    { label: `抓取中 ${formatCount(counts.running)}`, value: "running" },
+    { label: `已完成 ${formatCount(counts.completed)}`, value: "completed" },
+    { label: `失败 ${formatCount(counts.failed)}`, value: "failed" },
+    { label: `已分析 ${formatCount(counts.imported)}`, value: "imported" }
+  ];
+});
+
+const crawlJobPagination = computed(() => ({
+  current: crawlJobPage.value,
+  pageSize: crawlJobPageSize.value,
+  total: crawlJobTotal.value,
+  showSizeChanger: true,
+  pageSizeOptions: ["12", "24", "50", "100"],
+  showTotal: (total: number) => `共 ${formatCount(total)} 个任务`
+}));
+
 const activeJobs = computed(() => jobs.value.filter((job) => ["queued", "running"].includes(job.status)));
 const stalledJobs = computed(() => activeJobs.value.filter((job) => job.stalled));
-const hasActiveJobs = computed(() => activeJobs.value.length > 0);
-const activeJobCount = computed(() => activeJobs.value.length);
-const failedJobCount = computed(() => jobs.value.filter((job) => job.status === "failed").length);
-const fetchedRowCount = computed(() => jobs.value.reduce((total, job) => total + job.fetchedRows, 0));
+const activeJobCount = computed(() => crawlJobStatusCounts.value.active);
+const hasActiveJobs = computed(() => activeJobCount.value > 0);
+const failedJobCount = computed(() => crawlJobStatusCounts.value.failed);
+const fetchedRowCount = computed(() => crawlJobTotals.value.fetchedRows);
 const enabledMonitorCount = computed(() => monitors.value.filter((monitor) => monitor.enabled).length);
 const failedMonitorCount = computed(() => monitors.value.filter((monitor) => Boolean(monitor.lastError)).length);
 const hasEnabledMonitor = computed(() => monitors.value.some((monitor) => monitor.enabled));
@@ -597,7 +663,7 @@ const latestActivityJob = computed(() => {
 });
 const activeProgressText = computed(() => {
   if (!activeJobs.value.length) {
-    return "暂无运行任务";
+    return activeJobCount.value ? `${activeJobCount.value} 个运行中` : "暂无运行任务";
   }
   const fetched = activeJobs.value.reduce((total, job) => total + job.fetchedRows, 0);
   if (activeJobs.value.some((job) => !job.maxReviews)) {
@@ -607,7 +673,10 @@ const activeProgressText = computed(() => {
   return `${fetched}/${target}`;
 });
 const activeProgressNote = computed(() => {
-  return activeJobs.value.length ? `${activeJobs.value.length} 个任务正在排队或抓取` : "没有排队或抓取任务";
+  if (activeJobs.value.length) {
+    return `${activeJobs.value.length} 个当前页任务正在排队或抓取`;
+  }
+  return activeJobCount.value ? "切到运行中筛选查看详情" : "没有排队或抓取任务";
 });
 const activeFetchRates = computed(() => activeJobs.value.map((job) => job.fetchRatePerMinute).filter((value): value is number => value !== null));
 const currentFetchRateText = computed(() => {
@@ -889,9 +958,36 @@ function hasActiveMonitorJob(monitor: CrawlMonitorDTO) {
 }
 
 async function loadJobs() {
-  const rows = await fetchCrawlJobs(highlightedCrawlJobId.value ? { jobId: highlightedCrawlJobId.value } : undefined);
-  jobs.value = rows;
-  writeWorkspaceCache("crawl-jobs", rows);
+  const result = await fetchCrawlJobs({
+    jobId: highlightedCrawlJobId.value || undefined,
+    status: crawlJobStatusFilter.value,
+    page: crawlJobPage.value,
+    pageSize: crawlJobPageSize.value
+  });
+  if (result.items.length === 0 && result.total > 0 && result.page > 1) {
+    crawlJobPage.value = result.page - 1;
+    await loadJobs();
+    return;
+  }
+  jobs.value = result.items;
+  crawlJobPage.value = result.page;
+  crawlJobPageSize.value = result.pageSize;
+  crawlJobTotal.value = result.total;
+  crawlJobStatusCounts.value = result.statusCounts;
+  crawlJobTotals.value = result.totals;
+  writeWorkspaceCache("crawl-jobs", result.items);
+}
+
+async function handleCrawlJobStatusChange() {
+  crawlJobPage.value = 1;
+  await loadJobs();
+}
+
+async function handleCrawlJobTableChange(pagination: { current?: number; pageSize?: number }) {
+  const nextPageSize = pagination.pageSize || crawlJobPageSize.value;
+  crawlJobPage.value = nextPageSize === crawlJobPageSize.value ? pagination.current || 1 : 1;
+  crawlJobPageSize.value = nextPageSize;
+  await loadJobs();
 }
 
 async function loadMonitors() {
@@ -943,6 +1039,8 @@ async function retryJob(job: CrawlJobDTO) {
   retryingId.value = job.id;
   try {
     await retryCrawlJob(job.id);
+    crawlJobStatusFilter.value = "active";
+    crawlJobPage.value = 1;
     message.success("已重新加入采集队列");
     await loadJobs();
   } finally {
@@ -1096,6 +1194,10 @@ watch(
 watch(
   () => route.query.jobId,
   async () => {
+    if (highlightedCrawlJobId.value) {
+      crawlJobStatusFilter.value = "all";
+      crawlJobPage.value = 1;
+    }
     if (!loading.value) {
       await loadJobs();
     }
@@ -1118,7 +1220,7 @@ async function submitCrawlJob() {
   }
   creating.value = true;
   try {
-    const job = await createCrawlJob({
+    await createCrawlJob({
       name: form.name,
       productName: form.productName,
       sourceChannel: form.sourceChannel,
@@ -1127,8 +1229,8 @@ async function submitCrawlJob() {
       maxReviews: form.maxReviews,
       crawlChannels: ["browser_intercept"]
     });
-    jobs.value = [job, ...jobs.value.filter((item) => item.id !== job.id)];
-    writeWorkspaceCache("crawl-jobs", jobs.value);
+    crawlJobStatusFilter.value = "active";
+    crawlJobPage.value = 1;
     message.success("评论采集已加入队列，完成后会自动导入并启动 AI 分析。");
     showCreateModal.value = false;
     await loadJobs();
@@ -1188,6 +1290,8 @@ async function runMonitorNow(monitor: CrawlMonitorDTO) {
   monitorActionId.value = monitor.id;
   try {
     await runCrawlMonitorNow(monitor.id);
+    crawlJobStatusFilter.value = "active";
+    crawlJobPage.value = 1;
     message.success("已加入采集队列。");
     await refreshPageData();
   } finally {
@@ -1347,6 +1451,15 @@ onUnmounted(() => {
 .schedule-cell span {
   color: #64748b;
   font-size: 12px;
+}
+
+.crawl-job-toolbar {
+  justify-content: flex-end;
+}
+
+.crawl-job-status-filter {
+  max-width: min(100%, 760px);
+  overflow-x: auto;
 }
 
 .crawl-url {

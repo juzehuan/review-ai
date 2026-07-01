@@ -279,6 +279,26 @@ export interface CrawlJobDTO {
   finishedAt: string | null;
 }
 
+export type CrawlJobStatusFilter = CrawlJobStatus | "active" | "all";
+export type CrawlJobStatusCounts = Record<CrawlJobStatus | "active" | "all", number>;
+
+export interface CrawlJobListTotalsDTO {
+  fetchedRows: number;
+  importedRows: number;
+  skippedDuplicate: number;
+}
+
+export interface CrawlJobListResponse {
+  items: CrawlJobDTO[];
+  total: number;
+  page: number;
+  pageSize: number;
+  status: CrawlJobStatusFilter;
+  statusCounts: CrawlJobStatusCounts;
+  totals: CrawlJobListTotalsDTO;
+  updatedAt: string;
+}
+
 export interface CrawlMonitorDTO {
   id: string;
   workspaceId: string;

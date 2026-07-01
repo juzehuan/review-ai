@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@review-ai/db";
+import type { CrawlJobListResponse, CrawlJobStatus, CrawlJobStatusCounts, CrawlJobStatusFilter } from "@review-ai/shared";
 import { getCrawlQueue } from "@/lib/queue";
 import { resolvedCrawlerSettingFromRecord, normalizeRequestedCrawlInput, supportedCrawlUrlError } from "@/lib/crawl-utils";
 import { writeAuditLog } from "@/lib/audit-log";
@@ -6,6 +7,57 @@ import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlJob } from "@/lib/serializers";
 import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+
+const CRAWL_JOB_STATUSES = ["queued", "running", "completed", "failed", "imported"] as const satisfies readonly CrawlJobStatus[];
+const DEFAULT_CRAWL_JOB_PAGE_SIZE = 12;
+const MAX_CRAWL_JOB_PAGE_SIZE = 100;
+
+function parsePositiveInt(value: string | null, fallback: number, max: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.min(Math.max(Math.trunc(parsed), 1), max);
+}
+
+function normalizeCrawlJobStatusFilter(value: string | null): CrawlJobStatusFilter {
+  if (value === "active" || value === "all") {
+    return value;
+  }
+  return CRAWL_JOB_STATUSES.includes(value as CrawlJobStatus) ? (value as CrawlJobStatus) : "all";
+}
+
+function crawlJobStatusWhere(status: CrawlJobStatusFilter): Prisma.CrawlJobWhereInput {
+  if (status === "all") {
+    return {};
+  }
+  if (status === "active") {
+    return { status: { in: ["queued", "running"] } };
+  }
+  return { status };
+}
+
+function emptyCrawlJobStatusCounts(): CrawlJobStatusCounts {
+  return {
+    all: 0,
+    active: 0,
+    queued: 0,
+    running: 0,
+    completed: 0,
+    failed: 0,
+    imported: 0
+  };
+}
+
+function buildCrawlJobStatusCounts(groups: Array<{ status: CrawlJobStatus; _count: { _all: number } }>): CrawlJobStatusCounts {
+  const counts = emptyCrawlJobStatusCounts();
+  for (const group of groups) {
+    counts[group.status] = group._count._all;
+    counts.all += group._count._all;
+  }
+  counts.active = counts.queued + counts.running;
+  return counts;
+}
 
 export async function GET(request: Request) {
   const context = await getWorkspaceContext(request);
@@ -15,25 +67,49 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const targetJobId = searchParams.get("jobId");
+  const status = normalizeCrawlJobStatusFilter(searchParams.get("status"));
+  const page = parsePositiveInt(searchParams.get("page"), 1, 100000);
+  const pageSize = parsePositiveInt(searchParams.get("pageSize"), DEFAULT_CRAWL_JOB_PAGE_SIZE, MAX_CRAWL_JOB_PAGE_SIZE);
   const canViewAllJobs = canAccessAllWorkspaces(context);
-  const where = canViewAllJobs ? {} : { workspaceId: context.workspace.id };
-  const jobs = await prisma.crawlJob.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    include: {
-      workspace: { select: { name: true, slug: true } },
-      task: {
-        select: {
-          analysisRuns: {
-            select: { id: true },
-            orderBy: { createdAt: "desc" },
-            take: 1
+  const baseWhere: Prisma.CrawlJobWhereInput = canViewAllJobs ? {} : { workspaceId: context.workspace.id };
+  const where: Prisma.CrawlJobWhereInput = {
+    ...baseWhere,
+    ...crawlJobStatusWhere(status)
+  };
+  const [jobs, total, statusGroups, totalsAggregate] = await Promise.all([
+    prisma.crawlJob.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        workspace: { select: { name: true, slug: true } },
+        task: {
+          select: {
+            analysisRuns: {
+              select: { id: true },
+              orderBy: { createdAt: "desc" },
+              take: 1
+            }
           }
         }
       }
-    }
-  });
+    }),
+    prisma.crawlJob.count({ where }),
+    prisma.crawlJob.groupBy({
+      by: ["status"],
+      where: baseWhere,
+      _count: { _all: true }
+    }),
+    prisma.crawlJob.aggregate({
+      where: baseWhere,
+      _sum: {
+        fetchedRows: true,
+        importedRows: true,
+        skippedDuplicate: true
+      }
+    })
+  ]);
 
   if (targetJobId && !jobs.some((job) => job.id === targetJobId)) {
     const targetJob = await prisma.crawlJob.findFirst({
@@ -56,7 +132,20 @@ export async function GET(request: Request) {
     }
   }
 
-  return ok(jobs.map(serializeCrawlJob));
+  return ok<CrawlJobListResponse>({
+    items: jobs.map(serializeCrawlJob),
+    total,
+    page,
+    pageSize,
+    status,
+    statusCounts: buildCrawlJobStatusCounts(statusGroups),
+    totals: {
+      fetchedRows: totalsAggregate._sum.fetchedRows || 0,
+      importedRows: totalsAggregate._sum.importedRows || 0,
+      skippedDuplicate: totalsAggregate._sum.skippedDuplicate || 0
+    },
+    updatedAt: new Date().toISOString()
+  });
 }
 
 export async function POST(request: Request) {

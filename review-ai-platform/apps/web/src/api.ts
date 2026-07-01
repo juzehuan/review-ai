@@ -9,6 +9,8 @@ import type {
   AppendImportResponse,
   AuthResponseDTO,
   CrawlJobDTO,
+  CrawlJobListResponse,
+  CrawlJobStatusFilter,
   CrawlMonitorDTO,
   CreateCrawlJobResponse,
   CreateCrawlMonitorResponse,
@@ -337,8 +339,8 @@ export async function createCrawlJob(payload: {
   return data.job;
 }
 
-export async function fetchCrawlJobs(params?: { jobId?: string }) {
-  const { data } = await api.get<CrawlJobDTO[]>("/crawl-jobs", { params });
+export async function fetchCrawlJobs(params?: { jobId?: string; status?: CrawlJobStatusFilter; page?: number; pageSize?: number }) {
+  const { data } = await api.get<CrawlJobListResponse>("/crawl-jobs", { params });
   return data;
 }
 
