@@ -401,6 +401,11 @@ export async function retryCrawlJob(jobId: string) {
   return data;
 }
 
+export async function stopCrawlJob(jobId: string) {
+  const { data } = await api.patch<{ job: CrawlJobDTO }>(`/crawl-jobs/${jobId}`, { action: "cancel" });
+  return data;
+}
+
 export async function deleteCrawlJob(jobId: string) {
   const { data } = await api.delete<{ deleted: boolean }>(`/crawl-jobs/${jobId}`);
   return data;

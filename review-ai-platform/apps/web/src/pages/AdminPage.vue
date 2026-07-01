@@ -249,6 +249,16 @@
                     {{ queueContextActionLabel(record) }}
                   </a-button>
                   <a-button
+                    v-if="canCancelQueueCrawl(record)"
+                    size="small"
+                    type="link"
+                    danger
+                    :loading="queueRetryingId === record.id"
+                    @click="cancelQueueCrawl(record)"
+                  >
+                    停止采集
+                  </a-button>
+                  <a-button
                     v-if="canCancelQueueAnalysis(record)"
                     size="small"
                     type="link"
@@ -487,6 +497,7 @@ import {
   fetchInviteCodes,
   retryCrawlJob,
   resetAdminUserPassword,
+  stopCrawlJob,
   updateAdminUser
 } from "@/api";
 import { useTaskStore } from "@/composables";
@@ -561,6 +572,7 @@ const knownAuditActions = [
   "crawl_job.create",
   "crawl_job.start_analysis",
   "crawl_job.retry",
+  "crawl_job.cancel",
   "crawl_job.delete",
   "crawl_monitor.create",
   "crawl_monitor.update",
@@ -882,6 +894,10 @@ function canRetryQueueCrawl(record: QueueHealthItem) {
   return record.kind === "crawl" && record.status === "failed";
 }
 
+function canCancelQueueCrawl(record: QueueHealthItem) {
+  return record.kind === "crawl" && ["queued", "running"].includes(record.status);
+}
+
 function canRetryQueueAnalysis(record: QueueHealthItem) {
   return record.kind === "analysis" && Boolean(record.taskId) && ["failed", "partial_failed"].includes(record.status);
 }
@@ -912,6 +928,23 @@ async function retryQueueCrawl(record: QueueHealthItem) {
     await loadAuditLogs();
   } catch (error) {
     message.error(readErrorMessage(error, "采集任务重试失败"));
+  } finally {
+    queueRetryingId.value = "";
+  }
+}
+
+async function cancelQueueCrawl(record: QueueHealthItem) {
+  if (!canCancelQueueCrawl(record) || queueRetryingId.value) {
+    return;
+  }
+  queueRetryingId.value = record.id;
+  try {
+    await stopCrawlJob(record.id);
+    message.success("采集任务已停止");
+    await loadQueueHealth();
+    await loadAuditLogs();
+  } catch (error) {
+    message.error(readErrorMessage(error, "停止采集失败"));
   } finally {
     queueRetryingId.value = "";
   }
@@ -1014,6 +1047,7 @@ function actionLabel(action: string) {
       "crawl_job.create": "创建采集任务",
       "crawl_job.start_analysis": "采集启动分析",
       "crawl_job.retry": "重试采集任务",
+      "crawl_job.cancel": "停止采集任务",
       "crawl_job.delete": "删除采集任务",
       "crawl_monitor.create": "创建监听任务",
       "crawl_monitor.update": "更新监听任务",

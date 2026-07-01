@@ -27,6 +27,7 @@ const analysisQueue = new Queue("analysis-runs", { connection });
 const crawlQueue = new Queue("crawl-jobs", { connection });
 const CRAWLER_CHANNELS = new Set<CrawlerChannel>(["api_exporter", "api_basic", "browser_intercept"]);
 const DEFAULT_CRAWLER_CHANNELS: CrawlerChannel[] = ["api_exporter", "api_basic", "browser_intercept"];
+const MANUAL_CRAWL_CANCEL_MESSAGE = "已手动停止采集";
 
 function readPositiveIntEnv(name: string, fallback: number, options: { min?: number; max?: number } = {}) {
   const parsed = Number(process.env[name]);
@@ -2702,6 +2703,16 @@ async function scheduleDueCrawlMonitors() {
   }
 }
 
+async function throwIfCrawlJobManuallyCancelled(crawlJobId: string) {
+  const latest = await prisma.crawlJob.findUnique({
+    where: { id: crawlJobId },
+    select: { status: true, lastError: true }
+  });
+  if (latest?.status === "failed" && latest.lastError === MANUAL_CRAWL_CANCEL_MESSAGE) {
+    throw new Error(MANUAL_CRAWL_CANCEL_MESSAGE);
+  }
+}
+
 const crawlWorker = new Worker(
   "crawl-jobs",
   async (job) => {
@@ -2713,7 +2724,7 @@ const crawlWorker = new Worker(
     if (!crawlJob) {
       throw new Error(`Crawl job ${crawlJobId} not found`);
     }
-    if (crawlJob.status === "completed" || crawlJob.status === "imported") {
+    if (["completed", "imported", "failed"].includes(crawlJob.status)) {
       return { skipped: true };
     }
 
@@ -2735,6 +2746,7 @@ const crawlWorker = new Worker(
       let lastReportedProgress = 10;
       let lastReportedProgressEvent = "";
       const result = await runScraplingCrawler(crawlJob.normalizedUrl, crawlJob.maxReviews, setting, async ({ elapsedSec, timeoutSec, latestEvent }) => {
+        await throwIfCrawlJobManuallyCancelled(crawlJob.id);
         const nextProgress = Math.min(85, 10 + Math.floor((elapsedSec / Math.max(timeoutSec, 1)) * 75));
         const eventKey = latestEvent
           ? JSON.stringify({
@@ -2773,6 +2785,7 @@ const crawlWorker = new Worker(
           data: progressData
         });
       });
+      await throwIfCrawlJobManuallyCancelled(crawlJob.id);
       if (!result.rows.length) {
         const message = buildEmptyCrawlError(result);
         await prisma.crawlJob.update({
