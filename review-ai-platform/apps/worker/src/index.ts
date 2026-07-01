@@ -65,6 +65,10 @@ type CrawlResult = {
   domCommentCount?: number;
   domContentTextCount?: number;
   loadMoreClicks?: number;
+  idleRounds?: number;
+  lastAddedRows?: number;
+  noMoreButtonRounds?: number;
+  lastLoadMoreClicked?: boolean;
   hasMore?: boolean;
   lastRequestStatus?: number;
   endReached?: boolean;
@@ -100,6 +104,10 @@ type CrawlerProgressEvent = {
   domCommentCount?: number;
   domContentTextCount?: number;
   loadMoreClicks?: number;
+  idleRounds?: number;
+  lastAddedRows?: number;
+  noMoreButtonRounds?: number;
+  lastLoadMoreClicked?: boolean;
   hasMore?: boolean;
   lastRequestStatus?: number;
   endReached?: boolean;
@@ -366,6 +374,10 @@ function buildCrawlProgressRawResult(event: CrawlerProgressEvent) {
     domCommentCount: readProgressInt(event.domCommentCount),
     domContentTextCount: readProgressInt(event.domContentTextCount),
     loadMoreClicks: readProgressInt(event.loadMoreClicks),
+    idleRounds: readProgressInt(event.idleRounds),
+    lastAddedRows: readProgressInt(event.lastAddedRows),
+    noMoreButtonRounds: readProgressInt(event.noMoreButtonRounds),
+    lastLoadMoreClicked: readProgressBoolean(event.lastLoadMoreClicked),
     hasMore: readProgressBoolean(event.hasMore),
     lastRequestStatus: readProgressInt(event.lastRequestStatus),
     endReached: readProgressBoolean(event.endReached),
@@ -2857,6 +2869,10 @@ const crawlWorker = new Worker(
               domCommentCount: latestEvent.domCommentCount,
               domContentTextCount: latestEvent.domContentTextCount,
               loadMoreClicks: latestEvent.loadMoreClicks,
+              idleRounds: latestEvent.idleRounds,
+              lastAddedRows: latestEvent.lastAddedRows,
+              noMoreButtonRounds: latestEvent.noMoreButtonRounds,
+              lastLoadMoreClicked: latestEvent.lastLoadMoreClicked,
               hasMore: latestEvent.hasMore,
               lastRequestStatus: latestEvent.lastRequestStatus,
               cursor: latestEvent.cursor,

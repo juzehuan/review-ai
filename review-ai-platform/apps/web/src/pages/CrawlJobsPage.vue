@@ -1021,6 +1021,18 @@ function crawlTelemetryStats(job: CrawlJobDTO): CrawlTelemetryStat[] {
   if (job.loadMoreClicks !== null) {
     stats.push({ label: "加载更多", value: formatCount(job.loadMoreClicks) });
   }
+  if (job.lastLoadMoreClicked !== null) {
+    stats.push({ label: "本轮按钮", value: job.lastLoadMoreClicked ? "点到" : "未点到", warning: job.lastLoadMoreClicked === false });
+  }
+  if (job.idleRounds !== null) {
+    stats.push({ label: "空转轮次", value: formatCount(job.idleRounds), warning: job.idleRounds >= 3 });
+  }
+  if (job.lastAddedRows !== null) {
+    stats.push({ label: "本轮新增", value: formatCount(job.lastAddedRows), warning: job.lastAddedRows === 0 && ["queued", "running"].includes(job.status) });
+  }
+  if (job.noMoreButtonRounds !== null) {
+    stats.push({ label: "未见更多", value: formatCount(job.noMoreButtonRounds), warning: job.noMoreButtonRounds >= 3 });
+  }
   if (job.cursor) {
     stats.push({ label: "游标", value: shortCursor(job.cursor) });
   }
@@ -1051,6 +1063,12 @@ function crawlTelemetryHint(job: CrawlJobDTO) {
   }
   if ((job.loadMoreClicks || 0) > 0 && (job.domCommentCount || 0) === 0 && job.payloadComments === null) {
     return "页面有加载动作但没有识别到评论，建议检查登录态、排序和评论区权限。";
+  }
+  if ((job.idleRounds || 0) >= 3 && (job.lastAddedRows || 0) === 0 && job.lastLoadMoreClicked === false) {
+    return "连续多轮没有新增且未点到更多评论，可能已到页尾或按钮文案未匹配。";
+  }
+  if ((job.idleRounds || 0) >= 3 && (job.lastAddedRows || 0) === 0) {
+    return "连续多轮没有新增评论，建议确认是否已加载到底或触发平台风控。";
   }
   if (["queued", "running"].includes(job.status) && !job.progressEventAt && crawlTelemetryStats(job).length === 0) {
     return "采集过程指标暂少，继续等待下一次进度回传。";

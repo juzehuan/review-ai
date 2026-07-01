@@ -334,6 +334,10 @@ export interface CrawlJobDTO {
   domCommentCount: number | null;
   domContentTextCount: number | null;
   loadMoreClicks: number | null;
+  idleRounds: number | null;
+  lastAddedRows: number | null;
+  noMoreButtonRounds: number | null;
+  lastLoadMoreClicked: boolean | null;
   cursor: string | null;
   hasMore: boolean | null;
   lastRequestStatus: number | null;

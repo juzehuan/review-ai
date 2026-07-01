@@ -85,6 +85,10 @@ def emit_crawl_progress(
                 "domCommentCount": state.get("dom_comment_count"),
                 "domContentTextCount": state.get("dom_content_text_count"),
                 "loadMoreClicks": state.get("load_more_clicks"),
+                "idleRounds": state.get("idle_rounds"),
+                "lastAddedRows": state.get("last_added_rows"),
+                "noMoreButtonRounds": state.get("no_more_button_rounds"),
+                "lastLoadMoreClicked": state.get("last_load_more_clicked"),
                 "hasMore": state.get("has_more"),
                 "lastRequestStatus": state.get("last_request_status"),
                 "endReached": state.get("end_reached"),
@@ -1872,6 +1876,10 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         "dom_comment_count": 0,
         "total_comments": None,
         "load_more_clicks": 0,
+        "idle_rounds": 0,
+        "last_added_rows": 0,
+        "no_more_button_rounds": 0,
+        "last_load_more_clicked": None,
         "end_reached": False,
         "comment_sort_attempted": False,
         "comment_sort_switched": False,
@@ -2110,6 +2118,11 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
 
         while not limit_reached() and time.time() < deadline:
             clicked = click_more_comments()
+            state["last_load_more_clicked"] = clicked
+            if clicked:
+                state["no_more_button_rounds"] = 0
+            else:
+                state["no_more_button_rounds"] = int(state.get("no_more_button_rounds") or 0) + 1
             try:
                 scroll_comments()
                 page.wait_for_timeout(1800 if clicked else 1400)
@@ -2161,10 +2174,12 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
 
             current_count = len(comments_by_id)
             current_requests = int(state.get("next_requests") or 0)
+            state["last_added_rows"] = max(0, current_count - last_count)
             if current_count == last_count and current_requests == last_requests:
                 idle_rounds += 1
             else:
                 idle_rounds = 0
+            state["idle_rounds"] = idle_rounds
             last_count = current_count
             last_requests = current_requests
             emit_crawl_progress("Facebook", "facebook_post", comments_by_id, state, max_reviews, deadline)
@@ -2212,6 +2227,10 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         "domCommentCount": state.get("dom_comment_count"),
         "totalComments": state.get("total_comments"),
         "loadMoreClicks": state.get("load_more_clicks"),
+        "idleRounds": state.get("idle_rounds"),
+        "lastAddedRows": state.get("last_added_rows"),
+        "noMoreButtonRounds": state.get("no_more_button_rounds"),
+        "lastLoadMoreClicked": state.get("last_load_more_clicked"),
         "lastRequestStatus": state.get("last_request_status"),
         "endReached": state.get("end_reached"),
         "stopReason": stop_reason,
