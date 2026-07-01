@@ -158,6 +158,10 @@ export interface QueueFailureDTO {
   modelName: string | null;
   error: string | null;
   failedAt: string;
+  recoveryStatus: string | null;
+  recoveryId: string | null;
+  recoveryLabel: string | null;
+  recoveryAt: string | null;
 }
 
 export interface QueueStalledDTO {

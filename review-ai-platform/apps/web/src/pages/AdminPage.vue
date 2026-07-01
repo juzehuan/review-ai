@@ -216,6 +216,11 @@
               <template v-else-if="column.key === 'target'">
                 <div>{{ record.label }}</div>
                 <div class="member-email">{{ record.taskName || record.taskId || record.id }}</div>
+                <a-tooltip v-if="record.recoveryStatus" :title="record.recoveryLabel || record.recoveryId || '-'">
+                  <a-tag class="queue-recovery-tag" :color="recoveryStatusColor(record.recoveryStatus)">
+                    {{ recoveryStatusLabel(record.recoveryStatus) }}
+                  </a-tag>
+                </a-tooltip>
               </template>
               <template v-else-if="column.key === 'workspace'">
                 <div>{{ record.workspaceName || record.workspaceSlug || record.workspaceId || "-" }}</div>
@@ -891,7 +896,7 @@ function canOpenQueueContext(record: QueueHealthItem) {
 }
 
 function canRetryQueueCrawl(record: QueueHealthItem) {
-  return record.kind === "crawl" && record.status === "failed";
+  return record.kind === "crawl" && record.status === "failed" && !hasFailureRecovery(record);
 }
 
 function canCancelQueueCrawl(record: QueueHealthItem) {
@@ -899,7 +904,7 @@ function canCancelQueueCrawl(record: QueueHealthItem) {
 }
 
 function canRetryQueueAnalysis(record: QueueHealthItem) {
-  return record.kind === "analysis" && Boolean(record.taskId) && ["failed", "partial_failed"].includes(record.status);
+  return record.kind === "analysis" && Boolean(record.taskId) && ["failed", "partial_failed"].includes(record.status) && !hasFailureRecovery(record);
 }
 
 function canCancelQueueAnalysis(record: QueueHealthItem) {
@@ -914,6 +919,32 @@ function openQueueContext(record: QueueHealthItem) {
   if (record.taskId) {
     router.push({ path: `/tasks/${record.taskId}/runs`, query: { runId: record.id } });
   }
+}
+
+function hasFailureRecovery(record: QueueHealthItem) {
+  return "recoveryStatus" in record && Boolean(record.recoveryStatus);
+}
+
+function recoveryStatusLabel(status?: string | null) {
+  return (
+    {
+      queued: "已重新排队",
+      running: "处理中",
+      completed: "已完成",
+      imported: "已导入",
+      analyzing: "分析中"
+    }[String(status || "")] || "已恢复"
+  );
+}
+
+function recoveryStatusColor(status?: string | null) {
+  if (status === "completed" || status === "imported") {
+    return "green";
+  }
+  if (status === "running" || status === "analyzing") {
+    return "blue";
+  }
+  return "purple";
 }
 
 async function retryQueueCrawl(record: QueueHealthItem) {
@@ -1263,6 +1294,10 @@ onUnmounted(stopQueueHealthPolling);
 
 .audit-limit-input {
   width: 100%;
+}
+
+.queue-recovery-tag {
+  margin-top: 6px;
 }
 
 .stalled-diagnosis-cell {

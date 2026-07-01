@@ -434,6 +434,24 @@ async function readStalledItems(limit = 12): Promise<QueueStalledDTO[]> {
   return [...crawlItems, ...analysisItems].sort((a, b) => b.ageSeconds - a.ageSeconds).slice(0, limit);
 }
 
+type FailureRecovery = Pick<QueueFailureDTO, "recoveryStatus" | "recoveryId" | "recoveryLabel" | "recoveryAt">;
+
+const NO_FAILURE_RECOVERY: FailureRecovery = {
+  recoveryStatus: null,
+  recoveryId: null,
+  recoveryLabel: null,
+  recoveryAt: null
+};
+
+function buildFailureRecovery(input: { id: string; status: string; label: string; at: Date | null }): FailureRecovery {
+  return {
+    recoveryStatus: input.status,
+    recoveryId: input.id,
+    recoveryLabel: input.label,
+    recoveryAt: input.at?.toISOString() || null
+  };
+}
+
 async function readRecentFailures(limit = 12): Promise<QueueFailureDTO[]> {
   const [crawlFailures, analysisFailures] = await Promise.all([
     prisma.crawlJob.findMany({
@@ -464,6 +482,61 @@ async function readRecentFailures(limit = 12): Promise<QueueFailureDTO[]> {
     })
   ]);
 
+  const crawlRecoveries = await Promise.all(
+    crawlFailures.map(async (job) => {
+      const recovered = await prisma.crawlJob.findFirst({
+        where: {
+          id: { not: job.id },
+          workspaceId: job.workspaceId,
+          status: { not: "failed" },
+          createdAt: { gt: job.createdAt },
+          ...(job.monitorId ? { monitorId: job.monitorId } : { normalizedUrl: job.normalizedUrl })
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, status: true, name: true, productName: true, normalizedUrl: true, updatedAt: true, finishedAt: true }
+      });
+      return [
+        job.id,
+        recovered
+          ? buildFailureRecovery({
+              id: recovered.id,
+              status: recovered.status,
+              label: recovered.name || recovered.productName || recovered.normalizedUrl,
+              at: recovered.finishedAt || recovered.updatedAt
+            })
+          : NO_FAILURE_RECOVERY
+      ] as const;
+    })
+  );
+
+  const analysisRecoveries = await Promise.all(
+    analysisFailures.map(async (run) => {
+      const recovered = await prisma.analysisRun.findFirst({
+        where: {
+          id: { not: run.id },
+          taskId: run.taskId,
+          status: { notIn: ["failed", "partial_failed"] },
+          createdAt: { gt: run.createdAt }
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, status: true, createdAt: true, finishedAt: true, task: { select: { name: true, productName: true } } }
+      });
+      return [
+        run.id,
+        recovered
+          ? buildFailureRecovery({
+              id: recovered.id,
+              status: recovered.status,
+              label: recovered.task.name || recovered.task.productName || recovered.id,
+              at: recovered.finishedAt || recovered.createdAt
+            })
+          : NO_FAILURE_RECOVERY
+      ] as const;
+    })
+  );
+
+  const recoveryById = new Map<string, FailureRecovery>([...crawlRecoveries, ...analysisRecoveries]);
+
   return [
     ...crawlFailures.map((job) => ({
       id: job.id,
@@ -478,7 +551,8 @@ async function readRecentFailures(limit = 12): Promise<QueueFailureDTO[]> {
       sourceChannel: job.sourceChannel || job.platform || null,
       modelName: null,
       error: job.lastError,
-      failedAt: (job.finishedAt || job.updatedAt).toISOString()
+      failedAt: (job.finishedAt || job.updatedAt).toISOString(),
+      ...(recoveryById.get(job.id) || NO_FAILURE_RECOVERY)
     })),
     ...analysisFailures.map((run) => ({
       id: run.id,
@@ -493,7 +567,8 @@ async function readRecentFailures(limit = 12): Promise<QueueFailureDTO[]> {
       sourceChannel: run.task?.sourceChannel || null,
       modelName: run.modelName,
       error: run.lastError,
-      failedAt: (run.finishedAt || run.createdAt).toISOString()
+      failedAt: (run.finishedAt || run.createdAt).toISOString(),
+      ...(recoveryById.get(run.id) || NO_FAILURE_RECOVERY)
     }))
   ]
     .sort((a, b) => new Date(b.failedAt).getTime() - new Date(a.failedAt).getTime())
