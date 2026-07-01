@@ -1,5 +1,6 @@
 import { prisma } from "@review-ai/db";
 import type { PromptEvalDTO } from "@review-ai/shared";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { getPlatformAiSetting } from "@/lib/platform-settings";
 import { getWorkspaceContext } from "@/lib/workspace";
@@ -78,6 +79,25 @@ export async function POST(request: Request) {
     sampleCount,
     recommendations: recommendations.length ? recommendations : ["当前提示词结构较完整，建议每周抽样 20 条评论做人工验收。"]
   };
+
+  await writeAuditLog(request, {
+    workspaceId: workspaceContext.workspace.id,
+    actor: workspaceContext.user,
+    action: "prompt_eval.run",
+    targetType: "prompt_eval",
+    targetId: setting?.id || null,
+    targetLabel: setting?.promptVersion || setting?.modelName || "prompt-eval",
+    metadata: {
+      provider: dto.provider,
+      modelName: dto.modelName,
+      promptVersion: dto.promptVersion,
+      score: dto.score,
+      passedChecks: passed,
+      totalChecks: checks.length,
+      sampleCount: dto.sampleCount,
+      recommendationCount: dto.recommendations.length
+    }
+  });
 
   return ok(dto);
 }

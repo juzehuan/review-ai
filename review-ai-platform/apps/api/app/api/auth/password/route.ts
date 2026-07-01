@@ -1,5 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { hashPassword, requireAuthenticated, verifyPassword } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 
 export async function PATCH(request: Request) {
@@ -34,6 +35,20 @@ export async function PATCH(request: Request) {
       where: { userId: auth.user.id },
     }),
   ]);
+
+  await writeAuditLog(request, {
+    workspaceId: null,
+    actor: auth.user,
+    action: "auth.password.change",
+    targetType: "user",
+    targetId: auth.user.id,
+    targetLabel: auth.user.email || auth.user.name,
+    metadata: {
+      userId: auth.user.id,
+      email: auth.user.email,
+      isSuperAdmin: auth.user.isSuperAdmin
+    }
+  });
 
   return ok({ success: true });
 }
