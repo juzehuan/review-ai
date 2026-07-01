@@ -697,6 +697,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "应用": "Apply",
     "原始评论": "Original comment",
     "评论时间": "Comment time",
+    "浏览": "Views",
     "情绪": "Sentiment",
     "意图": "Intent",
     "主题": "Topic",
@@ -705,6 +706,9 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "痛点": "Pain points",
     "亮点": "Highlights",
     "报告": "Report",
+    "报告不可访问": "Report unavailable",
+    "正在加载报告": "Loading report",
+    "打印/PDF": "Print/PDF",
     "产品洞察报告": "Product insight report",
     "视频内容反馈报告": "Video feedback report",
     "社媒舆情报告": "Social sentiment report",
@@ -712,6 +716,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "推文舆情报告": "Post sentiment report",
     "实时报告": "Live report",
     "固定快照": "Snapshot",
+    "分享链接不存在、已撤销或已过期。": "The share link does not exist, has been revoked, or has expired.",
     "分享分析报告": "Share analysis report",
     "还没有分享链接": "No share link yet",
     "分享链接已生成并复制。": "Share link generated and copied.",
@@ -738,6 +743,17 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "洞察": "Insights",
     "执行摘要": "Executive summary",
     "核心指标": "Core metrics",
+    "评论总量": "Total comments",
+    "进入本次报告的样本量": "Samples included in this report",
+    "用户认可和可放大的反馈": "Approved feedback that can be amplified",
+    "有效评论": "Valuable comments",
+    "语言画像": "Language profile",
+    "低价值评论": "Low-value comments",
+    "已降权": "downweighted",
+    "非中文/混合评论，主语言": "Non-Chinese / mixed comments, primary language",
+    "为主": "dominant",
+    "条证据": "evidence items",
+    "条样本": "samples",
     "情感分布": "Sentiment distribution",
     "整体情感分布": "Overall sentiment distribution",
     "评论意图分布": "Comment intent distribution",
@@ -745,8 +761,15 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "评论语言分布": "Comment language distribution",
     "高频问题": "Frequent issues",
     "用户问题统计": "User issue statistics",
+    "高频问题统计": "Frequent issue statistics",
     "动态内容标签": "Dynamic content tags",
     "分析质量提醒": "Analysis quality alerts",
+    "重复/相似评论聚合": "Duplicate / similar comment clusters",
+    "重复评论占比": "Duplicate comment share",
+    "重复评论簇": "Duplicate comment clusters",
+    "最大重复簇占比": "Largest duplicate cluster share",
+    "观点聚类与证据评论": "Opinion clusters and evidence comments",
+    "主要问题证据": "Main issue evidence",
     "代表性评论": "Representative comments",
     "正向代表评论": "Positive representative comments",
     "负向代表评论": "Negative representative comments",
@@ -787,6 +810,9 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "传播理由": "Spread reasons",
     "传播优势": "Spread strengths",
     "内容优势": "Content strengths",
+    "核心理由": "Core reasons",
+    "优势信号": "Advantage signals",
+    "改进机会": "Improvement opportunities",
     "产品优势": "Product strengths",
     "销售卖点": "Sales points",
     "待改进点": "Improvements",
@@ -827,6 +853,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "需要运营跟进的低分反馈": "Low-score feedback needing operations follow-up",
     "需要澄清或复盘的观众反馈": "Audience feedback needing clarification or review",
     "需要回应或降风险的讨论": "Discussions needing response or risk reduction",
+    "需要优先跟进的问题信号": "Issue signals needing priority follow-up",
     "查看高频词评论": "View high-frequency term comments",
     "查看主要意图": "View main intents",
     "查看动态标签": "View dynamic tags",
@@ -1536,6 +1563,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "应用": "ใช้",
     "原始评论": "คอมเมนต์ต้นฉบับ",
     "评论时间": "เวลาคอมเมนต์",
+    "浏览": "ยอดดู",
     "情绪": "อารมณ์",
     "意图": "เจตนา",
     "主题": "หัวข้อ",
@@ -1544,6 +1572,9 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "痛点": "Pain points",
     "亮点": "Highlights",
     "报告": "รายงาน",
+    "报告不可访问": "ไม่สามารถเข้าถึงรายงานได้",
+    "正在加载报告": "กำลังโหลดรายงาน",
+    "打印/PDF": "พิมพ์/PDF",
     "产品洞察报告": "รายงานอินไซต์สินค้า",
     "视频内容反馈报告": "รายงานฟีดแบ็กวิดีโอ",
     "社媒舆情报告": "รายงานกระแสโซเชียล",
@@ -1551,6 +1582,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "推文舆情报告": "รายงานกระแสโพสต์",
     "实时报告": "รายงานเรียลไทม์",
     "固定快照": "snapshot คงที่",
+    "分享链接不存在、已撤销或已过期。": "ลิงก์แชร์ไม่มีอยู่ ถูกยกเลิก หรือหมดอายุแล้ว",
     "分享分析报告": "แชร์รายงานวิเคราะห์",
     "还没有分享链接": "ยังไม่มีลิงก์แชร์",
     "分享链接已生成并复制。": "สร้างและคัดลอกลิงก์แชร์แล้ว",
@@ -1577,6 +1609,17 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "洞察": "อินไซต์",
     "执行摘要": "สรุปผู้บริหาร",
     "核心指标": "ตัวชี้วัดหลัก",
+    "评论总量": "จำนวนคอมเมนต์ทั้งหมด",
+    "进入本次报告的样本量": "จำนวนตัวอย่างในรายงานนี้",
+    "用户认可和可放大的反馈": "ฟีดแบ็กที่ผู้ใช้ยอมรับและขยายผลได้",
+    "有效评论": "คอมเมนต์ที่มีคุณค่า",
+    "语言画像": "โปรไฟล์ภาษา",
+    "低价值评论": "คอมเมนต์มูลค่าต่ำ",
+    "已降权": "ลดน้ำหนักแล้ว",
+    "非中文/混合评论，主语言": "คอมเมนต์ไม่ใช่จีน/ผสม ภาษาหลัก",
+    "为主": "เป็นหลัก",
+    "条证据": "หลักฐาน",
+    "条样本": "ตัวอย่าง",
     "情感分布": "การกระจายความรู้สึก",
     "整体情感分布": "การกระจายความรู้สึกโดยรวม",
     "评论意图分布": "การกระจายเจตนาคอมเมนต์",
@@ -1584,8 +1627,15 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "评论语言分布": "การกระจายภาษาคอมเมนต์",
     "高频问题": "ปัญหาความถี่สูง",
     "用户问题统计": "สถิติปัญหาผู้ใช้",
+    "高频问题统计": "สถิติปัญหาที่พบบ่อย",
     "动态内容标签": "แท็กเนื้อหาแบบไดนามิก",
     "分析质量提醒": "แจ้งเตือนคุณภาพการวิเคราะห์",
+    "重复/相似评论聚合": "การรวมคอมเมนต์ซ้ำ/คล้ายกัน",
+    "重复评论占比": "สัดส่วนคอมเมนต์ซ้ำ",
+    "重复评论簇": "กลุ่มคอมเมนต์ซ้ำ",
+    "最大重复簇占比": "สัดส่วนกลุ่มซ้ำที่ใหญ่ที่สุด",
+    "观点聚类与证据评论": "กลุ่มความคิดเห็นและคอมเมนต์หลักฐาน",
+    "主要问题证据": "หลักฐานประเด็นหลัก",
     "代表性评论": "คอมเมนต์ตัวแทน",
     "正向代表评论": "คอมเมนต์ตัวแทนเชิงบวก",
     "负向代表评论": "คอมเมนต์ตัวแทนเชิงลบ",
@@ -1626,6 +1676,9 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "传播理由": "เหตุผลในการกระจาย",
     "传播优势": "ข้อได้เปรียบในการกระจาย",
     "内容优势": "จุดแข็งของเนื้อหา",
+    "核心理由": "เหตุผลหลัก",
+    "优势信号": "สัญญาณจุดแข็ง",
+    "改进机会": "โอกาสปรับปรุง",
     "产品优势": "จุดแข็งของสินค้า",
     "销售卖点": "จุดขาย",
     "待改进点": "จุดที่ควรปรับปรุง",
@@ -1666,6 +1719,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "需要运营跟进的低分反馈": "ฟีดแบ็กคะแนนต่ำที่ทีมปฏิบัติการควรติดตาม",
     "需要澄清或复盘的观众反馈": "ฟีดแบ็กผู้ชมที่ควรชี้แจงหรือทบทวน",
     "需要回应或降风险的讨论": "การสนทนาที่ควรตอบกลับหรือลดความเสี่ยง",
+    "需要优先跟进的问题信号": "สัญญาณปัญหาที่ควรติดตามก่อน",
     "查看高频词评论": "ดูคอมเมนต์คำถี่สูง",
     "查看主要意图": "ดูเจตนาหลัก",
     "查看动态标签": "ดูแท็กไดนามิก",
@@ -1756,6 +1810,14 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const commentCount = value.match(/^(\d+)\s*条评论$/);
   if (commentCount) {
     return locale === "en-US" ? `${commentCount[1]} comments` : `${commentCount[1]} คอมเมนต์`;
+  }
+  const headerComments = value.match(/^评论\s+([\d,]+)$/);
+  if (headerComments) {
+    return locale === "en-US" ? `Comments: ${headerComments[1]}` : `คอมเมนต์ ${headerComments[1]}`;
+  }
+  const headerViews = value.match(/^浏览\s+([\d,]+)$/);
+  if (headerViews) {
+    return locale === "en-US" ? `Views: ${headerViews[1]}` : `ยอดดู ${headerViews[1]}`;
   }
   const alertCount = value.match(/^(\d+)\s*条$/);
   if (alertCount) {
@@ -1969,6 +2031,36 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const related = value.match(/^关联\s+(\d+)\s+条评论$/);
   if (related) {
     return locale === "en-US" ? `${related[1]} related comments` : `เกี่ยวข้อง ${related[1]} คอมเมนต์`;
+  }
+  const countPercent = value.match(/^([\d,]+)\s+条\s+·\s+([\d.]+)%$/);
+  if (countPercent) {
+    return locale === "en-US" ? `${countPercent[1]} items · ${countPercent[2]}%` : `${countPercent[1]} รายการ · ${countPercent[2]}%`;
+  }
+  const lowValueDemoted = value.match(/^低价值评论\s+([\d.]+)%\s+已降权$/);
+  if (lowValueDemoted) {
+    return locale === "en-US"
+      ? `Low-value comments ${lowValueDemoted[1]}% downweighted`
+      : `ลดน้ำหนักคอมเมนต์มูลค่าต่ำ ${lowValueDemoted[1]}%`;
+  }
+  const languageProfile = value.match(/^非中文\/混合评论，主语言\s+(.+)$/);
+  if (languageProfile) {
+    return locale === "en-US"
+      ? `Non-Chinese / mixed comments, primary language ${languageProfile[1]}`
+      : `คอมเมนต์ไม่ใช่จีน/ผสม ภาษาหลัก ${languageProfile[1]}`;
+  }
+  const dominantEvidence = value.match(/^(正向|中性|负向)为主\s+·\s+([\d,]+)\s+条证据$/);
+  if (dominantEvidence) {
+    const sentiment = staticText[locale][dominantEvidence[1]] || dominantEvidence[1];
+    return locale === "en-US"
+      ? `Mostly ${sentiment} · ${dominantEvidence[2]} evidence items`
+      : `ส่วนใหญ่${sentiment} · หลักฐาน ${dominantEvidence[2]} รายการ`;
+  }
+  const commentClusterMeta = value.match(/^([\d,]+)\s+条评论\s+·\s+([\d.]+)%\s+·\s+(.+)$/);
+  if (commentClusterMeta) {
+    const sentiment = staticText[locale][commentClusterMeta[3]] || commentClusterMeta[3];
+    return locale === "en-US"
+      ? `${commentClusterMeta[1]} comments · ${commentClusterMeta[2]}% · ${sentiment}`
+      : `${commentClusterMeta[1]} คอมเมนต์ · ${commentClusterMeta[2]}% · ${sentiment}`;
   }
   const updatedTo = value.match(/^已更新为(.+)。$/);
   if (updatedTo) {
