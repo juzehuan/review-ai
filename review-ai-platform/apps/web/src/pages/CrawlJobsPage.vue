@@ -406,6 +406,13 @@
         <a-form-item label="评论链接">
           <a-input v-model:value="monitorForm.productUrl" placeholder="支持 Shopee 商品、YouTube 视频、TikTok 视频、Facebook 帖子/图片/Reel 链接" />
         </a-form-item>
+        <a-alert
+          class="platform-guide-alert"
+          type="info"
+          show-icon
+          :message="crawlPlatformGuideMessage(monitorForm)"
+          :description="crawlPlatformGuideDescription(monitorForm)"
+        />
         <div class="monitor-form-grid">
           <a-form-item label="来源渠道">
             <a-select v-model:value="monitorForm.sourceChannel" :options="sourceChannelOptions" />
@@ -452,6 +459,13 @@
         <a-form-item label="评论链接">
           <a-input v-model:value="form.productUrl" placeholder="支持 Shopee 商品、YouTube 视频、TikTok 视频、Facebook 帖子/图片/Reel 链接" />
         </a-form-item>
+        <a-alert
+          class="platform-guide-alert"
+          type="info"
+          show-icon
+          :message="crawlPlatformGuideMessage(form)"
+          :description="crawlPlatformGuideDescription(form)"
+        />
         <div class="monitor-form-grid">
           <a-form-item label="来源渠道">
             <a-select v-model:value="form.sourceChannel" :options="sourceChannelOptions" />
@@ -511,6 +525,7 @@ import {
   type CrawlJobStatusCounts,
   type CrawlJobStatusFilter,
   type CrawlMonitorDTO,
+  type CrawlSourceChannel,
   type CrawlerChannel
 } from "@review-ai/shared";
 
@@ -630,6 +645,42 @@ const intervalOptions = [
   { label: "每 12 小时", value: 720 },
   { label: "每天", value: 1440 }
 ];
+
+type CrawlEntryForm = {
+  sourceChannel: string;
+  productUrl: string;
+  analysisType: AnalysisType;
+  maxReviews: number;
+};
+
+type CrawlPlatformGuide = {
+  titleKey: string;
+  descriptionKey: string;
+  recommendedMaxReviews: number;
+};
+
+const crawlPlatformGuides: Record<CrawlSourceChannel, CrawlPlatformGuide> = {
+  Shopee: {
+    titleKey: "crawl.platformGuide.shopeeTitle",
+    descriptionKey: "crawl.platformGuide.shopeeDescription",
+    recommendedMaxReviews: 200
+  },
+  YouTube: {
+    titleKey: "crawl.platformGuide.youtubeTitle",
+    descriptionKey: "crawl.platformGuide.youtubeDescription",
+    recommendedMaxReviews: 0
+  },
+  "TikTok Video": {
+    titleKey: "crawl.platformGuide.tiktokTitle",
+    descriptionKey: "crawl.platformGuide.tiktokDescription",
+    recommendedMaxReviews: 0
+  },
+  Facebook: {
+    titleKey: "crawl.platformGuide.facebookTitle",
+    descriptionKey: "crawl.platformGuide.facebookDescription",
+    recommendedMaxReviews: 0
+  }
+};
 
 const currentMonitorAnalysisTypeDescription = computed(() => {
   return ANALYSIS_TYPE_PRESETS.find((item) => item.value === monitorForm.analysisType)?.description || "";
@@ -847,6 +898,10 @@ function normalizeSourceChannel(value?: string | null) {
   return normalizeCrawlSourceChannel(value, "YouTube");
 }
 
+function resolvedCrawlSourceChannel(target: Pick<CrawlEntryForm, "sourceChannel" | "productUrl">): CrawlSourceChannel {
+  return normalizeSourceChannel(inferSourceChannelFromUrl(target.productUrl) || target.sourceChannel);
+}
+
 function inferSourceChannelFromUrl(value?: string | null) {
   const text = String(value || "").trim().toLowerCase();
   if (text.includes("youtube.com") || text.includes("youtu.be")) {
@@ -878,6 +933,39 @@ function defaultContentName(sourceChannel: string) {
     return "Shopee 商品评论";
   }
   return "评论采集";
+}
+
+function recommendedMaxReviews(sourceChannel: CrawlSourceChannel) {
+  return crawlPlatformGuides[sourceChannel].recommendedMaxReviews;
+}
+
+function recommendedMaxReviewsText(sourceChannel: CrawlSourceChannel) {
+  const value = recommendedMaxReviews(sourceChannel);
+  return value > 0 ? String(value) : t("common.unlimited");
+}
+
+function crawlPlatformGuideMessage(target: CrawlEntryForm) {
+  const sourceChannel = resolvedCrawlSourceChannel(target);
+  const recommendedType = inferAnalysisType(sourceChannel, target.productUrl);
+  return t("crawl.platformGuide.message", {
+    platform: t(crawlPlatformGuides[sourceChannel].titleKey),
+    type: analysisTypeI18nLabel(recommendedType),
+    max: recommendedMaxReviewsText(sourceChannel)
+  });
+}
+
+function crawlPlatformGuideDescription(target: CrawlEntryForm) {
+  return t(crawlPlatformGuides[resolvedCrawlSourceChannel(target)].descriptionKey);
+}
+
+function shouldApplyRecommendedMaxReviews(currentMaxReviews: number) {
+  return currentMaxReviews === 0 || currentMaxReviews === 200;
+}
+
+function applySourceDefaults(target: CrawlEntryForm, sourceChannel: CrawlSourceChannel) {
+  if (shouldApplyRecommendedMaxReviews(target.maxReviews)) {
+    target.maxReviews = recommendedMaxReviews(sourceChannel);
+  }
 }
 
 function formatTime(value?: string | null) {
@@ -1383,9 +1471,7 @@ function applyUrlInference(target: typeof form | typeof monitorForm, productUrl?
   }
   target.sourceChannel = sourceChannel;
   target.analysisType = inferAnalysisType(sourceChannel, productUrl);
-  if (sourceChannel === "TikTok Video" || sourceChannel === "Facebook") {
-    target.maxReviews = 0;
-  }
+  applySourceDefaults(target, sourceChannel);
   if (!target.productName.trim()) {
     target.productName = defaultContentName(sourceChannel);
   }
@@ -1394,14 +1480,16 @@ function applyUrlInference(target: typeof form | typeof monitorForm, productUrl?
 watch(
   () => form.sourceChannel,
   (sourceChannel) => {
-    form.analysisType = inferAnalysisType(sourceChannel, form.productUrl);
+    const normalizedSourceChannel = normalizeSourceChannel(sourceChannel);
+    form.analysisType = inferAnalysisType(normalizedSourceChannel, form.productUrl);
   }
 );
 
 watch(
   () => monitorForm.sourceChannel,
   (sourceChannel) => {
-    monitorForm.analysisType = inferAnalysisType(sourceChannel, monitorForm.productUrl);
+    const normalizedSourceChannel = normalizeSourceChannel(sourceChannel);
+    monitorForm.analysisType = inferAnalysisType(normalizedSourceChannel, monitorForm.productUrl);
   }
 );
 
@@ -1643,6 +1731,10 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.platform-guide-alert {
+  margin-bottom: 16px;
 }
 
 .schedule-cell,
