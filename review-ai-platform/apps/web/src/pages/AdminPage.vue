@@ -241,6 +241,15 @@
                     {{ queueContextActionLabel(record) }}
                   </a-button>
                   <a-button
+                    v-if="canRepairQueueIntegrity(record)"
+                    size="small"
+                    type="link"
+                    :loading="queueRetryingId === record.id"
+                    @click="repairQueueIntegrity(record)"
+                  >
+                    补回队列
+                  </a-button>
+                  <a-button
                     v-if="canCancelQueueCrawl(record)"
                     size="small"
                     type="link"
@@ -566,6 +575,7 @@ import {
   fetchAdminUsers,
   fetchAdminWorkspaces,
   fetchInviteCodes,
+  repairQueueIntegrityAlert,
   retryCrawlJob,
   resetAdminUserPassword,
   stopCrawlJob,
@@ -645,6 +655,7 @@ const knownAuditActions = [
   "crawl_job.retry",
   "crawl_job.cancel",
   "crawl_job.delete",
+  "queue_integrity.requeue",
   "crawl_monitor.create",
   "crawl_monitor.update",
   "crawl_monitor.run_now",
@@ -983,6 +994,14 @@ function canRetryQueueAnalysis(record: QueueHealthItem) {
   return record.kind === "analysis" && Boolean(record.taskId) && ["failed", "partial_failed"].includes(record.status) && !hasFailureRecovery(record);
 }
 
+function isQueueIntegrityAlert(record: QueueHealthItem): record is QueueIntegrityAlertDTO {
+  return "queueDataKey" in record;
+}
+
+function canRepairQueueIntegrity(record: QueueHealthItem) {
+  return isQueueIntegrityAlert(record) && record.status === "queued";
+}
+
 function canCancelQueueAnalysis(record: QueueHealthItem) {
   return record.kind === "analysis" && Boolean(record.taskId) && ["queued", "running"].includes(record.status);
 }
@@ -1035,6 +1054,23 @@ async function retryQueueCrawl(record: QueueHealthItem) {
     await loadAuditLogs();
   } catch (error) {
     message.error(readErrorMessage(error, "采集任务重试失败"));
+  } finally {
+    queueRetryingId.value = "";
+  }
+}
+
+async function repairQueueIntegrity(record: QueueHealthItem) {
+  if (!canRepairQueueIntegrity(record) || queueRetryingId.value) {
+    return;
+  }
+  queueRetryingId.value = record.id;
+  try {
+    const result = await repairQueueIntegrityAlert({ kind: record.kind, id: record.id });
+    message.success(result.requeued ? "队列 job 已补回" : "队列 job 已存在");
+    await loadQueueHealth();
+    await loadAuditLogs();
+  } catch (error) {
+    message.error(readErrorMessage(error, "补回队列失败"));
   } finally {
     queueRetryingId.value = "";
   }
@@ -1156,6 +1192,7 @@ function actionLabel(action: string) {
       "crawl_job.retry": "重试采集任务",
       "crawl_job.cancel": "停止采集任务",
       "crawl_job.delete": "删除采集任务",
+      "queue_integrity.requeue": "补回队列任务",
       "crawl_monitor.create": "创建监听任务",
       "crawl_monitor.update": "更新监听任务",
       "crawl_monitor.run_now": "手动运行监听",

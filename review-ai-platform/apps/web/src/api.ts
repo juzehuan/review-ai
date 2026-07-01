@@ -24,6 +24,7 @@ import type {
   MyWorkspaceDTO,
   PromptEvalDTO,
   QueueHealthDTO,
+  QueueIntegrityRepairResponse,
   ReportShareDTO,
   ReviewCorrectionDTO,
   ReviewActionItemDTO,
@@ -270,6 +271,11 @@ export async function fetchAdminAuditLogs(params?: {
 
 export async function fetchAdminQueueHealth() {
   const { data } = await api.get<QueueHealthDTO>("/admin/queue-health");
+  return data;
+}
+
+export async function repairQueueIntegrityAlert(payload: { kind: "crawl" | "analysis"; id: string }) {
+  const { data } = await api.post<QueueIntegrityRepairResponse>("/admin/queue-health/requeue", payload);
   return data;
 }
 

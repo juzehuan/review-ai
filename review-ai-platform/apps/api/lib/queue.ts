@@ -4,6 +4,7 @@ import { getRedis } from "./redis";
 let analysisQueue: Queue | null = null;
 let crawlQueue: Queue | null = null;
 const REMOVABLE_JOB_TYPES: JobType[] = ["waiting", "delayed", "prioritized", "waiting-children", "paused"];
+const PENDING_JOB_TYPES: JobType[] = ["waiting", "active", "delayed", "prioritized", "waiting-children", "paused"];
 const PENDING_QUEUE_SCAN_BATCH_SIZE = 500;
 const PENDING_QUEUE_SCAN_LIMIT = 10000;
 
@@ -59,4 +60,21 @@ export async function removePendingQueueJobsByData(queue: Queue, dataKey: string
   }
 
   return removedCount;
+}
+
+export async function hasPendingQueueJobByData(queue: Queue, dataKey: string, dataValue: string) {
+  for (let start = 0; start < PENDING_QUEUE_SCAN_LIMIT; start += PENDING_QUEUE_SCAN_BATCH_SIZE) {
+    const end = Math.min(start + PENDING_QUEUE_SCAN_BATCH_SIZE - 1, PENDING_QUEUE_SCAN_LIMIT - 1);
+    const jobs = await queue.getJobs(PENDING_JOB_TYPES, start, end, true);
+    for (const job of jobs) {
+      const data = job.data as Record<string, unknown>;
+      if (String(data[dataKey] || "") === dataValue) {
+        return true;
+      }
+    }
+    if (jobs.length < PENDING_QUEUE_SCAN_BATCH_SIZE) {
+      break;
+    }
+  }
+  return false;
 }

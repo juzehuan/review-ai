@@ -230,6 +230,14 @@ export interface QueueIntegrityAlertDTO {
   nextAction: string;
 }
 
+export interface QueueIntegrityRepairResponse {
+  id: string;
+  kind: "crawl" | "analysis";
+  queueName: string;
+  requeued: boolean;
+  message: string;
+}
+
 export interface QueueHealthDTO {
   queues: QueueSnapshotDTO[];
   workloads: WorkloadHealthSnapshotDTO[];
