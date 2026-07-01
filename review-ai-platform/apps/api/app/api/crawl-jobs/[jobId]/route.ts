@@ -1,8 +1,9 @@
 import { prisma } from "@review-ai/db";
+import { buildCrawlQueueJobId } from "@review-ai/shared";
 import { writeAuditLog } from "@/lib/audit-log";
 import { attachCrawlQueuePosition } from "@/lib/crawl-job-queue";
 import { fail, ok } from "@/lib/http";
-import { getCrawlQueue, removePendingQueueJobsByData } from "@/lib/queue";
+import { getCrawlQueue, removePendingQueueJobsByIdOrData } from "@/lib/queue";
 import { serializeCrawlJob } from "@/lib/serializers";
 import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -106,7 +107,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ jobId
     }
     return nextJob;
   });
-  const removedQueueJobs = await removePendingQueueJobsByData(getCrawlQueue(), "crawlJobId", job.id);
+  const queueJobId = buildCrawlQueueJobId(job.id);
+  const removedQueueJobs = await removePendingQueueJobsByIdOrData(getCrawlQueue(), queueJobId, "crawlJobId", job.id);
 
   await writeAuditLog(request, {
     workspaceId: job.workspaceId,
@@ -125,6 +127,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ jobId
       taskId: job.taskId,
       monitorId: job.monitorId,
       lastError: job.lastError,
+      queueJobId,
       removedQueueJobs
     }
   });

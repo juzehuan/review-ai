@@ -5,6 +5,7 @@ let analysisQueue: Queue | null = null;
 let crawlQueue: Queue | null = null;
 const REMOVABLE_JOB_TYPES: JobType[] = ["waiting", "delayed", "prioritized", "waiting-children", "paused"];
 const PENDING_JOB_TYPES: JobType[] = ["waiting", "active", "delayed", "prioritized", "waiting-children", "paused"];
+const REMOVABLE_JOB_STATE_NAMES = new Set<string>(REMOVABLE_JOB_TYPES);
 const PENDING_JOB_STATE_NAMES = new Set<string>(PENDING_JOB_TYPES);
 const FINISHED_JOB_STATE_NAMES = new Set(["completed", "failed"]);
 const PENDING_QUEUE_SCAN_BATCH_SIZE = 500;
@@ -98,4 +99,22 @@ export async function hasPendingQueueJobByIdOrData(queue: Queue, jobId: string, 
   }
 
   return hasPendingQueueJobByData(queue, dataKey, dataValue);
+}
+
+export async function removePendingQueueJobsByIdOrData(queue: Queue, jobId: string, dataKey: string, dataValue: string) {
+  let removedCount = 0;
+  const directJob = await queue.getJob(jobId);
+  if (directJob) {
+    const state = await directJob.getState();
+    if (REMOVABLE_JOB_STATE_NAMES.has(state)) {
+      try {
+        await directJob.remove();
+        removedCount += 1;
+      } catch (error) {
+        console.warn(`Failed to remove queue job ${jobId}`, error);
+      }
+    }
+  }
+
+  return removedCount + (await removePendingQueueJobsByData(queue, dataKey, dataValue));
 }
