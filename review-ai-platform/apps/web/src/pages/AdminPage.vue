@@ -746,6 +746,7 @@ function actionLabel(action: string) {
       "crawl_monitor.delete": "删除监听任务",
       "analysis_run.create": "创建分析批次",
       "analysis_run.cancel": "取消分析批次",
+      "review_correction.create": "创建 AI 纠错",
       "task.delete": "删除任务",
       "report_share.create": "创建分享",
       "report_share.revoke": "撤销分享"
@@ -763,6 +764,7 @@ function targetTypeLabel(type: string) {
       crawl_job: "采集任务",
       crawl_monitor: "监听任务",
       analysis_run: "分析批次",
+      review_correction: "AI 纠错",
       task: "分析任务",
       report_share: "报告分享"
     }[type] || type

@@ -1,5 +1,6 @@
 import { prisma } from "@review-ai/db";
 import type { Sentiment } from "@review-ai/shared";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeCorrection } from "@/lib/serializers";
 import { findAnalysisRunForResults } from "@/lib/analysis-runs";
@@ -111,6 +112,31 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       }
     });
   }
+
+  await writeAuditLog(request, {
+    workspaceId: scoped.task?.workspaceId || workspaceContext.workspace.id,
+    actor: workspaceContext.user,
+    action: "review_correction.create",
+    targetType: "review_correction",
+    targetId: correction.id,
+    targetLabel: review.cmtId || review.id,
+    metadata: {
+      taskId,
+      reviewId,
+      runId,
+      cmtId: review.cmtId,
+      sentiment,
+      topicLabelCount: topicLabels.length,
+      painPointCount: painPoints.length,
+      highlightCount: highlights.length,
+      hasSummary: Boolean(summary),
+      hasSuggestion: Boolean(suggestion),
+      hasNote: Boolean(note),
+      summaryPreview: summary ? summary.slice(0, 120) : null,
+      notePreview: note ? note.slice(0, 120) : null,
+      appliedToAnalysis: Boolean(runId)
+    }
+  });
 
   return ok(serializeCorrection(correction), 201);
 }
