@@ -417,7 +417,7 @@ def collect_youtube_payload_comments(
             },
         }
         added += 1
-        if len(comments_by_id) >= max_reviews:
+        if max_reviews > 0 and len(comments_by_id) >= max_reviews:
             break
     return added
 
@@ -484,7 +484,7 @@ def collect_youtube_renderer_comments(
             },
         }
         added += 1
-        if len(comments_by_id) >= max_reviews:
+        if max_reviews > 0 and len(comments_by_id) >= max_reviews:
             break
     return added
 
@@ -651,15 +651,17 @@ def get_product_name(product_url: str, shop_id: str, item_id: str, proxy: str | 
 
 def fetch_api_reviews(product_url: str, max_reviews: int, proxy: str | None, channel: str, timeout: int) -> dict[str, Any]:
     shop_id, item_id = parse_product_ids(product_url)
-    limit = min(50, max(1, max_reviews))
+    unlimited = max_reviews <= 0
+    limit = 50 if unlimited else min(50, max(1, max_reviews))
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     offset = 0
     page_offsets: list[int] = []
     summary: dict[str, Any] | None = None
     product_name = get_product_name(product_url, shop_id, item_id, proxy, timeout)
+    deadline = time.time() + max(1, timeout)
 
-    while len(rows) < max_reviews:
+    while (unlimited or len(rows) < max_reviews) and time.time() < deadline:
         url = build_ratings_url(shop_id, item_id, offset, limit, channel)
         payload = request_json(url, product_url, proxy, timeout)
         ratings, has_more, next_summary = read_ratings(payload)
@@ -672,11 +674,11 @@ def fetch_api_reviews(product_url: str, max_reviews: int, proxy: str | None, cha
             if normalized and normalized["cmtId"] not in seen:
                 seen.add(normalized["cmtId"])
                 rows.append(normalized)
-                if len(rows) >= max_reviews:
+                if not unlimited and len(rows) >= max_reviews:
                     break
 
         page_offsets.append(offset)
-        if has_more is False or len(ratings) < limit:
+        if has_more is False or (has_more is None and len(ratings) < limit):
             break
         offset += limit
         time.sleep(0.35)
@@ -702,6 +704,7 @@ def fetch_browser_intercept_reviews(product_url: str, max_reviews: int, proxy: s
     shop_id, item_id = parse_product_ids(product_url)
     rows_by_id: dict[str, dict[str, Any]] = {}
     page_offsets: set[int] = set()
+    page_limit = 50 if max_reviews <= 0 else min(50, max_reviews)
     state: dict[str, Any] = {"has_more": None, "summary": None, "product_name": ""}
 
     def consume(url: str, payload: dict[str, Any]) -> bool:
@@ -744,7 +747,7 @@ def fetch_browser_intercept_reviews(product_url: str, max_reviews: int, proxy: s
         except Exception:
             state["product_name"] = ""
 
-        bootstrap_url = build_ratings_url(shop_id, item_id, 0, min(50, max_reviews), "api_exporter")
+        bootstrap_url = build_ratings_url(shop_id, item_id, 0, page_limit, "api_exporter")
         try:
             bootstrap_payload = page.evaluate(
                 """async (url) => {
@@ -759,7 +762,7 @@ def fetch_browser_intercept_reviews(product_url: str, max_reviews: int, proxy: s
 
         next_selector = ".product-ratings__page-controller .shopee-icon-button--right"
         deadline = time.time() + timeout
-        while len(rows_by_id) < max_reviews and time.time() < deadline:
+        while (max_reviews <= 0 or len(rows_by_id) < max_reviews) and time.time() < deadline:
             if state.get("has_more") is False:
                 break
             previous_count = len(rows_by_id)
@@ -793,7 +796,9 @@ def fetch_browser_intercept_reviews(product_url: str, max_reviews: int, proxy: s
 
     apply_dynamic_fetcher_defaults(fetch_kwargs)
     DynamicFetcher.fetch(product_url, **fetch_kwargs)
-    rows = list(rows_by_id.values())[:max_reviews]
+    rows = list(rows_by_id.values())
+    if max_reviews > 0:
+        rows = rows[:max_reviews]
     return {
         "source": "Shopee",
         "crawlChannel": "browser_intercept",
