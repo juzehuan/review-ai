@@ -1,5 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { getAnalysisQueue } from "@/lib/queue";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeRun } from "@/lib/serializers";
 import { defaultAiSetting, resolveApiKey } from "@/lib/ai-settings";
@@ -114,6 +115,22 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       level: "info",
       message: "Analysis run queued",
       meta: { provider: aiSetting.provider, modelName, reviewCount }
+    }
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: quotaWorkspaceId,
+    actor: workspaceContext.user,
+    action: "analysis_run.create",
+    targetType: "analysis_run",
+    targetId: run.id,
+    targetLabel: scoped.task.name,
+    metadata: {
+      taskId,
+      provider: aiSetting.provider,
+      modelName,
+      promptVersion,
+      reviewCount
     }
   });
 

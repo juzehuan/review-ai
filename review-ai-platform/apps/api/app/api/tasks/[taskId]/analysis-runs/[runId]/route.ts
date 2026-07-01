@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeRun } from "@/lib/serializers";
 import { getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
@@ -56,6 +57,25 @@ export async function PATCH(
   await prisma.task.update({
     where: { id: taskId },
     data: { status: "imported" }
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: scoped.task?.workspaceId || workspaceContext.workspace.id,
+    actor: workspaceContext.user,
+    action: "analysis_run.cancel",
+    targetType: "analysis_run",
+    targetId: run.id,
+    targetLabel: scoped.task?.name || taskId,
+    metadata: {
+      taskId,
+      previousStatus: run.status,
+      reviewCount: run.reviewCount,
+      successCount: run.successCount,
+      failedCount: run.failedCount,
+      provider: run.provider,
+      modelName: run.modelName,
+      lastError: run.lastError
+    }
   });
 
   const refreshed = await prisma.analysisRun.findUnique({
