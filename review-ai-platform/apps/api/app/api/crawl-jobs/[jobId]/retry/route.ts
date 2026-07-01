@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { getCrawlQueue } from "@/lib/queue";
 import { serializeCrawlJob } from "@/lib/serializers";
@@ -52,6 +53,20 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
   await getCrawlQueue().add("run-crawl", {
     crawlJobId: updated.id,
     workspaceId: job.workspaceId
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: job.workspaceId,
+    actor: workspaceContext.user,
+    action: "crawl_job.retry",
+    targetType: "crawl_job",
+    targetId: job.id,
+    targetLabel: job.name || job.productName || job.normalizedUrl,
+    metadata: {
+      previousError: job.lastError || null,
+      sourceChannel: job.sourceChannel,
+      platform: job.platform
+    }
   });
 
   return ok(serializeCrawlJob(updated));

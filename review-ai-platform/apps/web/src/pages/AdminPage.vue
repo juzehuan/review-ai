@@ -285,9 +285,20 @@
                 {{ formatTime(record.failedAt) }}
               </template>
               <template v-else-if="column.key === 'actions'">
-                <a-button size="small" type="link" :disabled="!canOpenQueueContext(record)" @click="openQueueContext(record)">
-                  {{ queueContextActionLabel(record) }}
-                </a-button>
+                <a-space size="small">
+                  <a-button size="small" type="link" :disabled="!canOpenQueueContext(record)" @click="openQueueContext(record)">
+                    {{ queueContextActionLabel(record) }}
+                  </a-button>
+                  <a-button
+                    v-if="canRetryQueueCrawl(record)"
+                    size="small"
+                    type="link"
+                    :loading="queueRetryingId === record.id"
+                    @click="retryQueueCrawl(record)"
+                  >
+                    重新采集
+                  </a-button>
+                </a-space>
               </template>
             </template>
           </a-table>
@@ -399,6 +410,7 @@ import {
   fetchAdminOverview,
   fetchAdminUsers,
   fetchInviteCodes,
+  retryCrawlJob,
   resetAdminUserPassword,
   updateAdminUser
 } from "@/api";
@@ -418,6 +430,7 @@ const auditLogs = ref<AuditLogDTO[]>([]);
 const queueHealth = ref<QueueHealthDTO | null>(null);
 const forbidden = ref(false);
 const savingUserId = ref("");
+const queueRetryingId = ref("");
 const quotaDrafts = reactive<Record<string, { monthlyReviewLimit: number; monthlyRunLimit: number }>>({});
 const { currentUser } = useTaskStore();
 let queueHealthTimer: ReturnType<typeof setInterval> | null = null;
@@ -477,7 +490,7 @@ const failureColumns = [
   { title: "渠道/模型", key: "context", width: 180 },
   { title: "错误摘要", key: "error", width: 280 },
   { title: "失败时间", key: "time", width: 190 },
-  { title: "操作", key: "actions", width: 130, fixed: "right" }
+  { title: "操作", key: "actions", width: 190, fixed: "right" }
 ];
 
 const stalledColumns = [
@@ -639,6 +652,10 @@ function canOpenQueueContext(record: QueueHealthItem) {
   return record.kind === "crawl" || Boolean(record.taskId);
 }
 
+function canRetryQueueCrawl(record: QueueHealthItem) {
+  return record.kind === "crawl" && record.status === "failed";
+}
+
 function openQueueContext(record: QueueHealthItem) {
   if (record.kind === "crawl") {
     router.push({ path: "/crawl-jobs", query: { jobId: record.id } });
@@ -646,6 +663,23 @@ function openQueueContext(record: QueueHealthItem) {
   }
   if (record.taskId) {
     router.push({ path: `/tasks/${record.taskId}/runs`, query: { runId: record.id } });
+  }
+}
+
+async function retryQueueCrawl(record: QueueHealthItem) {
+  if (!canRetryQueueCrawl(record) || queueRetryingId.value) {
+    return;
+  }
+  queueRetryingId.value = record.id;
+  try {
+    await retryCrawlJob(record.id);
+    message.success("采集任务已重新加入队列");
+    await loadQueueHealth();
+    await loadAuditLogs();
+  } catch (error) {
+    message.error(readErrorMessage(error, "采集任务重试失败"));
+  } finally {
+    queueRetryingId.value = "";
   }
 }
 
@@ -702,6 +736,7 @@ function actionLabel(action: string) {
       "admin.invite_code.create": "生成邀请码",
       "settings.ai.update": "更新 AI 设置",
       "settings.crawler.update": "更新爬虫设置",
+      "crawl_job.retry": "重试采集任务",
       "task.delete": "删除任务",
       "report_share.create": "创建分享",
       "report_share.revoke": "撤销分享"
@@ -716,6 +751,7 @@ function targetTypeLabel(type: string) {
       invite_code: "邀请码",
       workspace_ai_setting: "AI 设置",
       workspace_crawler_setting: "爬虫设置",
+      crawl_job: "采集任务",
       task: "分析任务",
       report_share: "报告分享"
     }[type] || type
