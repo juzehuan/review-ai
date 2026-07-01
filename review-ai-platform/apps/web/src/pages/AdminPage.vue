@@ -371,7 +371,7 @@
             :loading="loading"
             row-key="id"
             :pagination="{ pageSize: 8 }"
-            :scroll="{ x: 1400 }"
+            :scroll="{ x: 1820 }"
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'kind'">
@@ -394,6 +394,13 @@
                 <a-tooltip :title="record.error || '-'">
                   <span class="muted">{{ errorSummary(record.error) }}</span>
                 </a-tooltip>
+              </template>
+              <template v-else-if="column.key === 'diagnosis'">
+                <div class="stalled-diagnosis-cell">
+                  <a-tag :color="record.kind === 'crawl' ? 'orange' : 'purple'">{{ record.diagnosis || "待复核" }}</a-tag>
+                  <div v-if="record.metricSummary" class="member-email">{{ record.metricSummary }}</div>
+                  <div v-if="record.nextAction" class="member-email">{{ record.nextAction }}</div>
+                </div>
               </template>
               <template v-else-if="column.key === 'time'">
                 {{ formatTime(record.failedAt) }}
@@ -749,6 +756,7 @@ const failureColumns = [
   { title: "空间", key: "workspace", width: 210 },
   { title: "渠道/模型", key: "context", width: 180 },
   { title: "错误摘要", key: "error", width: 280 },
+  { title: "诊断建议", key: "diagnosis", width: 420 },
   { title: "失败时间", key: "time", width: 190 },
   { title: "操作", key: "actions", width: 190, fixed: "right" }
 ];

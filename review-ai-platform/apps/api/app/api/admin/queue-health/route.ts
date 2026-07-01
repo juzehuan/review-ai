@@ -650,6 +650,27 @@ function buildFailureRecovery(input: { id: string; status: string; label: string
   };
 }
 
+function buildAnalysisFailureInsight(run: { reviewCount: number; successCount: number; failedCount: number; lastError: string | null }) {
+  const processed = run.successCount + run.failedCount;
+  const failureRate = processed > 0 ? Math.round((run.failedCount / processed) * 100) : null;
+  return {
+    diagnosis:
+      run.successCount > 0
+        ? "分析批次部分失败，已成功结果仍可用于报告，但失败样本需要复核"
+        : "分析批次失败，通常与模型额度、API Key、网络超时或提示词返回格式有关",
+    nextAction:
+      run.successCount > 0
+        ? "抽查失败样本和错误日志，必要时降低批次大小或更换稳定模型后重试"
+        : "确认模型配置、额度、网络和提示词 JSON 输出格式后再重试",
+    metricSummary: buildMetricSummary([
+      `已处理 ${processed}/${run.reviewCount}`,
+      `失败 ${run.failedCount}`,
+      failureRate !== null ? `失败率 ${failureRate}%` : null
+    ]),
+    lastError: truncateText(run.lastError) || null
+  };
+}
+
 async function readRecentFailures(limit = 12): Promise<QueueFailureDTO[]> {
   const [crawlFailures, analysisFailures] = await Promise.all([
     prisma.crawlJob.findMany({
@@ -736,38 +757,50 @@ async function readRecentFailures(limit = 12): Promise<QueueFailureDTO[]> {
   const recoveryById = new Map<string, FailureRecovery>([...crawlRecoveries, ...analysisRecoveries]);
 
   return [
-    ...crawlFailures.map((job) => ({
-      id: job.id,
-      kind: "crawl" as const,
-      status: job.status,
-      label: job.name || job.productName || job.normalizedUrl,
-      workspaceId: job.workspaceId,
-      workspaceName: job.workspace.name,
-      workspaceSlug: job.workspace.slug,
-      taskId: job.taskId,
-      taskName: job.task?.name || job.task?.productName || null,
-      sourceChannel: job.sourceChannel || job.platform || null,
-      modelName: null,
-      error: job.lastError,
-      failedAt: (job.finishedAt || job.updatedAt).toISOString(),
-      ...(recoveryById.get(job.id) || NO_FAILURE_RECOVERY)
-    })),
-    ...analysisFailures.map((run) => ({
-      id: run.id,
-      kind: "analysis" as const,
-      status: run.status,
-      label: run.task?.name || run.task?.productName || run.id,
-      workspaceId: run.task?.workspaceId || null,
-      workspaceName: run.task?.workspace?.name || null,
-      workspaceSlug: run.task?.workspace?.slug || null,
-      taskId: run.taskId,
-      taskName: run.task?.name || run.task?.productName || null,
-      sourceChannel: run.task?.sourceChannel || null,
-      modelName: run.modelName,
-      error: run.lastError,
-      failedAt: (run.finishedAt || run.createdAt).toISOString(),
-      ...(recoveryById.get(run.id) || NO_FAILURE_RECOVERY)
-    }))
+    ...crawlFailures.map((job) => {
+      const insight = buildCrawlStalledInsight(job);
+      return {
+        id: job.id,
+        kind: "crawl" as const,
+        status: job.status,
+        label: job.name || job.productName || job.normalizedUrl,
+        workspaceId: job.workspaceId,
+        workspaceName: job.workspace.name,
+        workspaceSlug: job.workspace.slug,
+        taskId: job.taskId,
+        taskName: job.task?.name || job.task?.productName || null,
+        sourceChannel: job.sourceChannel || job.platform || null,
+        modelName: null,
+        error: job.lastError,
+        diagnosis: insight.diagnosis,
+        nextAction: insight.nextAction,
+        metricSummary: insight.metricSummary,
+        failedAt: (job.finishedAt || job.updatedAt).toISOString(),
+        ...(recoveryById.get(job.id) || NO_FAILURE_RECOVERY)
+      };
+    }),
+    ...analysisFailures.map((run) => {
+      const insight = buildAnalysisFailureInsight(run);
+      return {
+        id: run.id,
+        kind: "analysis" as const,
+        status: run.status,
+        label: run.task?.name || run.task?.productName || run.id,
+        workspaceId: run.task?.workspaceId || null,
+        workspaceName: run.task?.workspace?.name || null,
+        workspaceSlug: run.task?.workspace?.slug || null,
+        taskId: run.taskId,
+        taskName: run.task?.name || run.task?.productName || null,
+        sourceChannel: run.task?.sourceChannel || null,
+        modelName: run.modelName,
+        error: run.lastError,
+        diagnosis: insight.diagnosis,
+        nextAction: insight.nextAction,
+        metricSummary: insight.metricSummary,
+        failedAt: (run.finishedAt || run.createdAt).toISOString(),
+        ...(recoveryById.get(run.id) || NO_FAILURE_RECOVERY)
+      };
+    })
   ]
     .sort((a, b) => new Date(b.failedAt).getTime() - new Date(a.failedAt).getTime())
     .slice(0, limit);

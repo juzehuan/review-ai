@@ -200,6 +200,9 @@ export interface QueueFailureDTO {
   sourceChannel: string | null;
   modelName: string | null;
   error: string | null;
+  diagnosis: string | null;
+  nextAction: string | null;
+  metricSummary: string | null;
   failedAt: string;
   recoveryStatus: string | null;
   recoveryId: string | null;
