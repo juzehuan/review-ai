@@ -17,7 +17,18 @@ export async function GET(request: Request) {
   const monitors = await prisma.crawlMonitor.findMany({
     where: canViewAllMonitors ? {} : { workspaceId: context.workspace.id },
     orderBy: [{ enabled: "desc" }, { createdAt: "desc" }],
-    include: { workspace: { select: { name: true, slug: true } } }
+    include: {
+      workspace: { select: { name: true, slug: true } },
+      task: {
+        select: {
+          analysisRuns: {
+            select: { id: true },
+            orderBy: { createdAt: "desc" },
+            take: 1
+          }
+        }
+      }
+    }
   });
 
   return ok(monitors.map(serializeCrawlMonitor));

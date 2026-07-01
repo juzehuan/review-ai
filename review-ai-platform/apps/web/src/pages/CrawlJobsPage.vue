@@ -189,7 +189,11 @@
                 </a-button>
                 <template #overlay>
                   <a-menu class="crawl-action-menu" @click.stop>
-                    <a-menu-item key="task" :disabled="!record.taskId" @click="record.taskId && openTaskById(record.taskId)">
+                    <a-menu-item key="crawl-job" :disabled="!record.lastCrawlJobId" @click="record.lastCrawlJobId && openCrawlJobById(record.lastCrawlJobId)">
+                      <CloudDownloadOutlined />
+                      打开采集
+                    </a-menu-item>
+                    <a-menu-item key="task" :disabled="!record.taskId" @click="record.taskId && openTaskById(record.taskId, record.latestRunId)">
                       <FileSearchOutlined />
                       查看分析
                     </a-menu-item>
@@ -432,6 +436,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { Modal, message } from "ant-design-vue";
 import {
+  CloudDownloadOutlined,
   DownloadOutlined,
   ExclamationCircleOutlined,
   FileSearchOutlined,
@@ -985,6 +990,10 @@ function openTask(job: CrawlJobDTO) {
 
 function openTaskById(taskId: string, runId?: string | null) {
   router.push({ path: `/tasks/${taskId}/runs`, query: runId ? { runId } : undefined });
+}
+
+function openCrawlJobById(jobId: string) {
+  router.push({ path: "/crawl-jobs", query: { jobId } });
 }
 
 function resetCreateForm() {
