@@ -236,22 +236,32 @@
           <template v-else-if="column.key === 'progress'">
             <div class="run-progress-cell">
               <a-progress :percent="record.progress" size="small" :status="progressStatus(record.status)" />
-              <span>
-                已抓取 {{ record.fetchedRows }}/{{ record.maxReviews || "不限" }}
-              </span>
-              <span v-if="record.coveragePercent !== null" class="muted">目标覆盖 {{ record.coveragePercent }}%</span>
-              <span v-if="record.platformCoveragePercent != null" class="muted">
-                平台覆盖 {{ record.platformCoveragePercent }}%
-              </span>
-              <span v-if="platformCoverageSummary(record)" class="muted">{{ platformCoverageSummary(record) }}</span>
-              <span v-if="crawlThroughputSummary(record)" class="muted">{{ crawlThroughputSummary(record) }}</span>
-              <a-tag v-if="record.stalled" color="orange" class="crawl-stalled-tag">
-                疑似无更新 {{ durationLabel(record.updatedAgoSeconds) }}
-              </a-tag>
-              <a-tag v-if="record.partialDueToTimeout" color="orange" class="crawl-stalled-tag">
-                部分结果：采集接近超时，可能未加载完全部评论
-              </a-tag>
-              <span v-if="record.stopReason" class="muted">停止原因：{{ stopReasonLabel(record.stopReason) }}</span>
+              <div class="crawl-progress-headline">
+                <strong>已抓取 {{ record.fetchedRows }}/{{ record.maxReviews || "不限" }}</strong>
+                <a-tag v-if="record.coveragePercent !== null" color="blue" class="crawl-progress-tag">
+                  目标覆盖 {{ record.coveragePercent }}%
+                </a-tag>
+                <a-tag v-if="record.platformCoveragePercent != null" color="cyan" class="crawl-progress-tag">
+                  平台覆盖 {{ record.platformCoveragePercent }}%
+                </a-tag>
+              </div>
+              <div v-if="crawlCoverageStats(record).length" class="crawl-progress-grid">
+                <div v-for="stat in crawlCoverageStats(record)" :key="stat.label" class="crawl-progress-stat">
+                  <span>{{ stat.label }}</span>
+                  <strong>{{ stat.value }}</strong>
+                </div>
+              </div>
+              <div v-if="crawlRunSignals(record).length" class="crawl-signal-list">
+                <span v-for="signal in crawlRunSignals(record)" :key="signal">{{ signal }}</span>
+              </div>
+              <div class="crawl-alert-tags">
+                <a-tag v-if="record.stalled" color="orange" class="crawl-stalled-tag">
+                  疑似无更新 {{ durationLabel(record.updatedAgoSeconds) }}
+                </a-tag>
+                <a-tag v-if="record.partialDueToTimeout" color="orange" class="crawl-stalled-tag">
+                  部分结果：采集接近超时，可能未加载完全部评论
+                </a-tag>
+              </div>
               <span v-if="record.commentSortAttempted !== null" class="muted">
                 评论排序：{{ record.commentSortSwitched ? "已切换所有评论" : "未确认所有评论" }}
               </span>
@@ -539,7 +549,7 @@ const currentMonitorAnalysisTypeDescription = computed(() => {
 const columns = [
   { title: "任务", key: "job", width: 360 },
   { title: "状态", key: "status", width: 110 },
-  { title: "进度", key: "progress", width: 300 },
+  { title: "进度", key: "progress", width: 380 },
   { title: "来源", key: "meta", width: 160 },
   { title: "时间", key: "time", width: 170 },
   { title: "错误", key: "error" },
@@ -781,6 +791,29 @@ function shortJobName(job: CrawlJobDTO) {
   return text.length > 28 ? `${text.slice(0, 28)}...` : text;
 }
 
+function formatCount(value?: number | null) {
+  return value === null || value === undefined ? "-" : value.toLocaleString();
+}
+
+function crawlCoverageStats(job: CrawlJobDTO) {
+  const stats = [
+    { label: "目标上限", value: job.maxReviews > 0 ? formatCount(job.maxReviews) : "不限" }
+  ];
+  if (job.totalComments !== null) {
+    stats.push({ label: "平台总量", value: formatCount(job.totalComments) });
+  }
+  if (job.platformRemainingRows !== null) {
+    stats.push({ label: "平台剩余", value: `约 ${formatCount(job.platformRemainingRows)} 条` });
+  }
+  if (job.importedRows > 0) {
+    stats.push({ label: "已导入", value: formatCount(job.importedRows) });
+  }
+  if (job.skippedDuplicate > 0) {
+    stats.push({ label: "重复跳过", value: formatCount(job.skippedDuplicate) });
+  }
+  return stats;
+}
+
 function crawlMetricSummary(job: CrawlJobDTO) {
   const parts = [
     job.nextRequests !== null ? `接口请求 ${job.nextRequests}` : "",
@@ -788,14 +821,6 @@ function crawlMetricSummary(job: CrawlJobDTO) {
     job.domCommentCount !== null ? `DOM 评论 ${job.domCommentCount}` : "",
     job.domContentTextCount !== null ? `DOM 文本 ${job.domContentTextCount}` : "",
     job.loadMoreClicks !== null ? `加载更多 ${job.loadMoreClicks}` : ""
-  ].filter(Boolean);
-  return parts.join(" · ");
-}
-
-function platformCoverageSummary(job: CrawlJobDTO) {
-  const parts = [
-    job.totalComments != null ? `平台总量 ${job.totalComments}` : "",
-    job.platformRemainingRows != null ? `平台剩余约 ${job.platformRemainingRows} 条` : ""
   ].filter(Boolean);
   return parts.join(" · ");
 }
@@ -816,16 +841,17 @@ function durationLabel(seconds?: number | null) {
   return restMinutes ? `${hours} 小时 ${restMinutes} 分钟` : `${hours} 小时`;
 }
 
-function crawlThroughputSummary(job: CrawlJobDTO) {
+function crawlRunSignals(job: CrawlJobDTO) {
+  const isActive = ["queued", "running"].includes(job.status);
   const parts = [
-    job.importedRows > 0 ? `导入 ${job.importedRows}` : "",
-    job.skippedDuplicate > 0 ? `重复 ${job.skippedDuplicate}` : "",
     job.durationSeconds !== null ? `耗时 ${durationLabel(job.durationSeconds)}` : "",
     job.fetchRatePerMinute !== null ? `速度 ${job.fetchRatePerMinute}/分钟` : "",
-    ["queued", "running"].includes(job.status) && job.remainingSeconds !== null ? `预计剩余 ${durationLabel(job.remainingSeconds)}` : "",
-    ["queued", "running"].includes(job.status) ? `更新于 ${durationLabel(job.updatedAgoSeconds)}前` : ""
+    isActive && job.remainingSeconds !== null ? `预计剩余 ${durationLabel(job.remainingSeconds)}` : "",
+    isActive ? `更新于 ${durationLabel(job.updatedAgoSeconds)}前` : "",
+    job.progressEventAt ? `进度回传 ${formatTime(job.progressEventAt)}` : "",
+    job.stopReason ? `停止原因 ${stopReasonLabel(job.stopReason)}` : ""
   ].filter(Boolean);
-  return parts.join(" · ");
+  return parts;
 }
 
 function canStart(job: CrawlJobDTO) {
@@ -1298,9 +1324,68 @@ onUnmounted(() => {
   overflow-wrap: anywhere;
 }
 
+.crawl-progress-headline,
+.crawl-alert-tags,
+.crawl-signal-list {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.crawl-progress-headline strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.crawl-progress-tag,
+.crawl-stalled-tag {
+  margin-inline-end: 0;
+}
+
+.crawl-progress-grid {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 8px;
+}
+
+.crawl-progress-stat {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.crawl-progress-stat span {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.crawl-progress-stat strong {
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crawl-signal-list span {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #1d4ed8;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 2px 6px;
+}
+
 .crawl-stalled-tag {
   justify-self: start;
-  margin-inline-end: 0;
 }
 
 .error-pill {

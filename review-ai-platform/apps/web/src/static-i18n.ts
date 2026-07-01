@@ -103,6 +103,10 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "持续监听任务": "Continuous monitors",
     "采集记录": "Crawl records",
     "采集运行观察": "Crawl runtime watch",
+    "目标上限": "Target limit",
+    "平台总量": "Platform total",
+    "平台剩余": "Platform remaining",
+    "重复跳过": "Duplicates skipped",
     "疑似无更新": "Likely no update",
     "活跃采集量": "Active crawl volume",
     "当前速度": "Current speed",
@@ -502,6 +506,10 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "持续监听任务": "งานติดตามต่อเนื่อง",
     "采集记录": "ประวัติการเก็บข้อมูล",
     "采集运行观察": "ดูสถานะการเก็บข้อมูล",
+    "目标上限": "ขีดจำกัดเป้าหมาย",
+    "平台总量": "ทั้งหมดบนแพลตฟอร์ม",
+    "平台剩余": "เหลือบนแพลตฟอร์ม",
+    "重复跳过": "ข้ามรายการซ้ำ",
     "疑似无更新": "อาจไม่มีอัปเดต",
     "活跃采集量": "ปริมาณที่กำลังเก็บ",
     "当前速度": "ความเร็วปัจจุบัน",
@@ -939,6 +947,10 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const platformCoverage = value.match(/^平台覆盖\s+(\d+)%$/);
   if (platformCoverage) {
     return locale === "en-US" ? `Platform coverage ${platformCoverage[1]}%` : `ครอบคลุมแพลตฟอร์ม ${platformCoverage[1]}%`;
+  }
+  const approxRows = value.match(/^约\s+([\d,]+)\s+条$/);
+  if (approxRows) {
+    return locale === "en-US" ? `about ${approxRows[1]} rows` : `ประมาณ ${approxRows[1]} รายการ`;
   }
   const processedWithFailures = value.match(/^已处理\s+(.+)\/(.+)，失败\s+(.+)$/);
   if (processedWithFailures) {
