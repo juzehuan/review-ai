@@ -733,6 +733,9 @@ function actionLabel(action: string) {
       "admin.user.upsert": "保存账号",
       "admin.user.update": "更新用户",
       "admin.user.reset_password": "重置密码",
+      "workspace_member.upsert": "保存空间成员",
+      "workspace_member.update": "更新成员角色",
+      "workspace_member.delete": "移除空间成员",
       "admin.invite_code.create": "生成邀请码",
       "settings.ai.update": "更新 AI 设置",
       "settings.crawler.update": "更新爬虫设置",
@@ -763,6 +766,7 @@ function targetTypeLabel(type: string) {
   return (
     {
       user: "用户",
+      workspace_member: "空间成员",
       invite_code: "邀请码",
       workspace_ai_setting: "AI 设置",
       workspace_crawler_setting: "爬虫设置",

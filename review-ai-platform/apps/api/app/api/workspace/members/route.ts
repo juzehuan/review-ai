@@ -1,5 +1,6 @@
 import type { MemberRole } from "@review-ai/shared";
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeMember } from "@/lib/serializers";
 import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
@@ -44,14 +45,24 @@ export async function POST(request: Request) {
     return fail("邮箱和姓名不能为空");
   }
 
-  const member = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const user = await tx.user.upsert({
       where: { email },
       update: { name },
       create: { email, name }
     });
 
-    return tx.workspaceMember.upsert({
+    const existingMember = await tx.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId: workspace.id,
+          userId: user.id
+        }
+      },
+      select: { id: true, role: true }
+    });
+
+    const member = await tx.workspaceMember.upsert({
       where: {
         workspaceId_userId: {
           workspaceId: workspace.id,
@@ -66,7 +77,30 @@ export async function POST(request: Request) {
       },
       include: { user: true }
     });
+
+    return {
+      member,
+      created: !existingMember,
+      previousRole: existingMember?.role || null
+    };
   });
 
-  return ok(serializeMember(member), 201);
+  await writeAuditLog(request, {
+    workspaceId: workspace.id,
+    actor: context.user,
+    action: "workspace_member.upsert",
+    targetType: "workspace_member",
+    targetId: result.member.id,
+    targetLabel: result.member.user.email || result.member.user.name,
+    metadata: {
+      userId: result.member.userId,
+      email: result.member.user.email,
+      name: result.member.user.name,
+      role: result.member.role,
+      previousRole: result.previousRole,
+      created: result.created
+    }
+  });
+
+  return ok(serializeMember(result.member), 201);
 }
