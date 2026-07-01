@@ -260,6 +260,46 @@ def stable_facebook_comment_id(post_id: str, author: str, content: str, index: i
     return f"fb_{post_id}_{digest[:18]}"
 
 
+def facebook_comment_time(value: Any) -> str | None:
+    try:
+        timestamp = int(value)
+        return dt.datetime.utcfromtimestamp(timestamp).replace(microsecond=0).isoformat() + "Z"
+    except Exception:
+        return None
+
+
+def facebook_comment_url(node: dict[str, Any]) -> str:
+    url = node.get("url")
+    if isinstance(url, str):
+        return url
+    for child in iter_dicts(node.get("comment_action_links")):
+        comment = child.get("comment")
+        if isinstance(comment, dict) and isinstance(comment.get("url"), str):
+            return comment["url"]
+    return ""
+
+
+def parse_json_documents(text: str) -> list[dict[str, Any]]:
+    raw = text.strip()
+    if raw.startswith("for (;;);"):
+        raw = raw[len("for (;;);") :].strip()
+    candidates = [raw] if raw else []
+    candidates.extend(line.strip() for line in raw.splitlines() if line.strip().startswith("{"))
+    documents: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            parsed = json.loads(candidate)
+        except Exception:
+            continue
+        if isinstance(parsed, dict):
+            documents.append(parsed)
+    return documents
+
+
 def iter_dicts(value: Any):
     if isinstance(value, dict):
         yield value
@@ -268,6 +308,59 @@ def iter_dicts(value: Any):
     elif isinstance(value, list):
         for child in value:
             yield from iter_dicts(child)
+
+
+def collect_facebook_graphql_comments(
+    payload: dict[str, Any],
+    post_id: str,
+    source_url: str,
+    comments_by_id: dict[str, dict[str, Any]],
+    max_reviews: int,
+) -> int:
+    added = 0
+    for node in iter_dicts(payload):
+        if node.get("__typename") != "Comment":
+            continue
+        body = node.get("body") if isinstance(node.get("body"), dict) else {}
+        content = str(body.get("text") or "").strip()
+        if not content:
+            continue
+        author_node = node.get("author") if isinstance(node.get("author"), dict) else {}
+        author = str(author_node.get("name") or "").strip()
+        comment_id = str(node.get("id") or node.get("legacy_fbid") or "").strip() or stable_facebook_comment_id(
+            post_id,
+            author,
+            content,
+            len(comments_by_id),
+        )
+        if comment_id in comments_by_id:
+            continue
+        comment_time = facebook_comment_time(node.get("created_time"))
+        comment_url = facebook_comment_url(node)
+        comments_by_id[comment_id] = {
+            "cmtId": comment_id,
+            "shopId": "facebook",
+            "itemId": post_id,
+            "ratingStar": 0,
+            "comment": content,
+            "commentTr": None,
+            "modelName": author or None,
+            "hasMedia": bool(node.get("attachments")),
+            "commentTime": comment_time,
+            "rawJson": {
+                "platform": "Facebook",
+                "postId": post_id,
+                "author": author,
+                "authorId": author_node.get("id") or "",
+                "commentUrl": comment_url,
+                "sourceUrl": source_url,
+                "source": "facebook_graphql",
+            },
+        }
+        added += 1
+        if max_reviews > 0 and len(comments_by_id) >= max_reviews:
+            break
+    return added
 
 
 def collect_youtube_payload_comments(
@@ -1741,6 +1834,8 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
     comments_by_id: dict[str, dict[str, Any]] = {}
     state: dict[str, Any] = {
         "title": "",
+        "next_requests": 0,
+        "payload_comments": 0,
         "dom_comment_count": 0,
         "total_comments": None,
         "load_more_clicks": 0,
@@ -1754,6 +1849,22 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         def limit_reached() -> bool:
             return max_reviews > 0 and len(comments_by_id) >= max_reviews
 
+        def on_response(response: Any) -> None:
+            try:
+                if "/api/graphql/" not in response.url and "/graphql/" not in response.url:
+                    return
+                state["next_requests"] = int(state.get("next_requests") or 0) + 1
+                added = 0
+                for payload in parse_json_documents(response.text()):
+                    added += collect_facebook_graphql_comments(payload, post_id, post_url, comments_by_id, max_reviews)
+                    if limit_reached():
+                        break
+                if added:
+                    state["payload_comments"] = int(state.get("payload_comments") or 0) + added
+            except Exception:
+                return
+
+        page.on("response", on_response)
         page.wait_for_timeout(3000)
         try:
             state["title"] = (page.title() or "").replace("| Facebook", "").strip()
@@ -1944,6 +2055,7 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
 
         idle_rounds = 0
         last_count = 0
+        last_requests = int(state.get("next_requests") or 0)
         deadline = time.time() + timeout
 
         try:
@@ -2006,11 +2118,13 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
                     break
 
             current_count = len(comments_by_id)
-            if current_count == last_count:
+            current_requests = int(state.get("next_requests") or 0)
+            if current_count == last_count and current_requests == last_requests:
                 idle_rounds += 1
             else:
                 idle_rounds = 0
             last_count = current_count
+            last_requests = current_requests
             emit_crawl_progress("Facebook", "facebook_post", comments_by_id, state, max_reviews, deadline)
             if idle_rounds >= 5:
                 state["end_reached"] = True
@@ -2051,6 +2165,8 @@ def fetch_facebook_post_comments(post_url: str, max_reviews: int, proxy: str | N
         "shopId": "facebook",
         "itemId": post_id,
         "postId": post_id,
+        "nextRequests": state.get("next_requests"),
+        "payloadComments": state.get("payload_comments"),
         "domCommentCount": state.get("dom_comment_count"),
         "totalComments": state.get("total_comments"),
         "loadMoreClicks": state.get("load_more_clicks"),
