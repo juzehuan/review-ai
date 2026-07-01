@@ -425,6 +425,7 @@ import {
 import EChartCard from "@/components/EChartCard.vue";
 import { createActionItem, createTaskReportShare, fetchDashboard, fetchTaskReportShares, revokeTaskReportShare } from "@/api";
 import { useTaskStore } from "@/composables";
+import { translateStaticText } from "@/static-i18n";
 import { copyTextToClipboard } from "@/utils/clipboard";
 import type { DashboardDTO, ReportShareDTO, Sentiment } from "@review-ai/shared";
 import {
@@ -439,6 +440,8 @@ import {
   getXAxis,
   getYAxis
 } from "@/composables/useChartConfig";
+
+const tr = (value: string) => translateStaticText(value);
 
 const route = useRoute();
 const router = useRouter();
@@ -944,7 +947,7 @@ function exportReport(format: ExportFormat) {
     return;
   }
 
-  const fileBaseName = sanitizeFileName(`${reportTitle.value}-分析报告-${formatDateForFile(new Date())}`);
+  const fileBaseName = sanitizeFileName(`${reportTitle.value}-${tr("分析报告")}-${formatDateForFile(new Date())}`);
   if (format === "markdown") {
     downloadTextFile(`${fileBaseName}.md`, buildMarkdownReport(), "text/markdown;charset=utf-8");
     message.success("Markdown 报告已导出。");
@@ -963,60 +966,60 @@ function buildMarkdownReport() {
   }
 
   const lines = [
-    `# ${reportTitle.value} 分析报告`,
+    `# ${reportTitle.value} ${tr("分析报告")}`,
     "",
-    `- 任务名称：${task.name}`,
-    `- 来源渠道：${task.sourceChannel}`,
-    `- 分析类型：${analysisTypeLabel(task.analysisType)}`,
-    `- 导出时间：${new Date().toLocaleString()}`,
-    `- 评论样本：${data.reviewCount}`,
-    `- ${scoreLabel.value}：${data.nps}`,
+    `- ${tr("任务名称")}：${task.name}`,
+    `- ${tr("来源渠道")}：${task.sourceChannel}`,
+    `- ${tr("分析类型")}：${tr(analysisTypeLabel(task.analysisType))}`,
+    `- ${tr("导出时间")}：${new Date().toLocaleString()}`,
+    `- ${tr("评论样本")}：${data.reviewCount}`,
+    `- ${tr(scoreLabel.value)}：${data.nps}`,
     "",
-    "## 执行摘要",
+    `## ${tr("执行摘要")}`,
     "",
-    executiveHeadline.value,
+    tr(executiveHeadline.value),
     "",
-    normalizeExportText(data.aiSummary || emptySummaryText.value),
+    data.aiSummary ? normalizeExportText(data.aiSummary) : tr(emptySummaryText.value),
     "",
-    "## 核心指标",
+    `## ${tr("核心指标")}`,
     "",
-    ...reportSnapshots.value.map((item) => `- ${item.label}：${item.value}（${item.note}）`),
+    ...reportSnapshots.value.map((item) => `- ${tr(item.label)}：${item.value}（${tr(item.note)}）`),
     "",
-    "## 情感分布",
+    `## ${tr("情感分布")}`,
     "",
-    ...data.sentimentDistribution.map((item) => `- ${sentimentText(item.sentiment)}：${item.count} 条，占比 ${item.percent}%`),
+    ...data.sentimentDistribution.map((item) => `- ${tr(sentimentText(item.sentiment))}：${item.count} ${tr("条")}，${tr("占比")} ${item.percent}%`),
     "",
-    "## 评论意图",
+    `## ${tr("评论意图")}`,
     "",
-    ...(data.intentDistribution.length ? data.intentDistribution.map((item) => `- ${item.label}：${item.count} 条，占比 ${item.percent}%`) : ["- 暂无意图分布数据"]),
+    ...(data.intentDistribution.length ? data.intentDistribution.map((item) => `- ${item.label}：${item.count} ${tr("条")}，${tr("占比")} ${item.percent}%`) : [`- ${tr("暂无意图分布数据")}`]),
     "",
-    "## 高频问题",
+    `## ${tr("高频问题")}`,
     "",
-    ...(data.issues.length ? data.issues.slice(0, 10).map((item) => `- ${item.issueName}：${item.count} 条相关评论`) : ["- 暂无高频问题"]),
+    ...(data.issues.length ? data.issues.slice(0, 10).map((item) => `- ${item.issueName}：${item.count} ${tr("条相关评论")}`) : [`- ${tr("暂无高频问题")}`]),
     "",
-    "## 动态内容标签",
+    `## ${tr("动态内容标签")}`,
     "",
     ...(data.dynamicContentTags.length
-      ? data.dynamicContentTags.slice(0, 12).map((tag) => `- ${tag.label}：${dynamicTagKindText(tag.kind)}，${tag.count} 条，占比 ${tag.percent}%`)
-      : ["- 暂无动态内容标签"]),
+      ? data.dynamicContentTags.slice(0, 12).map((tag) => `- ${tag.label}：${tr(dynamicTagKindText(tag.kind))}，${tag.count} ${tr("条")}，${tr("占比")} ${tag.percent}%`)
+      : [`- ${tr("暂无动态内容标签")}`]),
     "",
-    "## 观点聚类",
+    `## ${tr("观点聚类")}`,
     "",
     ...(data.insightClusters.length
-      ? data.insightClusters.map((cluster) => `### ${cluster.title}\n\n${normalizeExportText(cluster.summary)}\n\n- 评论数：${cluster.count}，占比 ${cluster.percent}%\n- 情绪：${sentimentText(cluster.sentiment)}`)
-      : ["暂无观点聚类"]),
+      ? data.insightClusters.map((cluster) => `### ${cluster.title}\n\n${normalizeExportText(cluster.summary)}\n\n- ${tr("评论数")}：${cluster.count}，${tr("占比")} ${cluster.percent}%\n- ${tr("情感")}：${tr(sentimentText(cluster.sentiment))}`)
+      : [tr("暂无观点聚类")]),
     "",
-    `## ${insightReportTitle.value}`,
+    `## ${tr(insightReportTitle.value)}`,
     "",
-    ...(productInsightSections.value.length ? productInsightSections.value.map((item) => `### ${item.title}\n\n${normalizeExportText(item.content)}`) : ["暂无深度洞察"]),
+    ...(productInsightSections.value.length ? productInsightSections.value.map((item) => `### ${tr(item.title)}\n\n${normalizeExportText(item.content)}`) : [tr("暂无深度洞察")]),
     "",
-    "## 分析质量提醒",
+    `## ${tr("分析质量提醒")}`,
     "",
     ...(data.qualityAlerts.length
-      ? data.qualityAlerts.map((alert) => `- [${qualityAlertLevelText(alert.level)}] ${alert.title}：${normalizeExportText(`${alert.detail} ${alert.recommendation}`)}`)
-      : ["- 暂无质量提醒"]),
+      ? data.qualityAlerts.map((alert) => `- [${tr(qualityAlertLevelText(alert.level))}] ${alert.title}：${normalizeExportText(`${alert.detail} ${alert.recommendation}`)}`)
+      : [`- ${tr("暂无质量提醒")}`]),
     "",
-    "## 代表性评论",
+    `## ${tr("代表性评论")}`,
     "",
     ...buildRepresentativeReviewMarkdown(data)
   ];
@@ -1035,14 +1038,14 @@ function buildHtmlReport() {
     .map(
       (item) => `
         <article>
-          <span>${escapeHtml(item.label)}</span>
+          <span>${escapeHtml(tr(item.label))}</span>
           <strong>${escapeHtml(item.value)}</strong>
-          <small>${escapeHtml(item.note)}</small>
+          <small>${escapeHtml(tr(item.note))}</small>
         </article>`
     )
     .join("");
   const sentimentRows = data.sentimentDistribution
-    .map((item) => `<tr><td>${escapeHtml(sentimentText(item.sentiment))}</td><td>${item.count}</td><td>${item.percent}%</td></tr>`)
+    .map((item) => `<tr><td>${escapeHtml(tr(sentimentText(item.sentiment)))}</td><td>${item.count}</td><td>${item.percent}%</td></tr>`)
     .join("");
   const intentRows = data.intentDistribution
     .map((item) => `<tr><td>${escapeHtml(item.label)}</td><td>${item.count}</td><td>${item.percent}%</td></tr>`)
@@ -1053,7 +1056,7 @@ function buildHtmlReport() {
     .join("");
   const dynamicTags = data.dynamicContentTags
     .slice(0, 12)
-    .map((tag) => `<li><strong>${escapeHtml(tag.label)}</strong><span>${escapeHtml(dynamicTagKindText(tag.kind))} · ${tag.count} 条 · ${tag.percent}%</span></li>`)
+    .map((tag) => `<li><strong>${escapeHtml(tag.label)}</strong><span>${escapeHtml(tr(dynamicTagKindText(tag.kind)))} · ${tag.count} ${escapeHtml(tr("条"))} · ${tag.percent}%</span></li>`)
     .join("");
   const clusters = data.insightClusters
     .map(
@@ -1061,7 +1064,7 @@ function buildHtmlReport() {
         <article class="section-card">
           <h3>${escapeHtml(cluster.title)}</h3>
           <p>${escapeHtml(cluster.summary)}</p>
-          <div class="muted">${cluster.count} 条评论 · ${cluster.percent}% · ${escapeHtml(sentimentText(cluster.sentiment))}</div>
+          <div class="muted">${cluster.count} ${escapeHtml(tr("条评论"))} · ${cluster.percent}% · ${escapeHtml(tr(sentimentText(cluster.sentiment)))}</div>
         </article>`
     )
     .join("");
@@ -1084,7 +1087,7 @@ function buildHtmlReport() {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(reportTitle.value)} 分析报告</title>
+    <title>${escapeHtml(reportTitle.value)} ${escapeHtml(tr("分析报告"))}</title>
     <style>
       body { margin: 0; font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif; color: #172033; background: #f4f6fa; }
       main { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 32px 0 42px; }
@@ -1114,45 +1117,45 @@ function buildHtmlReport() {
     <main>
       <header class="hero">
         <div class="kicker">ReviewIQ Report</div>
-        <h1>${escapeHtml(reportTitle.value)} 分析报告</h1>
-        <p>${escapeHtml(task.name)} · ${escapeHtml(task.sourceChannel)} · ${escapeHtml(analysisTypeLabel(task.analysisType))} · 导出时间 ${escapeHtml(new Date().toLocaleString())}</p>
+        <h1>${escapeHtml(reportTitle.value)} ${escapeHtml(tr("分析报告"))}</h1>
+        <p>${escapeHtml(task.name)} · ${escapeHtml(task.sourceChannel)} · ${escapeHtml(tr(analysisTypeLabel(task.analysisType)))} · ${escapeHtml(tr("导出时间"))} ${escapeHtml(new Date().toLocaleString())}</p>
       </header>
       <section>
-        <h2>执行摘要</h2>
-        <h3>${escapeHtml(executiveHeadline.value)}</h3>
-        <p>${escapeHtml(data.aiSummary || emptySummaryText.value)}</p>
+        <h2>${escapeHtml(tr("执行摘要"))}</h2>
+        <h3>${escapeHtml(tr(executiveHeadline.value))}</h3>
+        <p>${escapeHtml(data.aiSummary || tr(emptySummaryText.value))}</p>
         <div class="metrics">${metrics}</div>
       </section>
       <section>
-        <h2>情感分布</h2>
-        <table><thead><tr><th>情感</th><th>数量</th><th>占比</th></tr></thead><tbody>${sentimentRows}</tbody></table>
+        <h2>${escapeHtml(tr("情感分布"))}</h2>
+        <table><thead><tr><th>${escapeHtml(tr("情感"))}</th><th>${escapeHtml(tr("数量"))}</th><th>${escapeHtml(tr("占比"))}</th></tr></thead><tbody>${sentimentRows}</tbody></table>
       </section>
       <section>
-        <h2>评论意图</h2>
-        <table><thead><tr><th>意图</th><th>数量</th><th>占比</th></tr></thead><tbody>${intentRows || `<tr><td colspan="3">暂无意图分布数据</td></tr>`}</tbody></table>
+        <h2>${escapeHtml(tr("评论意图"))}</h2>
+        <table><thead><tr><th>${escapeHtml(tr("意图"))}</th><th>${escapeHtml(tr("数量"))}</th><th>${escapeHtml(tr("占比"))}</th></tr></thead><tbody>${intentRows || `<tr><td colspan="3">${escapeHtml(tr("暂无意图分布数据"))}</td></tr>`}</tbody></table>
       </section>
       <section>
-        <h2>高频问题</h2>
-        <table><thead><tr><th>问题</th><th>相关评论</th><th>证据样本</th></tr></thead><tbody>${issueRows || `<tr><td colspan="3">暂无高频问题</td></tr>`}</tbody></table>
+        <h2>${escapeHtml(tr("高频问题"))}</h2>
+        <table><thead><tr><th>${escapeHtml(tr("问题"))}</th><th>${escapeHtml(tr("相关评论"))}</th><th>${escapeHtml(tr("证据样本"))}</th></tr></thead><tbody>${issueRows || `<tr><td colspan="3">${escapeHtml(tr("暂无高频问题"))}</td></tr>`}</tbody></table>
       </section>
       <section>
-        <h2>动态内容标签</h2>
-        <ul class="clean">${dynamicTags || "<li>暂无动态内容标签</li>"}</ul>
+        <h2>${escapeHtml(tr("动态内容标签"))}</h2>
+        <ul class="clean">${dynamicTags || `<li>${escapeHtml(tr("暂无动态内容标签"))}</li>`}</ul>
       </section>
       <section>
-        <h2>观点聚类</h2>
-        <div class="grid">${clusters || "<p>暂无观点聚类</p>"}</div>
+        <h2>${escapeHtml(tr("观点聚类"))}</h2>
+        <div class="grid">${clusters || `<p>${escapeHtml(tr("暂无观点聚类"))}</p>`}</div>
       </section>
       <section>
-        <h2>${escapeHtml(insightReportTitle.value)}</h2>
-        <div class="grid">${insightCards || "<p>暂无深度洞察</p>"}</div>
+        <h2>${escapeHtml(tr(insightReportTitle.value))}</h2>
+        <div class="grid">${insightCards || `<p>${escapeHtml(tr("暂无深度洞察"))}</p>`}</div>
       </section>
       <section>
-        <h2>分析质量提醒</h2>
-        <ul class="clean">${alerts || "<li>暂无质量提醒</li>"}</ul>
+        <h2>${escapeHtml(tr("分析质量提醒"))}</h2>
+        <ul class="clean">${alerts || `<li>${escapeHtml(tr("暂无质量提醒"))}</li>`}</ul>
       </section>
       <section>
-        <h2>代表性评论</h2>
+        <h2>${escapeHtml(tr("代表性评论"))}</h2>
         ${representativeReviews}
       </section>
     </main>
@@ -1165,10 +1168,10 @@ function buildRepresentativeReviewMarkdown(data: DashboardDTO) {
   const negative = data.representativeReviews?.negative || [];
   const lines: string[] = [];
 
-  lines.push("### 正向代表评论", "");
-  lines.push(...(positive.length ? positive.slice(0, 5).map((review) => `- ${normalizeExportText(review.summary || review.commentTr || review.comment)}`) : ["- 暂无正向代表评论"]));
-  lines.push("", "### 负向代表评论", "");
-  lines.push(...(negative.length ? negative.slice(0, 5).map((review) => `- ${normalizeExportText(review.summary || review.commentTr || review.comment)}`) : ["- 暂无负向代表评论"]));
+  lines.push(`### ${tr("正向代表评论")}`, "");
+  lines.push(...(positive.length ? positive.slice(0, 5).map((review) => `- ${normalizeExportText(review.summary || review.commentTr || review.comment)}`) : [`- ${tr("暂无正向代表评论")}`]));
+  lines.push("", `### ${tr("负向代表评论")}`, "");
+  lines.push(...(negative.length ? negative.slice(0, 5).map((review) => `- ${normalizeExportText(review.summary || review.commentTr || review.comment)}`) : [`- ${tr("暂无负向代表评论")}`]));
   return lines;
 }
 
@@ -1179,11 +1182,11 @@ function buildRepresentativeReviewHtml(data: DashboardDTO) {
           .slice(0, 5)
           .map((review) => `<li>${escapeHtml(review.summary || review.commentTr || review.comment)}</li>`)
           .join("")}</ul>`
-      : "<p>暂无代表评论</p>";
+      : `<p>${escapeHtml(tr("暂无代表评论"))}</p>`;
 
   return `<div class="grid">
-    <article class="section-card"><h3>正向代表评论</h3>${renderList(data.representativeReviews?.positive || [])}</article>
-    <article class="section-card"><h3>负向代表评论</h3>${renderList(data.representativeReviews?.negative || [])}</article>
+    <article class="section-card"><h3>${escapeHtml(tr("正向代表评论"))}</h3>${renderList(data.representativeReviews?.positive || [])}</article>
+    <article class="section-card"><h3>${escapeHtml(tr("负向代表评论"))}</h3>${renderList(data.representativeReviews?.negative || [])}</article>
   </div>`;
 }
 
@@ -1200,7 +1203,7 @@ function downloadTextFile(filename: string, content: string, mimeType: string) {
 }
 
 function sanitizeFileName(value: string) {
-  return value.replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim() || "ReviewIQ-分析报告";
+  return value.replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim() || `ReviewIQ-${tr("分析报告")}`;
 }
 
 function formatDateForFile(date: Date) {
