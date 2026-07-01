@@ -275,6 +275,11 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "平台触发限流，建议降低单次采集量或频率，更换代理后再重试。": "The platform rate-limited the request. Reduce per-crawl volume or frequency, change proxy, then retry.",
     "平台或代理链路返回服务异常，建议稍后重试并检查代理稳定性。": "The platform or proxy returned a service error. Retry later and check proxy stability.",
     "平台拒绝了本次请求，建议检查链接、接口签名、浏览器环境或登录态。": "The platform rejected this request. Check the link, API signature, browser environment, or login state.",
+    "平台接口返回 429，疑似请求过快或代理出口被限流": "Platform API returned 429. Requests may be too frequent, or the proxy exit may be rate-limited.",
+    "检查平台账号登录态、Cookie/会话、目标链接权限和代理出口地区": "Check the platform account login state, Cookie/session, target-link permissions, and proxy region.",
+    "降低单次最大采集数或采集频率，更换代理出口后重试": "Reduce the max comments per crawl or crawl frequency, change the proxy exit, then retry.",
+    "稍后重试；若持续出现，检查代理稳定性和目标平台可访问性": "Retry later. If it keeps happening, check proxy stability and target-platform accessibility.",
+    "检查目标链接是否有效、接口签名/浏览器环境是否过期，以及是否需要登录态": "Check whether the target link is valid, whether API signatures/browser context expired, and whether login is required.",
     "评论排序未确认切到全部评论，可能只抓到相关评论；建议检查登录态和页面语言后重试。": "Comment sorting was not confirmed as all comments, so only relevant comments may be collected. Check login state and page language, then retry.",
     "采集接近超时提前返回，建议降低单次最大采集量，或改用监听任务分批采集。": "Crawl returned early near timeout. Lower the max comments per crawl or use monitor tasks to collect in batches.",
     "已达到本次采集上限，如需更多评论可提高最大采集条数后重新采集。": "This crawl reached its limit. Increase the max comments and crawl again if more comments are needed.",
@@ -774,6 +779,11 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "平台触发限流，建议降低单次采集量或频率，更换代理后再重试。": "แพลตฟอร์มจำกัดอัตรา ควรลดจำนวนหรือความถี่ต่อครั้ง เปลี่ยน proxy แล้วลองใหม่",
     "平台或代理链路返回服务异常，建议稍后重试并检查代理稳定性。": "แพลตฟอร์มหรือ proxy ส่งข้อผิดพลาดบริการ ควรลองใหม่ภายหลังและตรวจความเสถียรของ proxy",
     "平台拒绝了本次请求，建议检查链接、接口签名、浏览器环境或登录态。": "แพลตฟอร์มปฏิเสธคำขอนี้ ควรตรวจลิงก์ ลายเซ็น API สภาพแวดล้อมเบราว์เซอร์ หรือสถานะล็อกอิน",
+    "平台接口返回 429，疑似请求过快或代理出口被限流": "API แพลตฟอร์มส่งกลับ 429 อาจส่งคำขอเร็วเกินไปหรือทางออก proxy ถูกจำกัด",
+    "检查平台账号登录态、Cookie/会话、目标链接权限和代理出口地区": "ตรวจสถานะล็อกอินบัญชีแพลตฟอร์ม, Cookie/session, สิทธิ์ลิงก์เป้าหมาย และพื้นที่ proxy",
+    "降低单次最大采集数或采集频率，更换代理出口后重试": "ลดจำนวนสูงสุดต่อครั้งหรือความถี่การเก็บ เปลี่ยนทางออก proxy แล้วลองใหม่",
+    "稍后重试；若持续出现，检查代理稳定性和目标平台可访问性": "ลองใหม่ภายหลัง หากยังเกิดซ้ำให้ตรวจความเสถียร proxy และการเข้าถึงแพลตฟอร์มเป้าหมาย",
+    "检查目标链接是否有效、接口签名/浏览器环境是否过期，以及是否需要登录态": "ตรวจว่าลิงก์เป้าหมายใช้ได้หรือไม่ ลายเซ็น API/สภาพแวดล้อมเบราว์เซอร์หมดอายุหรือไม่ และจำเป็นต้องล็อกอินหรือไม่",
     "评论排序未确认切到全部评论，可能只抓到相关评论；建议检查登录态和页面语言后重试。": "ยังยืนยันไม่ได้ว่าเปลี่ยนการเรียงเป็นคอมเมนต์ทั้งหมด อาจเก็บได้เฉพาะคอมเมนต์ที่เกี่ยวข้อง ควรตรวจล็อกอินและภาษาเพจก่อนลองใหม่",
     "采集接近超时提前返回，建议降低单次最大采集量，或改用监听任务分批采集。": "การเก็บข้อมูลใกล้หมดเวลาและคืนผลก่อน ควรลดจำนวนสูงสุดต่อครั้งหรือใช้การติดตามเพื่อเก็บเป็นชุด",
     "已达到本次采集上限，如需更多评论可提高最大采集条数后重新采集。": "ถึงขีดจำกัดการเก็บครั้งนี้แล้ว หากต้องการคอมเมนต์เพิ่มให้เพิ่มจำนวนสูงสุดแล้วเก็บใหม่",
@@ -1110,6 +1120,24 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const requestException = value.match(/^请求异常\s+(\d+)$/);
   if (requestException) {
     return locale === "en-US" ? `Request error ${requestException[1]}` : `คำขอผิดปกติ ${requestException[1]}`;
+  }
+  const requestAuthStatus = value.match(/^平台接口返回\s+(\d+)，疑似登录态失效、权限不足或评论区不可公开访问$/);
+  if (requestAuthStatus) {
+    return locale === "en-US"
+      ? `Platform API returned ${requestAuthStatus[1]}. Login may be invalid, permissions may be insufficient, or the comment area may not be public.`
+      : `API แพลตฟอร์มส่งกลับ ${requestAuthStatus[1]} สถานะล็อกอินอาจหมดอายุ สิทธิ์ไม่พอ หรือพื้นที่คอมเมนต์ไม่เปิดสาธารณะ`;
+  }
+  const requestServerStatus = value.match(/^平台接口返回\s+(\d+)，疑似平台服务异常、代理链路异常或临时风控$/);
+  if (requestServerStatus) {
+    return locale === "en-US"
+      ? `Platform API returned ${requestServerStatus[1]}. The platform service, proxy path, or temporary risk control may be abnormal.`
+      : `API แพลตฟอร์มส่งกลับ ${requestServerStatus[1]} บริการแพลตฟอร์ม เส้นทาง proxy หรือระบบป้องกันชั่วคราวอาจผิดปกติ`;
+  }
+  const requestRejectedStatus = value.match(/^平台接口返回\s+(\d+)，请求已被平台拒绝或参数不被接受$/);
+  if (requestRejectedStatus) {
+    return locale === "en-US"
+      ? `Platform API returned ${requestRejectedStatus[1]}. The request was rejected by the platform, or the parameters were not accepted.`
+      : `API แพลตฟอร์มส่งกลับ ${requestRejectedStatus[1]} คำขอถูกแพลตฟอร์มปฏิเสธ หรือพารามิเตอร์ไม่ถูกยอมรับ`;
   }
   const uncovered = value.match(/^平台仍约有\s+([\d,]+)\s+条未覆盖，可提高采集上限或用监听任务继续补采。$/);
   if (uncovered) {
