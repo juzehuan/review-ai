@@ -168,6 +168,13 @@
         <div class="table-shell">
           <div class="table-title">任务队列状态</div>
           <div class="member-email">更新时间：{{ formatTime(queueHealth?.updatedAt) }}</div>
+          <a-alert
+            class="queue-health-alert"
+            :type="queueHealthSummary.type"
+            show-icon
+            :message="queueHealthSummary.message"
+            :description="queueHealthSummary.description"
+          />
           <div class="summary-grid">
             <div v-for="queue in queueHealth?.queues || []" :key="queue.name" class="stat-card" :class="queue.failed ? 'stat-card-alert' : 'stat-card-success'">
               <div class="stat-label">{{ queue.label }}</div>
@@ -794,6 +801,75 @@ const auditWorkspaceOptions = computed(() => {
   return Array.from(options.values()).sort((a, b) => (a.value === "__platform" ? -1 : b.value === "__platform" ? 1 : a.label.localeCompare(b.label)));
 });
 
+type QueueHealthSummaryType = "success" | "info" | "warning" | "error";
+
+const queueHealthSummary = computed<{
+  type: QueueHealthSummaryType;
+  message: string;
+  description: string;
+}>(() => {
+  const health = queueHealth.value;
+  if (!health) {
+    return {
+      type: "info",
+      message: "队列健康数据加载中",
+      description: "后台会在队列健康页每 10 秒自动刷新一次。"
+    };
+  }
+
+  const queueErrorCount = health.queues.filter((queue) => queue.error).length;
+  const pausedQueueCount = health.queues.filter((queue) => queue.isPaused).length;
+  const bullFailedCount = health.queues.reduce((sum, queue) => sum + queue.failed, 0);
+  const activeCount = health.queues.reduce((sum, queue) => sum + queue.active + queue.waiting + queue.delayed, 0);
+  const workloadFailedCount = health.workloads.reduce((sum, workload) => sum + workload.failed, 0);
+  const integrityCount = health.integrityAlerts.length;
+  const stalledCount = health.stalledItems.length;
+  const recentFailureCount = health.recentFailures.length;
+  const issueParts = [
+    queueErrorCount ? `${queueErrorCount} 个队列连接异常` : null,
+    pausedQueueCount ? `${pausedQueueCount} 个队列暂停` : null,
+    integrityCount ? `${integrityCount} 个一致性告警` : null,
+    stalledCount ? `${stalledCount} 个疑似卡住任务` : null,
+    bullFailedCount ? `BullMQ 失败 ${bullFailedCount} 个` : null,
+    workloadFailedCount ? `数据库失败 ${workloadFailedCount} 个` : null,
+    recentFailureCount ? `最近失败 ${recentFailureCount} 个` : null
+  ].filter((item): item is string => Boolean(item));
+
+  if (queueErrorCount || pausedQueueCount || integrityCount) {
+    return {
+      type: "error",
+      message: `队列健康异常：${issueParts.join("，")}`,
+      description: "优先处理队列连接、暂停状态和一致性告警；需要时使用“补回队列”或停止后重新创建任务。"
+    };
+  }
+  if (stalledCount) {
+    return {
+      type: "warning",
+      message: `发现 ${stalledCount} 个疑似卡住任务`,
+      description: "先看诊断建议和最近错误，再检查 worker、Redis、代理、平台登录态或 AI 模型配置。"
+    };
+  }
+  if (bullFailedCount || workloadFailedCount || recentFailureCount) {
+    return {
+      type: "warning",
+      message: `队列可消费，但仍有失败记录：${issueParts.join("，")}`,
+      description: "查看最近失败任务，已恢复的任务可略过；未恢复的采集或分析可以按需重试。"
+    };
+  }
+  if (activeCount) {
+    return {
+      type: "info",
+      message: `队列正在正常处理 ${activeCount} 个待消费任务`,
+      description: "当前未发现一致性告警或卡住任务，保持观察即可。"
+    };
+  }
+  return {
+    type: "success",
+    message: "队列健康正常",
+    description: "当前没有待处理告警、卡住任务或最近失败记录。"
+  };
+});
+
 function buildAuditOptions(values: string[], extraValues: string[], labeler: (value: string) => string) {
   const uniqueValues = new Set([...values, ...extraValues.filter(Boolean)]);
   return Array.from(uniqueValues)
@@ -1411,6 +1487,14 @@ onUnmounted(stopQueueHealthPolling);
 
 .queue-recovery-tag {
   margin-top: 6px;
+}
+
+.queue-health-alert {
+  margin: 12px 0 16px;
+}
+
+.queue-health-alert :deep(.ant-alert-message) {
+  font-weight: 700;
 }
 
 .stalled-diagnosis-cell {
