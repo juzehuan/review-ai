@@ -1759,17 +1759,21 @@ async function incrementRunProgress(runId: string, successCount: number, failedC
 
 function resolveDashboardLanguageContext(dashboard: DashboardDTO) {
   const languageProfile = dashboard.languageProfile || {
+    primaryLanguageKey: "unknown",
     primaryLanguage: "未知/表情符号",
     nonChineseCount: 0,
     nonChineseRate: 0,
     mixedLanguageCount: 0,
+    mixedLanguageRate: 0,
+    translationCoverageCount: 0,
+    translationCoverageRate: 0,
     distribution: []
   };
   const languageDistribution =
     languageProfile.distribution.map((item) => `${item.label}(${item.percent}%)`).join("、") || languageProfile.primaryLanguage;
   const languageInstruction =
-    languageProfile.nonChineseRate >= 30
-      ? "非中文/混合语言评论占比较高，必须优先尊重原文语义，结合当前任务类型判断情绪、立场、问题和建议，不要只按中文翻译字面意思下结论。"
+    languageProfile.nonChineseRate >= 30 || (languageProfile.translationCoverageRate || 0) >= 50 || (languageProfile.mixedLanguageRate || 0) >= 15
+      ? "非中文、翻译或混合语言样本占比较高，必须优先尊重原文语义，结合当前任务类型判断情绪、立场、问题和建议，不要只按中文翻译字面意思下结论。"
       : "如评论包含非中文或混合语言，优先尊重原文语义，翻译仅作为辅助参考。";
 
   return { languageProfile, languageDistribution, languageInstruction };
@@ -1792,6 +1796,8 @@ function buildDashboardPromptContext(setting: ResolvedAiSetting, dashboard: Dash
     `低价值评论占比：${dashboard.contentProfile.lowValueCommentRate}%`,
     `评论主语言：${languageProfile.primaryLanguage}`,
     `非中文/混合评论占比：${languageProfile.nonChineseRate}%（${languageProfile.nonChineseCount}/${dashboard.reviewCount}）`,
+    `混合语言评论占比：${languageProfile.mixedLanguageRate || 0}%（${languageProfile.mixedLanguageCount || 0}/${dashboard.reviewCount}）`,
+    `翻译字段覆盖：${languageProfile.translationCoverageRate || 0}%（${languageProfile.translationCoverageCount || 0}/${dashboard.reviewCount}）`,
     `语言分布：${languageDistribution}`,
     `语言适配要求：${languageInstruction}`,
     `${issueLabel}：${dashboard.issues.slice(0, 5).map((item) => `${item.issueName}(${item.count})`).join("、") || "暂无明显问题"}`,
@@ -1852,6 +1858,12 @@ async function generateAiSummary(client: OpenAI | null, setting: ResolvedAiSetti
     non_chinese_count: languageProfile.nonChineseCount,
     mixedLanguageCount: languageProfile.mixedLanguageCount,
     mixed_language_count: languageProfile.mixedLanguageCount,
+    mixedLanguageRate: languageProfile.mixedLanguageRate || 0,
+    mixed_language_rate: languageProfile.mixedLanguageRate || 0,
+    translationCoverageCount: languageProfile.translationCoverageCount || 0,
+    translation_coverage_count: languageProfile.translationCoverageCount || 0,
+    translationCoverageRate: languageProfile.translationCoverageRate || 0,
+    translation_coverage_rate: languageProfile.translationCoverageRate || 0,
     languageDistribution,
     language_distribution: languageDistribution,
     dashboardLanguageInstruction: languageInstruction,
@@ -1940,6 +1952,12 @@ async function generateProductInsights(
     non_chinese_count: languageProfile.nonChineseCount,
     mixedLanguageCount: languageProfile.mixedLanguageCount,
     mixed_language_count: languageProfile.mixedLanguageCount,
+    mixedLanguageRate: languageProfile.mixedLanguageRate || 0,
+    mixed_language_rate: languageProfile.mixedLanguageRate || 0,
+    translationCoverageCount: languageProfile.translationCoverageCount || 0,
+    translation_coverage_count: languageProfile.translationCoverageCount || 0,
+    translationCoverageRate: languageProfile.translationCoverageRate || 0,
+    translation_coverage_rate: languageProfile.translationCoverageRate || 0,
     languageDistribution,
     language_distribution: languageDistribution,
     dashboardLanguageInstruction: languageInstruction,

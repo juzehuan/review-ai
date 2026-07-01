@@ -198,7 +198,10 @@
       <div class="stat-card stat-card-cool">
         <div class="stat-label">语言画像</div>
         <div class="stat-value">{{ dashboard?.languageProfile?.nonChineseRate || 0 }}%</div>
-        <div class="stat-note">非中文/混合评论，主语言 {{ dashboard?.languageProfile?.primaryLanguage || "-" }}</div>
+        <div class="stat-note">
+          主语言 {{ dashboard?.languageProfile?.primaryLanguage || "-" }} · 翻译覆盖
+          {{ dashboard?.languageProfile?.translationCoverageRate || 0 }}% · 混合 {{ dashboard?.languageProfile?.mixedLanguageRate || 0 }}%
+        </div>
       </div>
     </div>
 

@@ -1110,6 +1110,9 @@ export interface LanguageProfileDTO {
   nonChineseCount: number;
   nonChineseRate: number;
   mixedLanguageCount: number;
+  mixedLanguageRate: number;
+  translationCoverageCount: number;
+  translationCoverageRate: number;
   distribution: Array<{ key: DashboardLanguageKey; label: string; count: number; percent: number }>;
 }
 
@@ -1724,12 +1727,16 @@ function buildLanguageProfile(analyses: DashboardReviewLike[]): LanguageProfileD
   const total = analyses.length;
   const distributionMap = new Map<DashboardLanguageKey, number>();
   let nonChineseCount = 0;
+  let translationCoverageCount = 0;
 
   for (const item of analyses) {
     const language = detectDashboardLanguage(item.review.comment || item.review.commentTr || "");
     distributionMap.set(language.key, (distributionMap.get(language.key) || 0) + 1);
     if (language.isNonChinese) {
       nonChineseCount += 1;
+    }
+    if ((item.review.commentTr || "").trim()) {
+      translationCoverageCount += 1;
     }
   }
 
@@ -1749,6 +1756,9 @@ function buildLanguageProfile(analyses: DashboardReviewLike[]): LanguageProfileD
     nonChineseCount,
     nonChineseRate: total ? round((nonChineseCount / total) * 100) : 0,
     mixedLanguageCount: distributionMap.get("mixed") || 0,
+    mixedLanguageRate: total ? round(((distributionMap.get("mixed") || 0) / total) * 100) : 0,
+    translationCoverageCount,
+    translationCoverageRate: total ? round((translationCoverageCount / total) * 100) : 0,
     distribution
   };
 }
@@ -1948,6 +1958,26 @@ function buildQualityAlerts(params: {
       title: "非中文评论占比较高",
       detail: `本次 ${languageProfile.nonChineseRate}% 的评论以非中文或混合语言为主，主语言为${languageProfile.primaryLanguage}。`,
       recommendation: "建议复核原文语义和任务分析模式，避免仅依赖翻译文本判断情绪、立场或问题标签。"
+    });
+  }
+
+  if (total >= 20 && languageProfile.translationCoverageRate >= 50) {
+    alerts.push({
+      id: "translation-coverage-high",
+      level: languageProfile.translationCoverageRate >= 80 ? "warning" : "info",
+      title: "翻译字段覆盖较高",
+      detail: `本次 ${languageProfile.translationCoverageRate}% 的评论带有翻译文本（${languageProfile.translationCoverageCount}/${total}）。`,
+      recommendation: "建议抽样对照原文和翻译，确认模型优先理解原文，避免翻译误差影响情绪、意图和主题判断。"
+    });
+  }
+
+  if (total >= 20 && languageProfile.mixedLanguageRate >= 15) {
+    alerts.push({
+      id: "mixed-language-high",
+      level: languageProfile.mixedLanguageRate >= 30 ? "warning" : "info",
+      title: "混合语言评论较多",
+      detail: `本次 ${languageProfile.mixedLanguageRate}% 的评论包含多语言混写（${languageProfile.mixedLanguageCount}/${total}）。`,
+      recommendation: "建议优先复核混合语言样本中的专有名词、梗、缩写和情绪词，必要时按评论原文语言调整分析提示词。"
     });
   }
 
