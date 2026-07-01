@@ -928,6 +928,14 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
     const max = fetched[2] === "不限" ? unlimited : fetched[2];
     return locale === "en-US" ? `Fetched ${fetched[1]}/${max}` : `เก็บแล้ว ${fetched[1]}/${max}`;
   }
+  const targetCoverage = value.match(/^目标覆盖\s+(\d+)%$/);
+  if (targetCoverage) {
+    return locale === "en-US" ? `Target coverage ${targetCoverage[1]}%` : `ครอบคลุมเป้าหมาย ${targetCoverage[1]}%`;
+  }
+  const platformCoverage = value.match(/^平台覆盖\s+(\d+)%$/);
+  if (platformCoverage) {
+    return locale === "en-US" ? `Platform coverage ${platformCoverage[1]}%` : `ครอบคลุมแพลตฟอร์ม ${platformCoverage[1]}%`;
+  }
   const processedWithFailures = value.match(/^已处理\s+(.+)\/(.+)，失败\s+(.+)$/);
   if (processedWithFailures) {
     return locale === "en-US"
@@ -969,6 +977,10 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const crawlMetricPart = (part: string) => {
     const total = part.match(/^平台总量\s+(\d+)$/);
     if (total) return locale === "en-US" ? `Platform total ${total[1]}` : `ทั้งหมดบนแพลตฟอร์ม ${total[1]}`;
+    const platformRemaining = part.match(/^平台剩余约\s+(\d+)\s+条$/);
+    if (platformRemaining) {
+      return locale === "en-US" ? `Platform remaining about ${platformRemaining[1]}` : `เหลือบนแพลตฟอร์มประมาณ ${platformRemaining[1]}`;
+    }
     const apiRequests = part.match(/^接口请求\s+(\d+)$/);
     if (apiRequests) return locale === "en-US" ? `API requests ${apiRequests[1]}` : `คำขอ API ${apiRequests[1]}`;
     const apiComments = part.match(/^接口评论\s+(\d+)$/);

@@ -271,7 +271,11 @@ export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
   const durationEnd = job.finishedAt || (isActive ? now : job.updatedAt);
   const durationSeconds = elapsedSeconds(job.startedAt, durationEnd);
   const updatedAgoSeconds = Math.max(0, Math.floor((now.getTime() - job.updatedAt.getTime()) / 1000));
+  const totalComments = readOptionalNumber(rawResult?.totalComments);
   const coveragePercent = job.maxReviews > 0 ? Math.min(100, Math.round((job.fetchedRows / job.maxReviews) * 100)) : null;
+  const platformCoveragePercent =
+    totalComments !== null && totalComments > 0 ? Math.min(100, Math.round((job.fetchedRows / totalComments) * 100)) : null;
+  const platformRemainingRows = totalComments !== null && totalComments > 0 ? Math.max(0, totalComments - job.fetchedRows) : null;
   const fetchRatePerMinute =
     durationSeconds && durationSeconds > 0 && job.fetchedRows > 0 ? roundOne((job.fetchedRows / durationSeconds) * 60) : null;
   return {
@@ -293,6 +297,8 @@ export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
     importedRows: job.importedRows,
     skippedDuplicate: job.skippedDuplicate,
     coveragePercent,
+    platformCoveragePercent,
+    platformRemainingRows,
     durationSeconds,
     updatedAgoSeconds,
     fetchRatePerMinute,
@@ -307,7 +313,7 @@ export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
     domCommentCount: readOptionalNumber(rawResult?.domCommentCount),
     domContentTextCount: readOptionalNumber(rawResult?.domContentTextCount),
     loadMoreClicks: readOptionalNumber(rawResult?.loadMoreClicks),
-    totalComments: readOptionalNumber(rawResult?.totalComments),
+    totalComments,
     remainingSeconds: readOptionalNumber(rawResult?.remainingSeconds),
     progressEventAt: readOptionalString(rawResult?.progressEventAt),
     endReached: readOptionalBoolean(rawResult?.endReached),

@@ -238,8 +238,12 @@
               <a-progress :percent="record.progress" size="small" :status="progressStatus(record.status)" />
               <span>
                 已抓取 {{ record.fetchedRows }}/{{ record.maxReviews || "不限" }}
-                <template v-if="record.coveragePercent !== null"> · 目标 {{ record.coveragePercent }}%</template>
               </span>
+              <span v-if="record.coveragePercent !== null" class="muted">目标覆盖 {{ record.coveragePercent }}%</span>
+              <span v-if="record.platformCoveragePercent != null" class="muted">
+                平台覆盖 {{ record.platformCoveragePercent }}%
+              </span>
+              <span v-if="platformCoverageSummary(record)" class="muted">{{ platformCoverageSummary(record) }}</span>
               <span v-if="crawlThroughputSummary(record)" class="muted">{{ crawlThroughputSummary(record) }}</span>
               <a-tag v-if="record.stalled" color="orange" class="crawl-stalled-tag">
                 疑似无更新 {{ durationLabel(record.updatedAgoSeconds) }}
@@ -776,12 +780,19 @@ function shortJobName(job: CrawlJobDTO) {
 
 function crawlMetricSummary(job: CrawlJobDTO) {
   const parts = [
-    job.totalComments !== null ? `平台总量 ${job.totalComments}` : "",
     job.nextRequests !== null ? `接口请求 ${job.nextRequests}` : "",
     job.payloadComments !== null ? `接口评论 ${job.payloadComments}` : "",
     job.domCommentCount !== null ? `DOM 评论 ${job.domCommentCount}` : "",
     job.domContentTextCount !== null ? `DOM 文本 ${job.domContentTextCount}` : "",
     job.loadMoreClicks !== null ? `加载更多 ${job.loadMoreClicks}` : ""
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function platformCoverageSummary(job: CrawlJobDTO) {
+  const parts = [
+    job.totalComments != null ? `平台总量 ${job.totalComments}` : "",
+    job.platformRemainingRows != null ? `平台剩余约 ${job.platformRemainingRows} 条` : ""
   ].filter(Boolean);
   return parts.join(" · ");
 }

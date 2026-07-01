@@ -243,6 +243,8 @@ export interface CrawlJobDTO {
   importedRows: number;
   skippedDuplicate: number;
   coveragePercent: number | null;
+  platformCoveragePercent: number | null;
+  platformRemainingRows: number | null;
   durationSeconds: number | null;
   updatedAgoSeconds: number;
   fetchRatePerMinute: number | null;
