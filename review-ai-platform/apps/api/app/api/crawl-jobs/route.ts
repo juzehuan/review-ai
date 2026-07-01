@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@review-ai/db";
 import { getCrawlQueue } from "@/lib/queue";
 import { resolvedCrawlerSettingFromRecord, normalizeRequestedCrawlInput, supportedCrawlUrlError } from "@/lib/crawl-utils";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlJob } from "@/lib/serializers";
@@ -109,6 +110,22 @@ export async function POST(request: Request) {
   await getCrawlQueue().add("run-crawl", {
     crawlJobId: job.id,
     workspaceId: context.workspace.id
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: job.workspaceId,
+    actor: context.user,
+    action: "crawl_job.create",
+    targetType: "crawl_job",
+    targetId: job.id,
+    targetLabel: job.name,
+    metadata: {
+      productUrl: job.normalizedUrl,
+      sourceChannel: job.sourceChannel,
+      platform: job.platform,
+      maxReviews: job.maxReviews,
+      crawlChannels: input.crawlChannels
+    }
   });
 
   return ok({ job: serializeCrawlJob(job) }, 201);

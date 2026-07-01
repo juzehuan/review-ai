@@ -2,6 +2,7 @@ import { Prisma, prisma } from "@review-ai/db";
 import type { CrawlResult } from "@/lib/crawl-utils";
 import { parseOptionalDate } from "@/lib/crawl-utils";
 import { defaultAiSetting, resolveApiKey } from "@/lib/ai-settings";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { getPlatformAiSetting } from "@/lib/platform-settings";
 import { getAnalysisQueue } from "@/lib/queue";
@@ -245,6 +246,28 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     runId: result.run.id,
     taskId: result.taskId,
     workspaceId: quotaWorkspaceId
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: quotaWorkspaceId,
+    actor: workspaceContext.user,
+    action: "crawl_job.start_analysis",
+    targetType: "crawl_job",
+    targetId: job.id,
+    targetLabel: job.name,
+    metadata: {
+      taskId: result.taskId,
+      runId: result.run.id,
+      importId: result.importId,
+      reviewCount: result.reviewCount,
+      skippedDuplicate,
+      productUrl: job.normalizedUrl,
+      sourceChannel: job.sourceChannel,
+      platform: job.platform,
+      existingTask: Boolean(job.taskId),
+      provider: aiSetting.provider,
+      modelName
+    }
   });
 
   return ok(
