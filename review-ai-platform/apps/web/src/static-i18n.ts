@@ -258,6 +258,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "未确认": "Not confirmed",
     "达到采集上限": "Crawl limit reached",
     "没有更多评论": "No more comments",
+    "游标未推进": "Cursor did not advance",
     "未发现评论": "No comments found",
     "暂不支持该链接": "Unsupported link",
     "未采集到评论": "No comments collected",
@@ -395,6 +396,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "末尾状态": "End state",
     "接口已返回评论，但导入数量偏低，建议检查解析字段和去重规则。": "The API returned comments, but imports are low. Check parser fields and deduplication rules.",
     "页面已加载评论但入库偏低，建议检查评论选择器或平台语言。": "The page loaded comments, but stored rows are low. Check comment selectors or platform language.",
+    "平台接口返回的分页游标没有继续推进，可能是接口签名、会话或平台限制导致提前停住。": "The platform API returned a pagination cursor that did not advance. It may have stopped early because of API signature, session, or platform limits.",
     "平台仍提示还有更多评论，可提高最大采集条数或用监听任务继续补采。": "The platform still reports more comments. Increase the max comments or use monitor tasks to keep collecting.",
     "页面有加载动作但没有识别到评论，建议检查登录态、排序和评论区权限。": "The page loaded more content but no comments were recognized. Check login state, sorting, and comment permissions.",
     "连续多轮没有新增且未点到更多评论，可能已到页尾或按钮文案未匹配。": "No new comments for multiple rounds and the more-comments button was not found. The page may be at the end, or the button text may not match.",
@@ -408,6 +410,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "检查 crawl-jobs 队列 active/waiting 数、worker 进程和 Redis 连接": "Check crawl-jobs active/waiting counts, worker process, and Redis connection",
     "先查看错误摘要，确认代理、登录态、平台限制或 Python 浏览器依赖": "Review the error summary first; check proxy, login state, platform limits, or Python browser dependencies",
     "降低单次最大采集数或检查平台加载速度，必要时重试": "Lower max comments per crawl or check platform loading speed; retry if needed",
+    "稍后重试；若持续出现，降低单次采集上限并检查代理、浏览器参数和接口签名": "Retry later. If it keeps happening, lower the per-crawl limit and check proxy, browser parameters, and API signature",
     "检查平台登录态、页面语言和排序按钮文案，避免只抓到相关评论": "Check platform login, page language, and sort-button text to avoid only relevant comments",
     "等待短时间自动收尾；若持续静默，查看 worker 日志后重试": "Wait briefly for finalization; if silence continues, check worker logs and retry",
     "检查平台是否需要登录、评论区是否受限、代理是否触发风控": "Check whether login is required, comments are restricted, or proxy triggered risk control",
@@ -438,6 +441,8 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "评论排序未确认切到全部评论，可能只抓到相关评论；建议检查登录态和页面语言后重试。": "Comment sorting was not confirmed as all comments, so only relevant comments may be collected. Check login state and page language, then retry.",
     "采集接近超时提前返回，建议降低单次最大采集量，或改用监听任务分批采集。": "Crawl returned early near timeout. Lower the max comments per crawl or use monitor tasks to collect in batches.",
     "已达到本次采集上限，如需更多评论可提高最大采集条数后重新采集。": "This crawl reached its limit. Increase the max comments and crawl again if more comments are needed.",
+    "TikTok 接口游标未继续推进，疑似分页签名、会话或平台限制": "TikTok API cursor did not advance; pagination signature, session, or platform limits may be blocking it",
+    "TikTok 接口游标未继续推进，建议稍后重试；若持续出现，降低单次采集上限并检查代理、浏览器参数和接口签名。": "TikTok API cursor did not advance. Retry later; if it keeps happening, lower the per-crawl limit and check proxy, browser parameters, and API signature.",
     "任务长时间没有更新，可能卡在页面加载、代理访问或平台风控，建议稍后刷新或联系管理员查看后台诊断。": "The task has not updated for a long time. It may be stuck on page loading, proxy access, or platform risk control. Refresh later or ask an admin to check backend diagnostics.",
     "采集失败，先看错误摘要；确认链接公开、评论区开启、代理和登录态正常后再重试。": "Crawl failed. Check the error summary first; confirm the link is public, comments are enabled, proxy and login state are normal, then retry.",
     "未采集到评论，先确认链接公开可访问、评论区开启，必要时换登录态或代理再试。": "No comments were collected. Confirm the link is public, comments are enabled, and switch login state or proxy if needed.",
@@ -1193,6 +1198,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "未确认": "ยังไม่ยืนยัน",
     "达到采集上限": "ถึงขีดจำกัดการเก็บ",
     "没有更多评论": "ไม่มีคอมเมนต์เพิ่มเติม",
+    "游标未推进": "เคอร์เซอร์ไม่ขยับ",
     "未发现评论": "ไม่พบคอมเมนต์",
     "暂不支持该链接": "ยังไม่รองรับลิงก์นี้",
     "未采集到评论": "ไม่พบคอมเมนต์",
@@ -1325,6 +1331,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "末尾状态": "สถานะท้ายรายการ",
     "接口已返回评论，但导入数量偏低，建议检查解析字段和去重规则。": "API ส่งคอมเมนต์กลับมาแล้ว แต่จำนวนที่นำเข้าต่ำ ควรตรวจ field parser และกฎ dedup",
     "页面已加载评论但入库偏低，建议检查评论选择器或平台语言。": "หน้าโหลดคอมเมนต์แล้วแต่จำนวนบันทึกต่ำ ควรตรวจ selector คอมเมนต์หรือภาษาแพลตฟอร์ม",
+    "平台接口返回的分页游标没有继续推进，可能是接口签名、会话或平台限制导致提前停住。": "API แพลตฟอร์มส่งเคอร์เซอร์หน้าถัดไปที่ไม่ขยับ อาจหยุดก่อนเพราะลายเซ็น API, session หรือข้อจำกัดของแพลตฟอร์ม",
     "平台仍提示还有更多评论，可提高最大采集条数或用监听任务继续补采。": "แพลตฟอร์มยังแจ้งว่ามีคอมเมนต์เพิ่ม ให้เพิ่มจำนวนสูงสุดหรือใช้ monitor task เก็บต่อ",
     "页面有加载动作但没有识别到评论，建议检查登录态、排序和评论区权限。": "หน้ามีการโหลดเพิ่มเติมแต่ไม่พบคอมเมนต์ ควรตรวจสถานะล็อกอิน การเรียง และสิทธิ์คอมเมนต์",
     "连续多轮没有新增且未点到更多评论，可能已到页尾或按钮文案未匹配。": "หลายรอบไม่มีคอมเมนต์ใหม่และไม่พบปุ่มโหลดเพิ่ม อาจถึงท้ายหน้าแล้วหรือข้อความปุ่มไม่ตรง",
@@ -1338,6 +1345,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "检查 crawl-jobs 队列 active/waiting 数、worker 进程和 Redis 连接": "ตรวจจำนวน active/waiting ในคิว crawl-jobs, โปรเซส worker และการเชื่อมต่อ Redis",
     "先查看错误摘要，确认代理、登录态、平台限制或 Python 浏览器依赖": "ดูสรุปข้อผิดพลาดก่อน แล้วตรวจ proxy, สถานะล็อกอิน, ข้อจำกัดแพลตฟอร์ม หรือ dependency เบราว์เซอร์ Python",
     "降低单次最大采集数或检查平台加载速度，必要时重试": "ลดจำนวนสูงสุดต่อครั้งหรือตรวจความเร็วโหลดของแพลตฟอร์ม แล้วลองใหม่หากจำเป็น",
+    "稍后重试；若持续出现，降低单次采集上限并检查代理、浏览器参数和接口签名": "ลองใหม่ภายหลัง หากยังเกิดซ้ำ ให้ลดจำนวนสูงสุดต่อครั้งและตรวจ proxy, ค่าพารามิเตอร์เบราว์เซอร์ และลายเซ็น API",
     "检查平台登录态、页面语言和排序按钮文案，避免只抓到相关评论": "ตรวจสถานะล็อกอิน ภาษาเพจ และข้อความปุ่มเรียงลำดับ เพื่อเลี่ยงการเก็บเฉพาะคอมเมนต์ที่เกี่ยวข้อง",
     "等待短时间自动收尾；若持续静默，查看 worker 日志后重试": "รอสักครู่ให้ปิดงานอัตโนมัติ หากยังเงียบให้ดูบันทึก worker แล้วลองใหม่",
     "检查平台是否需要登录、评论区是否受限、代理是否触发风控": "ตรวจว่าต้องล็อกอินหรือไม่ คอมเมนต์ถูกจำกัดหรือไม่ หรือ proxy กระตุ้นระบบป้องกันหรือไม่",
@@ -1368,6 +1376,8 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "评论排序未确认切到全部评论，可能只抓到相关评论；建议检查登录态和页面语言后重试。": "ยังยืนยันไม่ได้ว่าเปลี่ยนการเรียงเป็นคอมเมนต์ทั้งหมด อาจเก็บได้เฉพาะคอมเมนต์ที่เกี่ยวข้อง ควรตรวจล็อกอินและภาษาเพจก่อนลองใหม่",
     "采集接近超时提前返回，建议降低单次最大采集量，或改用监听任务分批采集。": "การเก็บข้อมูลใกล้หมดเวลาและคืนผลก่อน ควรลดจำนวนสูงสุดต่อครั้งหรือใช้การติดตามเพื่อเก็บเป็นชุด",
     "已达到本次采集上限，如需更多评论可提高最大采集条数后重新采集。": "ถึงขีดจำกัดการเก็บครั้งนี้แล้ว หากต้องการคอมเมนต์เพิ่มให้เพิ่มจำนวนสูงสุดแล้วเก็บใหม่",
+    "TikTok 接口游标未继续推进，疑似分页签名、会话或平台限制": "TikTok API cursor ไม่ขยับ อาจถูกบล็อกจากลายเซ็นแบ่งหน้า, session หรือข้อจำกัดแพลตฟอร์ม",
+    "TikTok 接口游标未继续推进，建议稍后重试；若持续出现，降低单次采集上限并检查代理、浏览器参数和接口签名。": "TikTok API cursor ไม่ขยับ ควรลองใหม่ภายหลัง หากยังเกิดซ้ำให้ลดจำนวนสูงสุดต่อครั้งและตรวจ proxy, ค่าพารามิเตอร์เบราว์เซอร์ และลายเซ็น API",
     "任务长时间没有更新，可能卡在页面加载、代理访问或平台风控，建议稍后刷新或联系管理员查看后台诊断。": "งานไม่อัปเดตเป็นเวลานาน อาจค้างที่การโหลดหน้า proxy หรือระบบป้องกันแพลตฟอร์ม ควรรีเฟรชภายหลังหรือติดต่อผู้ดูแลเพื่อตรวจ backend",
     "采集失败，先看错误摘要；确认链接公开、评论区开启、代理和登录态正常后再重试。": "เก็บข้อมูลล้มเหลว ให้ดูสรุปข้อผิดพลาดก่อน ตรวจว่าลิงก์สาธารณะ เปิดคอมเมนต์ proxy และล็อกอินปกติ แล้วลองใหม่",
     "未采集到评论，先确认链接公开可访问、评论区开启，必要时换登录态或代理再试。": "ไม่พบคอมเมนต์ ให้ยืนยันว่าลิงก์เข้าถึงได้และเปิดคอมเมนต์ หากจำเป็นให้เปลี่ยนล็อกอินหรือ proxy แล้วลองใหม่",
@@ -2253,7 +2263,10 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
     const progressEvent = part.match(/^进度回传\s+(.+)$/);
     if (progressEvent) return locale === "en-US" ? `Progress event ${progressEvent[1]}` : `ความคืบหน้า ${progressEvent[1]}`;
     const stopReason = part.match(/^停止原因\s+(.+)$/);
-    if (stopReason) return locale === "en-US" ? `Stop reason ${stopReason[1]}` : `เหตุผลที่หยุด ${stopReason[1]}`;
+    if (stopReason) {
+      const reason = staticText[locale][stopReason[1]] || stopReason[1];
+      return locale === "en-US" ? `Stop reason ${reason}` : `เหตุผลที่หยุด ${reason}`;
+    }
     const updated = part.match(/^更新于\s+(.+)前$/);
     if (updated) return locale === "en-US" ? `Updated ${translateDuration(updated[1])} ago` : `อัปเดตเมื่อ ${translateDuration(updated[1])}ที่แล้ว`;
     return null;

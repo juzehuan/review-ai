@@ -1150,10 +1150,7 @@ def collect_tiktok_api_comments(
     comments_by_id: dict[str, dict[str, Any]],
     max_reviews: int,
 ) -> int:
-    comments = payload.get("comments")
-    if not isinstance(comments, list):
-        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
-        comments = data.get("comments") if isinstance(data.get("comments"), list) else []
+    comments = tiktok_payload_comments(payload)
 
     added = 0
     for index, comment in enumerate(comments):
@@ -1239,6 +1236,23 @@ def parse_tiktok_has_more(value: Any) -> bool | None:
     return bool(value)
 
 
+def tiktok_payload_value(payload: dict[str, Any], key: str) -> Any:
+    value = payload.get(key)
+    if value is not None:
+        return value
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    return data.get(key)
+
+
+def tiktok_payload_comments(payload: dict[str, Any]) -> list[Any]:
+    comments = payload.get("comments")
+    if isinstance(comments, list):
+        return comments
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    comments = data.get("comments")
+    return comments if isinstance(comments, list) else []
+
+
 def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: str | None, timeout: int) -> dict[str, Any]:
     video_id = parse_tiktok_video_id(video_url)
     comments_by_id: dict[str, dict[str, Any]] = {}
@@ -1252,6 +1266,7 @@ def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: 
         "payload_comments": 0,
         "dom_comment_count": 0,
         "cursor": cursor,
+        "has_more": None,
         "total_comments": None,
         "end_reached": False,
         "stop_reason": None,
@@ -1267,35 +1282,55 @@ def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: 
         page_count += 1
         state["comment_requests"] = page_count
         state["last_request_status"] = request_status
-        comments = payload.get("comments")
-        if not isinstance(comments, list):
-            data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
-            comments = data.get("comments") if isinstance(data.get("comments"), list) else []
-        collect_tiktok_api_comments(payload, video_id, video_url, comments_by_id, max_reviews)
+        comments = tiktok_payload_comments(payload)
+        added = collect_tiktok_api_comments(payload, video_id, video_url, comments_by_id, max_reviews)
         state["payload_comments"] = len(comments_by_id)
-        parsed_has_more = parse_tiktok_has_more(payload.get("has_more"))
-        has_more = False if parsed_has_more is False or not comments else bool(parsed_has_more)
-        if parsed_has_more is False or not comments:
-            state["end_reached"] = True
-            state["stop_reason"] = "no_more_comments"
+        state["last_added_rows"] = added
+        parsed_has_more = parse_tiktok_has_more(tiktok_payload_value(payload, "has_more"))
         try:
-            total_count = int(payload.get("total") or total_count or 0) or total_count
+            total_count = int(tiktok_payload_value(payload, "total") or total_count or 0) or total_count
             state["total_comments"] = total_count
         except Exception:
             total_count = total_count
         try:
-            next_cursor = int(payload.get("cursor") or 0)
+            next_cursor = int(tiktok_payload_value(payload, "cursor") or 0)
         except Exception:
             next_cursor = 0
-        if next_cursor <= cursor:
+        reached_limit = max_reviews > 0 and len(comments_by_id) >= max_reviews
+        if reached_limit:
+            state["stop_reason"] = "max_reviews"
+            cursor_advanced = next_cursor > cursor
+            if cursor_advanced:
+                cursor = next_cursor
+                state["cursor"] = cursor
+            if parsed_has_more is not None:
+                has_more = parsed_has_more
+            elif cursor_advanced:
+                has_more = True
+            state["has_more"] = has_more
+            emit_crawl_progress("TikTok Video", "tiktok_video", comments_by_id, state, max_reviews, deadline)
+            break
+        if parsed_has_more is False or not comments:
+            has_more = False
+            state["has_more"] = has_more
             state["end_reached"] = True
-            state["stop_reason"] = state.get("stop_reason") or "no_more_comments"
+            state["stop_reason"] = "no_more_comments"
+            if next_cursor > cursor:
+                cursor = next_cursor
+                state["cursor"] = cursor
+            emit_crawl_progress("TikTok Video", "tiktok_video", comments_by_id, state, max_reviews, deadline)
+            break
+        if next_cursor <= cursor:
+            has_more = True if parsed_has_more is not False else False
+            state["has_more"] = has_more
+            state["end_reached"] = False
+            state["stop_reason"] = "cursor_stalled"
             emit_crawl_progress("TikTok Video", "tiktok_video", comments_by_id, state, max_reviews, deadline)
             break
         cursor = next_cursor
         state["cursor"] = cursor
-        if max_reviews > 0 and len(comments_by_id) >= max_reviews:
-            state["stop_reason"] = "max_reviews"
+        has_more = True if parsed_has_more is None else parsed_has_more
+        state["has_more"] = has_more
         emit_crawl_progress("TikTok Video", "tiktok_video", comments_by_id, state, max_reviews, deadline)
         time.sleep(0.8)
     if time.time() >= deadline and has_more and (max_reviews <= 0 or len(comments_by_id) < max_reviews):
@@ -1320,7 +1355,7 @@ def fetch_tiktok_video_comments_direct(video_url: str, max_reviews: int, proxy: 
         "payloadComments": len(rows),
         "domCommentCount": 0,
         "cursor": cursor,
-        "hasMore": has_more,
+        "hasMore": state.get("has_more") if state.get("has_more") is not None else has_more,
         "lastRequestStatus": state.get("last_request_status"),
         "totalComments": total_count,
         "endReached": bool(state.get("end_reached")),
@@ -1366,12 +1401,15 @@ def fetch_tiktok_video_comments(video_url: str, max_reviews: int, proxy: str | N
                     payload = json.loads(response.text())
                     added = collect_tiktok_api_comments(payload, video_id, video_url, comments_by_id, max_reviews)
                     state["payload_comments"] = int(state.get("payload_comments") or 0) + added
-                    if "has_more" in payload:
-                        state["has_more"] = parse_tiktok_has_more(payload.get("has_more"))
-                    if "cursor" in payload:
-                        state["cursor"] = payload.get("cursor")
-                    if "total" in payload:
-                        state["total_comments"] = payload.get("total")
+                    has_more_value = tiktok_payload_value(payload, "has_more")
+                    if has_more_value is not None:
+                        state["has_more"] = parse_tiktok_has_more(has_more_value)
+                    cursor_value = tiktok_payload_value(payload, "cursor")
+                    if cursor_value is not None:
+                        state["cursor"] = cursor_value
+                    total_value = tiktok_payload_value(payload, "total")
+                    if total_value is not None:
+                        state["total_comments"] = total_value
                 except Exception:
                     return
             except Exception:

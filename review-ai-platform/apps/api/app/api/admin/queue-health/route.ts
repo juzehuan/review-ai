@@ -179,6 +179,17 @@ function buildMetricSummary(parts: Array<string | null | undefined>) {
   return values.length ? values.join(" · ") : null;
 }
 
+function formatCrawlStopReason(value: string) {
+  const labels: Record<string, string> = {
+    max_reviews: "达到采集上限",
+    no_more_comments: "没有更多评论",
+    cursor_stalled: "游标未推进",
+    timeout: "采集超时",
+    no_comments_found: "未发现评论"
+  };
+  return labels[value] || value;
+}
+
 function buildRequestStatusInsight(status: number | null) {
   if (status === null || status < 400) {
     return null;
@@ -247,7 +258,7 @@ function buildCrawlStalledInsight(job: {
     commentSortOpened !== null ? `排序菜单 ${commentSortOpened ? "已打开" : "未打开"}` : null,
     progressEventAt ? `进度回传 ${progressEventAt}` : null,
     partialDueToTimeout ? "部分结果超时" : null,
-    stopReason ? `停止原因 ${stopReason}` : null
+    stopReason ? `停止原因 ${formatCrawlStopReason(stopReason)}` : null
   ]);
 
   if (job.status === "queued") {
@@ -264,6 +275,15 @@ function buildCrawlStalledInsight(job: {
     return {
       detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
       ...requestStatusInsight,
+      metricSummary,
+      lastError: truncateText(job.lastError) || null
+    };
+  }
+  if (stopReason === "cursor_stalled") {
+    return {
+      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      diagnosis: "TikTok 接口游标未继续推进，疑似分页签名、会话或平台限制",
+      nextAction: "稍后重试；若持续出现，降低单次采集上限并检查代理、浏览器参数和接口签名",
       metricSummary,
       lastError: truncateText(job.lastError) || null
     };

@@ -1007,6 +1007,9 @@ function stopReasonLabel(value?: string | null) {
   if (value === "no_more_comments") {
     return "没有更多评论";
   }
+  if (value === "cursor_stalled") {
+    return "游标未推进";
+  }
   if (value === "timeout") {
     return "采集超时";
   }
@@ -1149,6 +1152,9 @@ function crawlTelemetryStats(job: CrawlJobDTO): CrawlTelemetryStat[] {
 }
 
 function crawlTelemetryHint(job: CrawlJobDTO) {
+  if (job.stopReason === "cursor_stalled") {
+    return "平台接口返回的分页游标没有继续推进，可能是接口签名、会话或平台限制导致提前停住。";
+  }
   if (job.payloadComments !== null && job.payloadComments > 0 && job.fetchedRows < Math.min(job.payloadComments, job.maxReviews || job.payloadComments)) {
     return "接口已返回评论，但导入数量偏低，建议检查解析字段和去重规则。";
   }
@@ -1216,6 +1222,9 @@ function crawlJobDiagnostic(job: CrawlJobDTO) {
   }
   if (job.stopReason === "max_reviews") {
     return "已达到本次采集上限，如需更多评论可提高最大采集条数后重新采集。";
+  }
+  if (job.stopReason === "cursor_stalled") {
+    return "TikTok 接口游标未继续推进，建议稍后重试；若持续出现，降低单次采集上限并检查代理、浏览器参数和接口签名。";
   }
   if (job.platformRemainingRows !== null && job.platformRemainingRows > 0 && ["completed", "imported"].includes(job.status)) {
     return `平台仍约有 ${formatCount(job.platformRemainingRows)} 条未覆盖，可提高采集上限或用监听任务继续补采。`;
