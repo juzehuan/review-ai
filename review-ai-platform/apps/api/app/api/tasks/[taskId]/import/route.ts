@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@review-ai/db";
 import type { AppendImportResponse } from "@review-ai/shared";
 import { parseReviewFile } from "@/lib/csv";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { assertReviewQuota, canBypassQuota, getWorkspaceContext, requireScopedTask, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -123,6 +124,28 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       droppedDuplicate,
       droppedByDb: rowsToCreate.length - inserted.count
     } satisfies AppendImportResponse;
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: quotaWorkspaceId,
+    actor: workspaceContext.user,
+    action: "review_import.append",
+    targetType: "review_import",
+    targetId: result.importId,
+    targetLabel: scoped.task.name,
+    metadata: {
+      taskId,
+      importId: result.importId,
+      filename: file.name,
+      sourceChannel: scoped.task.sourceChannel,
+      analysisType: scoped.task.analysisType,
+      totalRows: result.totalRows,
+      newRows: result.newRows,
+      skippedRows: result.skippedRows,
+      droppedExisting: result.droppedExisting,
+      droppedDuplicate: result.droppedDuplicate,
+      droppedByDb: result.droppedByDb
+    }
   });
 
   return ok(result, 201);

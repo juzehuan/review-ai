@@ -2,6 +2,7 @@ import { Prisma, prisma } from "@review-ai/db";
 import type { AnalysisType, ImportTaskResponse } from "@review-ai/shared";
 import { inferAnalysisType } from "@review-ai/shared";
 import { parseReviewFile } from "@/lib/csv";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { assertReviewQuota, canBypassQuota, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
@@ -85,9 +86,11 @@ export async function POST(request: Request) {
     });
 
     const existing = new Set<string>();
+    let droppedDuplicate = 0;
     const createManyData = parsedRows
       .filter((row) => {
         if (existing.has(row.cmtId)) {
+          droppedDuplicate += 1;
           return false;
         }
         existing.add(row.cmtId);
@@ -109,7 +112,7 @@ export async function POST(request: Request) {
         rawJson: row.rawJson as Prisma.InputJsonValue
       }));
 
-    await tx.review.createMany({
+    const inserted = await tx.review.createMany({
       data: createManyData,
       skipDuplicates: true
     });
@@ -119,7 +122,7 @@ export async function POST(request: Request) {
         where: { workspaceId: workspace.id },
         data: {
           currentPeriodReviewCount: {
-            increment: createManyData.length
+            increment: inserted.count
           }
         }
       });
@@ -128,9 +131,41 @@ export async function POST(request: Request) {
     return {
       taskId: task.id,
       importId: importRecord.id,
-      reviewCount: createManyData.length
-    } satisfies ImportTaskResponse;
+      reviewCount: inserted.count,
+      taskName: task.name,
+      totalRows: parsedRows.length,
+      droppedDuplicate,
+      droppedByDb: createManyData.length - inserted.count
+    };
   });
 
-  return ok(result, 201);
+  await writeAuditLog(request, {
+    workspaceId: workspace.id,
+    actor: context.user,
+    action: "review_import.create_task",
+    targetType: "review_import",
+    targetId: result.importId,
+    targetLabel: result.taskName,
+    metadata: {
+      taskId: result.taskId,
+      importId: result.importId,
+      filename: file.name,
+      sourceChannel,
+      analysisType,
+      totalRows: result.totalRows,
+      newRows: result.reviewCount,
+      skippedRows: result.totalRows - result.reviewCount,
+      droppedDuplicate: result.droppedDuplicate,
+      droppedByDb: result.droppedByDb
+    }
+  });
+
+  return ok(
+    {
+      taskId: result.taskId,
+      importId: result.importId,
+      reviewCount: result.reviewCount
+    } satisfies ImportTaskResponse,
+    201
+  );
 }
