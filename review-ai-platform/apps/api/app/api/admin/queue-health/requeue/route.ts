@@ -8,7 +8,7 @@ import {
 import { writeAuditLog } from "@/lib/audit-log";
 import { requireSuperAdmin } from "@/lib/auth";
 import { fail, ok } from "@/lib/http";
-import { getAnalysisQueue, getCrawlQueue, hasPendingQueueJobByData } from "@/lib/queue";
+import { getAnalysisQueue, getCrawlQueue, hasPendingQueueJobByIdOrData } from "@/lib/queue";
 
 function readPayload(value: unknown) {
   const body = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -41,7 +41,8 @@ export async function POST(request: Request) {
     }
 
     const queue = getCrawlQueue();
-    const queueExists = await hasPendingQueueJobByData(queue, "crawlJobId", job.id);
+    const queueJobId = buildCrawlQueueJobId(job.id);
+    const queueExists = await hasPendingQueueJobByIdOrData(queue, queueJobId, "crawlJobId", job.id);
     if (!queueExists) {
       await queue.add(
         "run-crawl",
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
           ...(job.monitorId ? { monitorId: job.monitorId } : {})
         },
         {
-          jobId: buildCrawlQueueJobId(job.id),
+          jobId: queueJobId,
           ...QUEUE_JOB_CLEANUP_OPTIONS
         }
       );
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
       metadata: {
         kind,
         queueName: "crawl-jobs",
+        queueJobId,
         queueDataKey: "crawlJobId",
         requeued: !queueExists,
         workspaceSlug: job.workspace.slug,
@@ -117,7 +119,8 @@ export async function POST(request: Request) {
   }
 
   const queue = getAnalysisQueue();
-  const queueExists = await hasPendingQueueJobByData(queue, "runId", run.id);
+  const queueJobId = buildAnalysisQueueJobId(run.id);
+  const queueExists = await hasPendingQueueJobByIdOrData(queue, queueJobId, "runId", run.id);
   if (!queueExists) {
     await queue.add(
       "run-analysis",
@@ -127,7 +130,7 @@ export async function POST(request: Request) {
         workspaceId: run.task.workspaceId
       },
       {
-        jobId: buildAnalysisQueueJobId(run.id),
+        jobId: queueJobId,
         ...QUEUE_JOB_CLEANUP_OPTIONS
       }
     );
@@ -157,6 +160,7 @@ export async function POST(request: Request) {
     metadata: {
       kind,
       queueName: "analysis-runs",
+      queueJobId,
       queueDataKey: "runId",
       requeued: !queueExists,
       taskId: run.taskId,
