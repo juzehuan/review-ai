@@ -5,7 +5,7 @@ import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord, support
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlMonitor } from "@/lib/serializers";
-import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function GET(request: Request) {
   const context = await getWorkspaceContext(request);
@@ -13,9 +13,11 @@ export async function GET(request: Request) {
     return context.response;
   }
 
+  const canViewAllMonitors = canAccessAllWorkspaces(context);
   const monitors = await prisma.crawlMonitor.findMany({
-    where: { workspaceId: context.workspace.id },
-    orderBy: [{ enabled: "desc" }, { createdAt: "desc" }]
+    where: canViewAllMonitors ? {} : { workspaceId: context.workspace.id },
+    orderBy: [{ enabled: "desc" }, { createdAt: "desc" }],
+    include: { workspace: { select: { name: true, slug: true } } }
   });
 
   return ok(monitors.map(serializeCrawlMonitor));

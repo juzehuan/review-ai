@@ -278,6 +278,8 @@ export interface CrawlJobDTO {
 export interface CrawlMonitorDTO {
   id: string;
   workspaceId: string;
+  workspaceName?: string | null;
+  workspaceSlug?: string | null;
   taskId: string | null;
   name: string;
   productName: string;

@@ -4,7 +4,7 @@ import { normalizeRequestedCrawlInput, resolvedCrawlerSettingFromRecord, support
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
 import { serializeCrawlMonitor } from "@/lib/serializers";
-import { getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
+import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 export async function POST(request: Request, context: { params: Promise<{ monitorId: string }> }) {
   const { monitorId } = await context.params;
@@ -16,9 +16,10 @@ export async function POST(request: Request, context: { params: Promise<{ monito
   if (roleResponse) {
     return roleResponse;
   }
+  const allowGlobalAccess = canAccessAllWorkspaces(workspaceContext);
 
   const monitor = await prisma.crawlMonitor.findFirst({
-    where: { id: monitorId, workspaceId: workspaceContext.workspace.id }
+    where: allowGlobalAccess ? { id: monitorId } : { id: monitorId, workspaceId: workspaceContext.workspace.id }
   });
   if (!monitor) {
     return fail("监听任务不存在或不属于当前账号。", 404);
@@ -39,9 +40,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ monit
   if (roleResponse) {
     return roleResponse;
   }
+  const allowGlobalAccess = canAccessAllWorkspaces(workspaceContext);
 
   const existing = await prisma.crawlMonitor.findFirst({
-    where: { id: monitorId, workspaceId: workspaceContext.workspace.id }
+    where: allowGlobalAccess ? { id: monitorId } : { id: monitorId, workspaceId: workspaceContext.workspace.id }
   });
   if (!existing) {
     return fail("监听任务不存在或不属于当前账号。", 404);
@@ -101,9 +103,10 @@ export async function DELETE(request: Request, context: { params: Promise<{ moni
   if (roleResponse) {
     return roleResponse;
   }
+  const allowGlobalAccess = canAccessAllWorkspaces(workspaceContext);
 
   const deleted = await prisma.crawlMonitor.deleteMany({
-    where: { id: monitorId, workspaceId: workspaceContext.workspace.id }
+    where: allowGlobalAccess ? { id: monitorId } : { id: monitorId, workspaceId: workspaceContext.workspace.id }
   });
   if (!deleted.count) {
     return fail("监听任务不存在或不属于当前账号。", 404);

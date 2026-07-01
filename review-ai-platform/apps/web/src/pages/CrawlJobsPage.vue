@@ -121,7 +121,7 @@
         :data-source="monitors"
         :pagination="{ pageSize: 8 }"
         :loading="loading"
-        :scroll="{ x: 1340 }"
+        :scroll="{ x: 1420 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'monitor'">
@@ -129,6 +129,9 @@
               <strong>{{ record.name }}</strong>
               <span>{{ record.productName || record.normalizedUrl }}</span>
               <a class="crawl-url" :href="record.normalizedUrl" target="_blank" rel="noreferrer">{{ record.normalizedUrl }}</a>
+              <span v-if="record.workspaceName || record.workspaceSlug" class="muted">
+                空间：{{ record.workspaceName || record.workspaceSlug }}
+              </span>
             </div>
           </template>
           <template v-else-if="column.key === 'schedule'">

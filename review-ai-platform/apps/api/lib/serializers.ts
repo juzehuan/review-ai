@@ -364,10 +364,14 @@ export function serializeCrawlJob(job: CrawlJobWithWorkspace): CrawlJobDTO {
   };
 }
 
-export function serializeCrawlMonitor(monitor: CrawlMonitor): CrawlMonitorDTO {
+type CrawlMonitorWithWorkspace = CrawlMonitor & { workspace?: Pick<Workspace, "name" | "slug"> | null };
+
+export function serializeCrawlMonitor(monitor: CrawlMonitorWithWorkspace): CrawlMonitorDTO {
   return {
     id: monitor.id,
     workspaceId: monitor.workspaceId,
+    workspaceName: monitor.workspace?.name || null,
+    workspaceSlug: monitor.workspace?.slug || null,
     taskId: monitor.taskId,
     name: monitor.name,
     productName: monitor.productName,
