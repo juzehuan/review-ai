@@ -36,6 +36,7 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
   const sourceChannel = searchParams.get("sourceChannel")?.trim() || "";
   const sortBy = searchParams.get("sortBy") || "commentTime";
   const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
+  const groupBy = searchParams.get("groupBy") || "sentiment";
   const page = Math.max(Number(searchParams.get("page") || 1), 1);
   const pageSize = Math.min(Math.max(Number(searchParams.get("pageSize") || 20), 1), 500);
   const sourceChannelRowsPromise = prisma.review.findMany({
@@ -93,8 +94,10 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     baseWhere,
     reviewWhere,
     baseAnalysisFilter,
+    analysisFilter,
     sentiment,
-    hasMedia
+    hasMedia,
+    groupBy
   });
 
   if (sortBy === "sentimentScore" && analysisWhere) {
@@ -153,21 +156,25 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
 }
 
 function emptyReviewStats(): ReviewListStatsDTO {
-  return { mediaCount: 0, negativeCount: 0 };
+  return { mediaCount: 0, negativeCount: 0, groupStats: [] };
 }
 
 async function readReviewListStats({
   baseWhere,
   reviewWhere,
   baseAnalysisFilter,
+  analysisFilter,
   sentiment,
-  hasMedia
+  hasMedia,
+  groupBy
 }: {
   baseWhere: Prisma.ReviewWhereInput;
   reviewWhere: Prisma.ReviewWhereInput;
   baseAnalysisFilter: Prisma.ReviewAnalysisWhereInput | null;
+  analysisFilter: Prisma.ReviewAnalysisWhereInput | null;
   sentiment: string | null;
   hasMedia: string | null;
+  groupBy: string;
 }): Promise<ReviewListStatsDTO> {
   const mediaCountPromise =
     hasMedia !== null && hasMedia !== "true"
@@ -190,8 +197,100 @@ async function readReviewListStats({
           }
         });
 
-  const [mediaCount, negativeCount] = await Promise.all([mediaCountPromise, negativeCountPromise]);
-  return { mediaCount, negativeCount };
+  const groupStatsPromise = readReviewGroupStats({ baseWhere, reviewWhere, analysisFilter, groupBy });
+  const [mediaCount, negativeCount, groupStats] = await Promise.all([mediaCountPromise, negativeCountPromise, groupStatsPromise]);
+  return { mediaCount, negativeCount, groupStats };
+}
+
+async function readReviewGroupStats({
+  baseWhere,
+  reviewWhere,
+  analysisFilter,
+  groupBy
+}: {
+  baseWhere: Prisma.ReviewWhereInput;
+  reviewWhere: Prisma.ReviewWhereInput;
+  analysisFilter: Prisma.ReviewAnalysisWhereInput | null;
+  groupBy: string;
+}): Promise<ReviewListStatsDTO["groupStats"]> {
+  if (groupBy === "ratingStar") {
+    const rows = await prisma.review.groupBy({
+      by: ["ratingStar"],
+      where: reviewWhere,
+      _count: { _all: true },
+      orderBy: { ratingStar: "desc" }
+    });
+    return rows.map((row) => ({
+      key: String(row.ratingStar),
+      label: `${row.ratingStar} 星`,
+      count: row._count._all
+    }));
+  }
+
+  if (!analysisFilter) {
+    const total = await prisma.review.count({ where: reviewWhere });
+    return total ? [{ key: "unknown", label: "未分析", count: total }] : [];
+  }
+
+  if (groupBy === "sentiment") {
+    const rows = await prisma.reviewAnalysis.groupBy({
+      by: ["sentiment"],
+      where: { ...analysisFilter, review: baseWhere },
+      _count: { _all: true },
+      orderBy: { _count: { sentiment: "desc" } }
+    });
+    return rows.map((row) => ({
+      key: row.sentiment,
+      label: sentimentLabel(row.sentiment),
+      count: row._count._all
+    }));
+  }
+
+  if (groupBy === "intent") {
+    const rows = await prisma.reviewAnalysis.findMany({
+      where: { ...analysisFilter, review: baseWhere },
+      select: { intentLabels: true }
+    });
+    return buildLabelGroupStats(
+      rows.map((row) => row.intentLabels),
+      "未识别意图"
+    );
+  }
+
+  const rows = await prisma.reviewAnalysis.findMany({
+    where: { ...analysisFilter, review: baseWhere },
+    select: { topicLabels: true }
+  });
+  return buildLabelGroupStats(
+    rows.map((row) => row.topicLabels),
+    "未打标"
+  );
+}
+
+function buildLabelGroupStats(labelGroups: string[][], fallbackLabel: string): ReviewListStatsDTO["groupStats"] {
+  const counts = new Map<string, number>();
+  for (const labels of labelGroups) {
+    const effectiveLabels = labels.length ? labels : [fallbackLabel];
+    for (const label of effectiveLabels) {
+      counts.set(label, (counts.get(label) || 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([label, count]) => ({ key: label, label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "zh-Hans-CN"));
+}
+
+function sentimentLabel(sentiment: string) {
+  if (sentiment === "positive") {
+    return "正向";
+  }
+  if (sentiment === "negative") {
+    return "负向";
+  }
+  if (sentiment === "neutral") {
+    return "中性";
+  }
+  return "未分析";
 }
 
 function buildReviewFacets(

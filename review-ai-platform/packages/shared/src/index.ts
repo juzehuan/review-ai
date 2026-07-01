@@ -745,6 +745,11 @@ export interface ReviewListFacetsDTO {
 export interface ReviewListStatsDTO {
   mediaCount: number;
   negativeCount: number;
+  groupStats: Array<{
+    key: string;
+    label: string;
+    count: number;
+  }>;
 }
 
 export interface ReviewListResponseDTO {

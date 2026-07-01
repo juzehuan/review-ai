@@ -275,9 +275,9 @@
         <div class="group-header">
           <div>
             <div class="group-title">{{ group.label }}</div>
-            <div class="group-subtitle">共 {{ group.items.length }} 条评论</div>
+            <div class="group-subtitle">全量 {{ group.totalCount }} 条，当前样本 {{ group.items.length }} 条</div>
           </div>
-          <a-tag color="blue">{{ group.items.length }}</a-tag>
+          <a-tag color="blue">{{ group.totalCount }}</a-tag>
         </div>
 
         <div class="group-items">
@@ -413,7 +413,7 @@ type SavedView = {
 
 const DEFAULT_VIEW_ID = "all-comments";
 const EMPTY_REVIEW_FACETS: ReviewListFacetsDTO = { sourceChannels: [], intentLabels: [], analysisTags: [] };
-const EMPTY_REVIEW_STATS: ReviewListStatsDTO = { mediaCount: 0, negativeCount: 0 };
+const EMPTY_REVIEW_STATS: ReviewListStatsDTO = { mediaCount: 0, negativeCount: 0, groupStats: [] };
 const route = useRoute();
 const router = useRouter();
 const { selectedTask, setSelectedTask } = useTaskStore();
@@ -540,7 +540,10 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 const applyingSavedView = ref(false);
 
 const groupedRows = computed(() => {
-  const groups = new Map<string, { key: string; label: string; items: ReviewRowDTO[] }>();
+  const groups = new Map<string, { key: string; label: string; totalCount: number; items: ReviewRowDTO[] }>();
+  for (const stat of reviewStats.value.groupStats) {
+    groups.set(stat.key, { key: stat.key, label: stat.label, totalCount: stat.count, items: [] });
+  }
 
   for (const row of rows.value) {
     if (groupBy.value === "sentiment") {
@@ -569,17 +572,19 @@ const groupedRows = computed(() => {
     }
   }
 
-  return [...groups.values()].sort((a, b) => b.items.length - a.items.length);
+  return [...groups.values()]
+    .map((group) => ({ ...group, totalCount: Math.max(group.totalCount, group.items.length) }))
+    .sort((a, b) => b.totalCount - a.totalCount || b.items.length - a.items.length);
 });
 
 function addGroupItem(
-  groups: Map<string, { key: string; label: string; items: ReviewRowDTO[] }>,
+  groups: Map<string, { key: string; label: string; totalCount: number; items: ReviewRowDTO[] }>,
   key: string,
   label: string,
   row: ReviewRowDTO
 ) {
   if (!groups.has(key)) {
-    groups.set(key, { key, label, items: [] });
+    groups.set(key, { key, label, totalCount: 0, items: [] });
   }
   groups.get(key)!.items.push(row);
 }
@@ -961,6 +966,7 @@ async function loadReviews() {
       keyword: filters.keyword || undefined,
       sortBy: sortState.sortBy,
       sortOrder: sortState.sortOrder,
+      groupBy: groupBy.value,
       runId: selectedResultRunId.value,
       issue: evidenceIssue.value || undefined,
       reviewIds: evidenceReviewIds.value.length ? evidenceReviewIds.value.join(",") : undefined
@@ -970,7 +976,8 @@ async function loadReviews() {
     reviewStats.value =
       result.stats || {
         mediaCount: result.items.filter((item) => item.hasMedia).length,
-        negativeCount: result.items.filter((item) => item.sentiment === "negative").length
+        negativeCount: result.items.filter((item) => item.sentiment === "negative").length,
+        groupStats: []
       };
     pagination.total = result.total;
     if (viewMode.value === "grouped") {

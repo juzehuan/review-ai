@@ -813,6 +813,12 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   if (alertCount) {
     return locale === "en-US" ? `${alertCount[1]} items` : `${alertCount[1]} รายการ`;
   }
+  const groupSampleCount = value.match(/^全量\s+(\d+)\s+条，当前样本\s+(\d+)\s+条$/);
+  if (groupSampleCount) {
+    return locale === "en-US"
+      ? `Total ${groupSampleCount[1]}, current sample ${groupSampleCount[2]}`
+      : `ทั้งหมด ${groupSampleCount[1]} รายการ, ตัวอย่างปัจจุบัน ${groupSampleCount[2]} รายการ`;
+  }
   const activeCrawlJobs = value.match(/^(\d+)\s*个任务正在排队或抓取$/);
   if (activeCrawlJobs) {
     return locale === "en-US" ? `${activeCrawlJobs[1]} tasks queued or crawling` : `${activeCrawlJobs[1]} งานรอคิวหรือกำลังเก็บ`;
