@@ -412,6 +412,7 @@ export function serializeCrawlJob(job: CrawlJobWithWorkspace): CrawlJobDTO {
     domContentTextCount: readOptionalNumber(rawResult?.domContentTextCount),
     loadMoreClicks: readOptionalNumber(rawResult?.loadMoreClicks),
     cursor: readOptionalScalarString(rawResult?.cursor),
+    hasMore: readOptionalBoolean(rawResult?.hasMore),
     totalComments,
     remainingSeconds: readOptionalNumber(rawResult?.remainingSeconds),
     progressEventAt: readOptionalString(rawResult?.progressEventAt),

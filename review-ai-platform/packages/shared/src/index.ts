@@ -335,6 +335,7 @@ export interface CrawlJobDTO {
   domContentTextCount: number | null;
   loadMoreClicks: number | null;
   cursor: string | null;
+  hasMore: boolean | null;
   totalComments: number | null;
   remainingSeconds: number | null;
   progressEventAt: string | null;

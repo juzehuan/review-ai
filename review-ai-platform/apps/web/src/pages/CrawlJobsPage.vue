@@ -912,7 +912,8 @@ function crawlMetricSummary(job: CrawlJobDTO) {
     job.domCommentCount !== null ? `DOM 评论 ${job.domCommentCount}` : "",
     job.domContentTextCount !== null ? `DOM 文本 ${job.domContentTextCount}` : "",
     job.loadMoreClicks !== null ? `加载更多 ${job.loadMoreClicks}` : "",
-    job.cursor ? `游标 ${shortCursor(job.cursor)}` : ""
+    job.cursor ? `游标 ${shortCursor(job.cursor)}` : "",
+    job.hasMore !== null ? `还有更多 ${job.hasMore ? "是" : "否"}` : ""
   ].filter(Boolean);
   return parts.join(" · ");
 }
