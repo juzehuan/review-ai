@@ -244,9 +244,21 @@
                 <div class="member-email">已静默 {{ durationLabel(record.ageSeconds) }}</div>
               </template>
               <template v-else-if="column.key === 'actions'">
-                <a-button size="small" type="link" :disabled="!canOpenQueueContext(record)" @click="openQueueContext(record)">
-                  {{ queueContextActionLabel(record) }}
-                </a-button>
+                <a-space size="small">
+                  <a-button size="small" type="link" :disabled="!canOpenQueueContext(record)" @click="openQueueContext(record)">
+                    {{ queueContextActionLabel(record) }}
+                  </a-button>
+                  <a-button
+                    v-if="canCancelQueueAnalysis(record)"
+                    size="small"
+                    type="link"
+                    danger
+                    :loading="queueRetryingId === record.id"
+                    @click="cancelQueueAnalysis(record)"
+                  >
+                    停止分析
+                  </a-button>
+                </a-space>
               </template>
             </template>
           </a-table>
@@ -465,6 +477,7 @@ import type {
 import {
   fetchAdminAuditLogs,
   fetchAdminQueueHealth,
+  cancelRun,
   createAdminUser,
   createInviteCode,
   createRun,
@@ -873,6 +886,10 @@ function canRetryQueueAnalysis(record: QueueHealthItem) {
   return record.kind === "analysis" && Boolean(record.taskId) && ["failed", "partial_failed"].includes(record.status);
 }
 
+function canCancelQueueAnalysis(record: QueueHealthItem) {
+  return record.kind === "analysis" && Boolean(record.taskId) && ["queued", "running"].includes(record.status);
+}
+
 function openQueueContext(record: QueueHealthItem) {
   if (record.kind === "crawl") {
     router.push({ path: "/crawl-jobs", query: { jobId: record.id } });
@@ -912,6 +929,23 @@ async function retryQueueAnalysis(record: QueueHealthItem) {
     await loadAuditLogs();
   } catch (error) {
     message.error(readErrorMessage(error, "分析任务重试失败"));
+  } finally {
+    queueRetryingId.value = "";
+  }
+}
+
+async function cancelQueueAnalysis(record: QueueHealthItem) {
+  if (!canCancelQueueAnalysis(record) || !record.taskId || queueRetryingId.value) {
+    return;
+  }
+  queueRetryingId.value = record.id;
+  try {
+    await cancelRun(record.taskId, record.id);
+    message.success("分析任务已停止");
+    await loadQueueHealth();
+    await loadAuditLogs();
+  } catch (error) {
+    message.error(readErrorMessage(error, "停止分析失败"));
   } finally {
     queueRetryingId.value = "";
   }
