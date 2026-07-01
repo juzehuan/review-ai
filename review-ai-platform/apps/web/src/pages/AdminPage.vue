@@ -298,6 +298,15 @@
                   >
                     重新采集
                   </a-button>
+                  <a-button
+                    v-if="canRetryQueueAnalysis(record)"
+                    size="small"
+                    type="link"
+                    :loading="queueRetryingId === record.id"
+                    @click="retryQueueAnalysis(record)"
+                  >
+                    重新分析
+                  </a-button>
                 </a-space>
               </template>
             </template>
@@ -458,6 +467,7 @@ import {
   fetchAdminQueueHealth,
   createAdminUser,
   createInviteCode,
+  createRun,
   fetchAdminOverview,
   fetchAdminUsers,
   fetchAdminWorkspaces,
@@ -859,6 +869,10 @@ function canRetryQueueCrawl(record: QueueHealthItem) {
   return record.kind === "crawl" && record.status === "failed";
 }
 
+function canRetryQueueAnalysis(record: QueueHealthItem) {
+  return record.kind === "analysis" && Boolean(record.taskId) && ["failed", "partial_failed"].includes(record.status);
+}
+
 function openQueueContext(record: QueueHealthItem) {
   if (record.kind === "crawl") {
     router.push({ path: "/crawl-jobs", query: { jobId: record.id } });
@@ -881,6 +895,23 @@ async function retryQueueCrawl(record: QueueHealthItem) {
     await loadAuditLogs();
   } catch (error) {
     message.error(readErrorMessage(error, "采集任务重试失败"));
+  } finally {
+    queueRetryingId.value = "";
+  }
+}
+
+async function retryQueueAnalysis(record: QueueHealthItem) {
+  if (!canRetryQueueAnalysis(record) || !record.taskId || queueRetryingId.value) {
+    return;
+  }
+  queueRetryingId.value = record.id;
+  try {
+    await createRun(record.taskId);
+    message.success("分析任务已重新加入队列");
+    await loadQueueHealth();
+    await loadAuditLogs();
+  } catch (error) {
+    message.error(readErrorMessage(error, "分析任务重试失败"));
   } finally {
     queueRetryingId.value = "";
   }
