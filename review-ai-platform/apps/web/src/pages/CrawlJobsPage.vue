@@ -271,6 +271,23 @@
               <div v-if="crawlRunSignals(record).length" class="crawl-signal-list">
                 <span v-for="signal in crawlRunSignals(record)" :key="signal">{{ signal }}</span>
               </div>
+              <div v-if="crawlTelemetryStats(record).length || crawlTelemetryHint(record)" class="crawl-telemetry-card">
+                <div class="crawl-telemetry-head">
+                  <span>采集阶段</span>
+                  <strong>{{ crawlStageLabel(record) }}</strong>
+                </div>
+                <div v-if="crawlTelemetryStats(record).length" class="crawl-telemetry-grid">
+                  <span
+                    v-for="metric in crawlTelemetryStats(record)"
+                    :key="metric.label"
+                    :class="{ 'crawl-telemetry-warning': metric.warning }"
+                  >
+                    <small>{{ metric.label }}</small>
+                    <strong>{{ metric.value }}</strong>
+                  </span>
+                </div>
+                <div v-if="crawlTelemetryHint(record)" class="crawl-telemetry-hint">{{ crawlTelemetryHint(record) }}</div>
+              </div>
               <div class="crawl-alert-tags">
                 <a-tag v-if="record.stalled" color="orange" class="crawl-stalled-tag">
                   疑似无更新 {{ durationLabel(record.updatedAgoSeconds) }}
@@ -956,6 +973,91 @@ function crawlMetricSummary(job: CrawlJobDTO) {
   return parts.join(" · ");
 }
 
+type CrawlTelemetryStat = {
+  label: string;
+  value: string;
+  warning?: boolean;
+};
+
+function crawlStageLabel(job: CrawlJobDTO) {
+  if (job.status === "queued") {
+    return "等待 Worker 消费";
+  }
+  if (job.status === "failed") {
+    return "采集失败";
+  }
+  if (job.status === "imported") {
+    return "已导入并进入分析";
+  }
+  if (job.status === "completed") {
+    return job.importedRows > 0 ? "已导入并进入分析" : "采集完成";
+  }
+  if (job.nextRequests !== null || job.payloadComments !== null || job.cursor) {
+    return "接口分页采集中";
+  }
+  if (job.domCommentCount !== null || job.domContentTextCount !== null || job.loadMoreClicks !== null) {
+    return "页面滚动加载中";
+  }
+  if (job.fetchedRows > 0 && job.importedRows === 0 && job.progress >= 80) {
+    return "导入/收尾阶段";
+  }
+  return "采集启动中";
+}
+
+function crawlTelemetryStats(job: CrawlJobDTO): CrawlTelemetryStat[] {
+  const stats: CrawlTelemetryStat[] = [];
+  if (job.nextRequests !== null) {
+    stats.push({ label: "接口请求", value: formatCount(job.nextRequests) });
+  }
+  if (job.payloadComments !== null) {
+    stats.push({ label: "接口评论", value: formatCount(job.payloadComments) });
+  }
+  if (job.domCommentCount !== null) {
+    stats.push({ label: "页面评论", value: formatCount(job.domCommentCount) });
+  }
+  if (job.domContentTextCount !== null) {
+    stats.push({ label: "页面文本", value: formatCount(job.domContentTextCount) });
+  }
+  if (job.loadMoreClicks !== null) {
+    stats.push({ label: "加载更多", value: formatCount(job.loadMoreClicks) });
+  }
+  if (job.cursor) {
+    stats.push({ label: "游标", value: shortCursor(job.cursor) });
+  }
+  if (job.lastRequestStatus !== null) {
+    stats.push({ label: "HTTP 状态", value: String(job.lastRequestStatus), warning: isRequestStatusWarning(job.lastRequestStatus) });
+  }
+  if (job.hasMore !== null) {
+    stats.push({ label: "还有更多", value: job.hasMore ? "是" : "否", warning: job.hasMore && ["completed", "imported"].includes(job.status) });
+  }
+  if (job.endReached !== null) {
+    stats.push({ label: "末尾状态", value: job.endReached ? "已到达" : "未确认", warning: job.endReached === false });
+  }
+  if (job.remainingSeconds !== null && ["queued", "running"].includes(job.status)) {
+    stats.push({ label: "剩余时间", value: durationLabel(job.remainingSeconds) });
+  }
+  return stats;
+}
+
+function crawlTelemetryHint(job: CrawlJobDTO) {
+  if (job.payloadComments !== null && job.payloadComments > 0 && job.fetchedRows < Math.min(job.payloadComments, job.maxReviews || job.payloadComments)) {
+    return "接口已返回评论，但导入数量偏低，建议检查解析字段和去重规则。";
+  }
+  if (job.domCommentCount !== null && job.domCommentCount > job.fetchedRows) {
+    return "页面已加载评论但入库偏低，建议检查评论选择器或平台语言。";
+  }
+  if (job.hasMore && ["completed", "imported"].includes(job.status)) {
+    return "平台仍提示还有更多评论，可提高最大采集条数或用监听任务继续补采。";
+  }
+  if ((job.loadMoreClicks || 0) > 0 && (job.domCommentCount || 0) === 0 && job.payloadComments === null) {
+    return "页面有加载动作但没有识别到评论，建议检查登录态、排序和评论区权限。";
+  }
+  if (["queued", "running"].includes(job.status) && !job.progressEventAt && crawlTelemetryStats(job).length === 0) {
+    return "采集过程指标暂少，继续等待下一次进度回传。";
+  }
+  return "";
+}
+
 function isRequestStatusWarning(status?: number | null) {
   return typeof status === "number" && status >= 400;
 }
@@ -1634,6 +1736,76 @@ onUnmounted(() => {
   font-size: 12px;
   line-height: 1.45;
   padding: 2px 6px;
+}
+
+.crawl-telemetry-card {
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  max-width: 540px;
+  padding: 8px;
+}
+
+.crawl-telemetry-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.crawl-telemetry-head span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.crawl-telemetry-head strong {
+  color: #1d4ed8;
+  font-size: 12px;
+}
+
+.crawl-telemetry-grid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.crawl-telemetry-grid span {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px 6px;
+}
+
+.crawl-telemetry-grid small {
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.crawl-telemetry-grid strong {
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crawl-telemetry-grid .crawl-telemetry-warning {
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.crawl-telemetry-hint {
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .crawl-diagnostic-tip {
