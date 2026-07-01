@@ -1,4 +1,5 @@
 import { prisma } from "@review-ai/db";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { requireSuperAdmin } from "@/lib/auth";
 import { serializeAdminWorkspace } from "@/lib/serializers";
@@ -74,6 +75,24 @@ export async function POST(request: Request) {
           memberships: true
         }
       }
+    }
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: workspace.id,
+    actor: auth.user,
+    action: "workspace.create",
+    targetType: "workspace",
+    targetId: workspace.id,
+    targetLabel: workspace.name,
+    metadata: {
+      slug: workspace.slug,
+      name: workspace.name,
+      source: "admin_console",
+      ownerUserId: workspace.ownerUserId,
+      planTier: workspace.subscription?.planTier || "pro",
+      monthlyReviewLimit: workspace.subscription?.monthlyReviewLimit || 0,
+      monthlyRunLimit: workspace.subscription?.monthlyRunLimit || 0
     }
   });
 

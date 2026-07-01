@@ -1,5 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { requireAuthenticated } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ workspaceId: string }> }) {
@@ -38,6 +39,21 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ w
     where: { id: workspaceId }
   });
 
+  await writeAuditLog(request, {
+    workspaceId: null,
+    actor: auth.user,
+    action: "workspace.delete",
+    targetType: "workspace",
+    targetId: membership.workspace.id,
+    targetLabel: membership.workspace.name,
+    metadata: {
+      workspaceId: membership.workspace.id,
+      slug: membership.workspace.slug,
+      name: membership.workspace.name,
+      ownerUserId: membership.workspace.ownerUserId,
+      actorRole: membership.role
+    }
+  });
+
   return ok({ success: true });
 }
-

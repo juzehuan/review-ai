@@ -1,5 +1,6 @@
 import { prisma } from "@review-ai/db";
 import { requireAuthenticated } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { serializeMyWorkspace } from "@/lib/serializers";
 
@@ -64,6 +65,24 @@ export async function POST(request: Request) {
         where: { userId: auth.user.id },
         take: 1
       }
+    }
+  });
+
+  await writeAuditLog(request, {
+    workspaceId: workspace.id,
+    actor: auth.user,
+    action: "workspace.create",
+    targetType: "workspace",
+    targetId: workspace.id,
+    targetLabel: workspace.name,
+    metadata: {
+      slug: workspace.slug,
+      name: workspace.name,
+      source: "self_service",
+      ownerUserId: workspace.ownerUserId,
+      planTier: workspace.subscription?.planTier || "free",
+      monthlyReviewLimit: workspace.subscription?.monthlyReviewLimit || 0,
+      monthlyRunLimit: workspace.subscription?.monthlyRunLimit || 0
     }
   });
 
