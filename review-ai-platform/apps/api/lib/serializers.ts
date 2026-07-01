@@ -201,17 +201,12 @@ export function serializeTask(
   };
 }
 
-export function serializeWorkspace(workspace: Workspace & { subscription?: Subscription | null }): WorkspaceDTO {
-  const subscription = workspace.subscription;
+function serializeSubscriptionUsage(subscription?: Subscription | null) {
   const periodEndsAt = subscription?.currentPeriodEndsAt || null;
   const periodRemainingDays = periodEndsAt
     ? Math.max(0, Math.ceil((periodEndsAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
     : null;
   return {
-    id: workspace.id,
-    slug: workspace.slug,
-    name: workspace.name,
-    planTier: subscription?.planTier || "free",
     monthlyReviewLimit: subscription?.monthlyReviewLimit || 0,
     monthlyRunLimit: subscription?.monthlyRunLimit || 0,
     currentPeriodReviewCount: subscription?.currentPeriodReviewCount || 0,
@@ -219,6 +214,17 @@ export function serializeWorkspace(workspace: Workspace & { subscription?: Subsc
     currentPeriodStartedAt: subscription?.currentPeriodStartedAt.toISOString() || null,
     currentPeriodEndsAt: periodEndsAt?.toISOString() || null,
     currentPeriodRemainingDays: periodRemainingDays
+  };
+}
+
+export function serializeWorkspace(workspace: Workspace & { subscription?: Subscription | null }): WorkspaceDTO {
+  const subscription = workspace.subscription;
+  return {
+    id: workspace.id,
+    slug: workspace.slug,
+    name: workspace.name,
+    planTier: subscription?.planTier || "free",
+    ...serializeSubscriptionUsage(subscription)
   };
 }
 
@@ -288,10 +294,7 @@ export function serializeAdminUser(
   return {
     ...serializeUser(user),
     workspaceId: primaryWorkspace?.id || null,
-    monthlyReviewLimit: subscription?.monthlyReviewLimit || 0,
-    monthlyRunLimit: subscription?.monthlyRunLimit || 0,
-    currentPeriodReviewCount: subscription?.currentPeriodReviewCount || 0,
-    currentPeriodRunCount: subscription?.currentPeriodRunCount || 0,
+    ...serializeSubscriptionUsage(subscription),
     inviteCode: user.usedInviteCode?.code || null
   };
 }

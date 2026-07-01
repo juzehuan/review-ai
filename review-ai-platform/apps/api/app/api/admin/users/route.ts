@@ -4,6 +4,7 @@ import { DEFAULT_RESET_PASSWORD, hashPassword, requireSuperAdmin } from "@/lib/a
 import { writeAuditLog } from "@/lib/audit-log";
 import { ensurePersonalWorkspace } from "@/lib/personal-workspace";
 import { serializeAdminUser } from "@/lib/serializers";
+import { ensureSubscriptionPeriod } from "@/lib/workspace";
 
 export async function GET(request: Request) {
   const auth = await requireSuperAdmin(request);
@@ -26,7 +27,28 @@ export async function GET(request: Request) {
     }
   });
 
-  return ok(users.map(serializeAdminUser));
+  await Promise.all(
+    users.flatMap((user) =>
+      user.memberships.map((member) => ensureSubscriptionPeriod(member.workspace.id, member.workspace.subscription))
+    )
+  );
+
+  const refreshedUsers = await prisma.user.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      usedInviteCode: true,
+      memberships: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          workspace: {
+            include: { subscription: true }
+          }
+        }
+      }
+    }
+  });
+
+  return ok(refreshedUsers.map(serializeAdminUser));
 }
 
 export async function POST(request: Request) {

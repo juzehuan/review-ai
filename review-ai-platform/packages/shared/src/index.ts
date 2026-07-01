@@ -35,6 +35,9 @@ export interface AdminUserDTO extends UserDTO {
   monthlyRunLimit: number;
   currentPeriodReviewCount: number;
   currentPeriodRunCount: number;
+  currentPeriodStartedAt: string | null;
+  currentPeriodEndsAt: string | null;
+  currentPeriodRemainingDays: number | null;
   inviteCode: string | null;
 }
 

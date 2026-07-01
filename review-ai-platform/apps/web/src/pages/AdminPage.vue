@@ -116,6 +116,7 @@
                   <span>{{ record.currentPeriodReviewCount }}/{{ record.monthlyReviewLimit }} 评论</span>
                   <a-progress :percent="reviewPercent(record)" size="small" :show-info="false" />
                   <span>{{ record.currentPeriodRunCount }}/{{ record.monthlyRunLimit }} 分析</span>
+                  <div class="quota-period-mini">{{ quotaPeriodLabel(record) }}</div>
                 </div>
               </template>
               <template v-else-if="column.key === 'inviteCode'">
@@ -1022,6 +1023,14 @@ function formatTime(value?: string | null) {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
 }
 
+function formatDate(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString();
+}
+
 function durationLabel(seconds?: number | null) {
   const totalSeconds = Math.max(0, Math.floor(Number(seconds || 0)));
   if (totalSeconds < 60) {
@@ -1442,6 +1451,16 @@ function reviewPercent(record: AdminUserDTO) {
     return 0;
   }
   return Math.min(Math.round((record.currentPeriodReviewCount / record.monthlyReviewLimit) * 100), 100);
+}
+
+function quotaPeriodLabel(record: AdminUserDTO) {
+  if (record.isSuperAdmin) {
+    return "超管不限额";
+  }
+  if (!record.currentPeriodEndsAt) {
+    return "未设置重置日期";
+  }
+  return `剩余 ${record.currentPeriodRemainingDays ?? 0} 天 · ${formatDate(record.currentPeriodEndsAt)} 重置`;
 }
 
 watch(activeTab, (tab) => {

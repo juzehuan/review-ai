@@ -4,6 +4,7 @@ import { requireSuperAdmin } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { ensurePersonalWorkspace } from "@/lib/personal-workspace";
 import { serializeAdminUser } from "@/lib/serializers";
+import { ensureSubscriptionPeriod } from "@/lib/workspace";
 
 function toLimit(value: unknown, fallback: number) {
   const numberValue = Number(value);
@@ -48,6 +49,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     (await prisma.subscription.create({
       data: { workspaceId: workspace.id }
     }));
+  const activeSubscription = await ensureSubscriptionPeriod(workspace.id, currentSubscription);
 
   await prisma.$transaction(async (tx) => {
     if (typeof body.name === "string" || typeof body.isSuperAdmin === "boolean" || typeof body.isActive === "boolean") {
@@ -68,8 +70,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     await tx.subscription.update({
       where: { workspaceId: workspace.id },
       data: {
-        monthlyReviewLimit: toLimit(body.monthlyReviewLimit, currentSubscription.monthlyReviewLimit),
-        monthlyRunLimit: toLimit(body.monthlyRunLimit, currentSubscription.monthlyRunLimit)
+        monthlyReviewLimit: toLimit(body.monthlyReviewLimit, activeSubscription?.monthlyReviewLimit ?? currentSubscription.monthlyReviewLimit),
+        monthlyRunLimit: toLimit(body.monthlyRunLimit, activeSubscription?.monthlyRunLimit ?? currentSubscription.monthlyRunLimit)
       }
     });
   });
@@ -85,15 +87,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
         name: user.name,
         isActive: user.isActive,
         isSuperAdmin: user.isSuperAdmin,
-        monthlyReviewLimit: currentSubscription.monthlyReviewLimit,
-        monthlyRunLimit: currentSubscription.monthlyRunLimit
+        monthlyReviewLimit: activeSubscription?.monthlyReviewLimit ?? currentSubscription.monthlyReviewLimit,
+        monthlyRunLimit: activeSubscription?.monthlyRunLimit ?? currentSubscription.monthlyRunLimit
       },
       after: {
         name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : user.name,
         isActive: nextIsActive,
         isSuperAdmin: nextIsSuperAdmin,
-        monthlyReviewLimit: toLimit(body.monthlyReviewLimit, currentSubscription.monthlyReviewLimit),
-        monthlyRunLimit: toLimit(body.monthlyRunLimit, currentSubscription.monthlyRunLimit)
+        monthlyReviewLimit: toLimit(body.monthlyReviewLimit, activeSubscription?.monthlyReviewLimit ?? currentSubscription.monthlyReviewLimit),
+        monthlyRunLimit: toLimit(body.monthlyRunLimit, activeSubscription?.monthlyRunLimit ?? currentSubscription.monthlyRunLimit)
       }
     }
   });

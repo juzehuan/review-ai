@@ -661,6 +661,8 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "可管理": "Manageable",
     "只读": "Read-only",
     "不限额": "Unlimited",
+    "超管不限额": "Admin unlimited",
+    "未设置重置日期": "No reset date set",
     "空间已切换": "Workspace switched",
     "空间已创建": "Workspace created",
     "空间创建失败，请稍后重试": "Failed to create workspace. Try again later.",
@@ -1562,6 +1564,8 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "可管理": "จัดการได้",
     "只读": "อ่านอย่างเดียว",
     "不限额": "ไม่จำกัดโควตา",
+    "超管不限额": "ผู้ดูแลไม่จำกัดโควตา",
+    "未设置重置日期": "ยังไม่ได้ตั้งวันรีเซ็ต",
     "空间已切换": "สลับพื้นที่แล้ว",
     "空间已创建": "สร้างพื้นที่แล้ว",
     "空间创建失败，请稍后重试": "สร้างพื้นที่ไม่สำเร็จ กรุณาลองใหม่ภายหลัง",
@@ -1840,6 +1844,10 @@ function replaceKnownParts(value: string, locale: Exclude<AppLocale, "zh-CN">) {
 
 function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const unlimited = staticText[locale]["不限"];
+  const quotaReset = value.match(/^剩余\s+(\d+)\s+天\s+·\s+(.+)\s+重置$/);
+  if (quotaReset) {
+    return locale === "en-US" ? `${quotaReset[1]} days left · resets ${quotaReset[2]}` : `เหลือ ${quotaReset[1]} วัน · รีเซ็ต ${quotaReset[2]}`;
+  }
   const translateUnit = (unit: string) => {
     if (locale === "en-US") {
       return unit === "秒" ? "seconds" : unit === "分钟" ? "minutes" : unit === "小时" ? "hours" : unit === "天" ? "days" : unit;
