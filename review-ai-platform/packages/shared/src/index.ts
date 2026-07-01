@@ -394,6 +394,7 @@ export interface StartCrawlAnalysisResponse {
   importId: string;
   reviewCount: number;
   skippedDuplicate: number;
+  reusedRun: boolean;
   run: AnalysisRunDTO;
 }
 

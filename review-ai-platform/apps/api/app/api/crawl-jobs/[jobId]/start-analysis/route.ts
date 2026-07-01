@@ -82,6 +82,67 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     return fail("爬取任务尚未完成，不能开始分析", 400);
   }
 
+  const quotaWorkspaceId = job.workspaceId;
+  if (job.taskId) {
+    const activeRun = await prisma.analysisRun.findFirst({
+      where: {
+        taskId: job.taskId,
+        status: { in: ["queued", "running"] }
+      },
+      orderBy: [{ createdAt: "desc" }, { startedAt: "desc" }],
+      include: {
+        logs: {
+          orderBy: { createdAt: "desc" },
+          take: 1
+        }
+      }
+    });
+    if (activeRun) {
+      await prisma.$transaction([
+        prisma.task.updateMany({
+          where: { id: job.taskId },
+          data: { status: "analyzing" }
+        }),
+        prisma.crawlJob.update({
+          where: { id: job.id },
+          data: { status: "imported", progress: 100 }
+        })
+      ]);
+
+      await writeAuditLog(request, {
+        workspaceId: quotaWorkspaceId,
+        actor: workspaceContext.user,
+        action: "crawl_job.start_analysis",
+        targetType: "crawl_job",
+        targetId: job.id,
+        targetLabel: job.name,
+        metadata: {
+          taskId: job.taskId,
+          runId: activeRun.id,
+          importId: null,
+          reviewCount: activeRun.reviewCount,
+          skippedDuplicate: job.skippedDuplicate,
+          productUrl: job.normalizedUrl,
+          sourceChannel: job.sourceChannel,
+          platform: job.platform,
+          existingTask: true,
+          reusedRun: true,
+          provider: activeRun.provider,
+          modelName: activeRun.modelName
+        }
+      });
+
+      return ok({
+        taskId: job.taskId,
+        importId: "",
+        reviewCount: activeRun.reviewCount,
+        skippedDuplicate: job.skippedDuplicate,
+        reusedRun: true,
+        run: serializeRun(activeRun)
+      });
+    }
+  }
+
   const crawlResult = parseCrawlResult(job.rawResult);
   if (!crawlResult || !crawlResult.rows.length) {
     return fail("爬取结果为空，不能开始分析", 400);
@@ -109,7 +170,6 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     return fail("爬取结果里没有可导入的评论，不能开始分析", 400);
   }
 
-  const quotaWorkspaceId = job.workspaceId;
   const quotaResponse = job.taskId ? null : await assertReviewQuota(quotaWorkspaceId, rowsToCreate.length, quotaUnlimited);
   if (quotaResponse) {
     return quotaResponse;
@@ -136,75 +196,115 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     let reviewCount = 0;
 
     if (!taskId) {
-      const first = rowsToCreate[0];
-      const task = await tx.task.create({
-        data: {
-          workspaceId: quotaWorkspaceId,
-          name: job.name,
-          productName: job.productName || crawlResult.productName || job.name,
-          shopId: crawlResult.shopId || first.shopId || fallback.shopId,
-          itemId: crawlResult.itemId || first.itemId || fallback.itemId,
-          sourceChannel: job.sourceChannel,
-          analysisType: job.analysisType,
-          status: "imported"
+      const claimed = await tx.crawlJob.updateMany({
+        where: { id: job.id, taskId: null, status: "completed" },
+        data: { status: "imported", progress: 100 }
+      });
+
+      if (!claimed.count) {
+        const refreshedJob = await tx.crawlJob.findUnique({
+          where: { id: job.id },
+          select: { taskId: true }
+        });
+
+        if (!refreshedJob?.taskId) {
+          throw new Error("Crawl job was already claimed for import");
         }
-      });
-      taskId = task.id;
 
-      const importRecord = await tx.importRecord.create({
-        data: {
-          taskId,
-          filename: job.normalizedUrl,
-          rawContent: Buffer.from(JSON.stringify(crawlResult)).toString("base64"),
-          rowCount: crawlResult.rows.length,
-          status: "completed"
+        taskId = refreshedJob.taskId;
+        reviewCount = await tx.review.count({ where: { taskId } });
+      } else {
+        const first = rowsToCreate[0];
+        const task = await tx.task.create({
+          data: {
+            workspaceId: quotaWorkspaceId,
+            name: job.name,
+            productName: job.productName || crawlResult.productName || job.name,
+            shopId: crawlResult.shopId || first.shopId || fallback.shopId,
+            itemId: crawlResult.itemId || first.itemId || fallback.itemId,
+            sourceChannel: job.sourceChannel,
+            analysisType: job.analysisType,
+            status: "imported"
+          }
+        });
+        taskId = task.id;
+
+        const importRecord = await tx.importRecord.create({
+          data: {
+            taskId,
+            filename: job.normalizedUrl,
+            rawContent: Buffer.from(JSON.stringify(crawlResult)).toString("base64"),
+            rowCount: crawlResult.rows.length,
+            status: "completed"
+          }
+        });
+        importId = importRecord.id;
+
+        const inserted = await tx.review.createMany({
+          data: rowsToCreate.map((row) => ({
+            taskId: taskId!,
+            importId: importRecord.id,
+            cmtId: row.cmtId,
+            shopId: row.shopId || task.shopId,
+            itemId: row.itemId || task.itemId,
+            ratingStar: row.ratingStar,
+            comment: row.comment,
+            commentTr: row.commentTr,
+            modelName: row.modelName,
+            hasMedia: row.hasMedia,
+            commentTime: row.commentTime,
+            sourceChannel: job.sourceChannel,
+            rawJson: row.rawJson as Prisma.InputJsonValue
+          })),
+          skipDuplicates: true
+        });
+        reviewCount = inserted.count;
+
+        if (!quotaUnlimited) {
+          await tx.subscription.update({
+            where: { workspaceId: quotaWorkspaceId },
+            data: { currentPeriodReviewCount: { increment: inserted.count } }
+          });
         }
-      });
-      importId = importRecord.id;
 
-      const inserted = await tx.review.createMany({
-        data: rowsToCreate.map((row) => ({
-          taskId: taskId!,
-          importId: importRecord.id,
-          cmtId: row.cmtId,
-          shopId: row.shopId || task.shopId,
-          itemId: row.itemId || task.itemId,
-          ratingStar: row.ratingStar,
-          comment: row.comment,
-          commentTr: row.commentTr,
-          modelName: row.modelName,
-          hasMedia: row.hasMedia,
-          commentTime: row.commentTime,
-          sourceChannel: job.sourceChannel,
-          rawJson: row.rawJson as Prisma.InputJsonValue
-        })),
-        skipDuplicates: true
-      });
-      reviewCount = inserted.count;
-
-      if (!quotaUnlimited) {
-        await tx.subscription.update({
-          where: { workspaceId: quotaWorkspaceId },
-          data: { currentPeriodReviewCount: { increment: inserted.count } }
+        await tx.crawlJob.update({
+          where: { id: job.id },
+          data: {
+            taskId,
+            status: "imported",
+            progress: 100,
+            importedRows: inserted.count,
+            skippedDuplicate
+          }
         });
       }
-
-      await tx.crawlJob.update({
-        where: { id: job.id },
-        data: {
-          taskId,
-          status: "imported",
-          progress: 100,
-          importedRows: inserted.count,
-          skippedDuplicate
-        }
-      });
     } else {
       reviewCount = await tx.review.count({ where: { taskId } });
     }
 
     if (!reviewCount) {
       throw new Error("No reviews available for analysis");
+    }
+
+    const activeRun = await tx.analysisRun.findFirst({
+      where: {
+        taskId,
+        status: { in: ["queued", "running"] }
+      },
+      orderBy: [{ createdAt: "desc" }, { startedAt: "desc" }],
+      include: {
+        logs: {
+          orderBy: { createdAt: "desc" },
+          take: 1
+        }
+      }
+    });
+    if (activeRun) {
+      await tx.task.update({
+        where: { id: taskId },
+        data: { status: "analyzing" }
+      });
+      return { taskId, importId, reviewCount: activeRun.reviewCount || reviewCount, run: activeRun, reusedRun: true };
     }
 
     const run = await tx.analysisRun.create({
@@ -239,14 +339,16 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
       }
     });
 
-    return { taskId, importId, reviewCount, run };
+    return { taskId, importId, reviewCount, run, reusedRun: false };
   });
 
-  await getAnalysisQueue().add("run-analysis", {
-    runId: result.run.id,
-    taskId: result.taskId,
-    workspaceId: quotaWorkspaceId
-  });
+  if (!result.reusedRun) {
+    await getAnalysisQueue().add("run-analysis", {
+      runId: result.run.id,
+      taskId: result.taskId,
+      workspaceId: quotaWorkspaceId
+    });
+  }
 
   await writeAuditLog(request, {
     workspaceId: quotaWorkspaceId,
@@ -265,8 +367,9 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
       sourceChannel: job.sourceChannel,
       platform: job.platform,
       existingTask: Boolean(job.taskId),
-      provider: aiSetting.provider,
-      modelName
+      reusedRun: result.reusedRun,
+      provider: result.run.provider,
+      modelName: result.run.modelName
     }
   });
 
@@ -276,8 +379,9 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
       importId: result.importId || "",
       reviewCount: result.reviewCount,
       skippedDuplicate,
+      reusedRun: result.reusedRun,
       run: serializeRun(result.run)
     },
-    201
+    result.reusedRun ? 200 : 201
   );
 }
