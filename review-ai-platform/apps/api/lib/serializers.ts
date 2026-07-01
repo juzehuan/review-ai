@@ -55,6 +55,35 @@ function readOptionalNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function readCrawlTotalComments(rawResult: Record<string, unknown> | null) {
+  const directTotal = readOptionalNumber(rawResult?.totalComments);
+  if (directTotal !== null) {
+    return directTotal;
+  }
+
+  const summary = rawObject(rawResult?.summary);
+  const summaryCandidates = [
+    summary?.rcount_with_context,
+    summary?.rcountWithContext,
+    summary?.rating_count_with_context,
+    summary?.review_count_with_context,
+    summary?.comment_count,
+    summary?.commentCount,
+    summary?.rating_total,
+    summary?.ratingTotal,
+    summary?.total,
+    summary?.total_count,
+    summary?.totalCount
+  ];
+  for (const candidate of summaryCandidates) {
+    const value = readOptionalNumber(candidate);
+    if (value !== null) {
+      return value;
+    }
+  }
+  return null;
+}
+
 function readStringArray(value: unknown) {
   return Array.isArray(value) ? value.map((item) => String(item || "").trim()).filter(Boolean) : [];
 }
@@ -271,7 +300,7 @@ export function serializeCrawlJob(job: CrawlJob): CrawlJobDTO {
   const durationEnd = job.finishedAt || (isActive ? now : job.updatedAt);
   const durationSeconds = elapsedSeconds(job.startedAt, durationEnd);
   const updatedAgoSeconds = Math.max(0, Math.floor((now.getTime() - job.updatedAt.getTime()) / 1000));
-  const totalComments = readOptionalNumber(rawResult?.totalComments);
+  const totalComments = readCrawlTotalComments(rawResult);
   const coveragePercent = job.maxReviews > 0 ? Math.min(100, Math.round((job.fetchedRows / job.maxReviews) * 100)) : null;
   const platformCoveragePercent =
     totalComments !== null && totalComments > 0 ? Math.min(100, Math.round((job.fetchedRows / totalComments) * 100)) : null;

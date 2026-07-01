@@ -81,6 +81,35 @@ function readOptionalNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function readCrawlTotalComments(rawResult: Record<string, unknown> | null) {
+  const directTotal = readOptionalNumber(rawResult?.totalComments);
+  if (directTotal !== null) {
+    return directTotal;
+  }
+
+  const summary = rawObject(rawResult?.summary);
+  const summaryCandidates = [
+    summary?.rcount_with_context,
+    summary?.rcountWithContext,
+    summary?.rating_count_with_context,
+    summary?.review_count_with_context,
+    summary?.comment_count,
+    summary?.commentCount,
+    summary?.rating_total,
+    summary?.ratingTotal,
+    summary?.total,
+    summary?.total_count,
+    summary?.totalCount
+  ];
+  for (const candidate of summaryCandidates) {
+    const value = readOptionalNumber(candidate);
+    if (value !== null) {
+      return value;
+    }
+  }
+  return null;
+}
+
 function truncateText(value: string | null | undefined, maxLength = 80) {
   const text = String(value || "").trim();
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
@@ -106,7 +135,7 @@ function buildCrawlStalledInsight(job: {
   const partialDueToTimeout = readOptionalBoolean(rawResult?.partialDueToTimeout);
   const commentSortAttempted = readOptionalBoolean(rawResult?.commentSortAttempted);
   const commentSortSwitched = readOptionalBoolean(rawResult?.commentSortSwitched);
-  const totalComments = readOptionalNumber(rawResult?.totalComments);
+  const totalComments = readCrawlTotalComments(rawResult);
   const nextRequests = readOptionalNumber(rawResult?.nextRequests);
   const payloadComments = readOptionalNumber(rawResult?.payloadComments);
   const domCommentCount = readOptionalNumber(rawResult?.domCommentCount);
