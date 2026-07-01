@@ -970,6 +970,29 @@ select {
   margin-bottom: 8px;
 }
 
+.analysis-progress-metrics {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.analysis-progress-metrics span {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 2px 6px;
+}
+
+.analysis-progress-stalled {
+  margin-inline-end: 0;
+  margin-top: 8px;
+}
+
 .analysis-progress-error {
   margin-top: 8px;
   color: #b42318;

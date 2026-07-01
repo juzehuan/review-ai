@@ -42,9 +42,20 @@
     <div v-if="latestRun" class="analysis-progress-panel">
       <div class="analysis-progress-head">
         <span>{{ runStatusLabel(latestRun.status) }}</span>
-        <span>{{ latestRun.successCount }}/{{ latestRun.reviewCount || 0 }} 完成，{{ latestRun.failedCount }} 失败</span>
+        <span>
+          已处理 {{ latestRun.processedCount }}/{{ latestRun.reviewCount || 0 }}，成功 {{ latestRun.successCount }}，失败 {{ latestRun.failedCount }}
+        </span>
       </div>
       <a-progress :percent="progressPercent" :status="progressStatus" />
+      <div class="analysis-progress-metrics">
+        <span>失败率 {{ latestRun.failureRatePercent }}%</span>
+        <span v-if="latestRun.throughputPerMinute !== null">速度 {{ latestRun.throughputPerMinute }}/分钟</span>
+        <span v-if="latestRun.estimatedRemainingSeconds !== null">预计剩余 {{ durationLabel(latestRun.estimatedRemainingSeconds) }}</span>
+        <span v-if="latestRun.lastActivityAt">最后日志 {{ durationLabel(latestRun.lastActivityAgoSeconds) }}前</span>
+      </div>
+      <a-tag v-if="latestRun.stalled" color="orange" class="analysis-progress-stalled">
+        疑似无日志 {{ durationLabel(latestRun.lastActivityAgoSeconds) }}
+      </a-tag>
       <div v-if="latestRun.lastError" class="analysis-progress-error">{{ latestRun.lastError }}</div>
     </div>
 
@@ -514,10 +525,7 @@ const activeFilterCount = computed(() =>
 const canCancelRun = computed(() => Boolean(latestRun.value && ["queued", "running"].includes(latestRun.value.status)));
 const resultRuns = computed(() => allRuns.value.filter((run) => ["completed", "partial_failed"].includes(run.status)));
 const progressPercent = computed(() => {
-  if (!latestRun.value?.reviewCount) {
-    return 0;
-  }
-  return Math.min(Math.round((latestRun.value.successCount / latestRun.value.reviewCount) * 100), 100);
+  return latestRun.value?.progressPercent || 0;
 });
 const progressStatus = computed(() => {
   if (latestRun.value?.status === "failed") {
@@ -892,6 +900,22 @@ function runStatusColor(status?: string | null) {
 
 function formatRunTime(value?: string | null) {
   return value ? new Date(value).toLocaleString() : "-";
+}
+
+function durationLabel(seconds?: number | null) {
+  if (seconds === null || seconds === undefined) {
+    return "-";
+  }
+  if (seconds < 60) {
+    return `${seconds} 秒`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes} 分钟`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  return restMinutes ? `${hours} 小时 ${restMinutes} 分钟` : `${hours} 小时`;
 }
 
 function stopPolling() {
