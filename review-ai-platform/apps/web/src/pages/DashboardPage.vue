@@ -1,6 +1,6 @@
 <template>
   <div v-if="!selectedTask" class="empty-state">
-    <a-empty description="先创建分析项目并导入评论 CSV">
+    <a-empty :description="tr('先创建分析项目并导入评论 CSV')">
       <template #image>
         <CloudUploadOutlined class="empty-icon" />
       </template>
@@ -10,56 +10,56 @@
   <div v-else class="dashboard-grid">
     <div class="page-toolbar dashboard-toolbar report-toolbar">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">分析报告</div>
+        <div class="toolbar-title">{{ tr("分析报告") }}</div>
         <div class="toolbar-subtitle">
-          面向业务复盘和对外汇报的评论洞察报告，支持导出、分享和证据追溯。
+          {{ tr("面向业务复盘和对外汇报的评论洞察报告，支持导出、分享和证据追溯。") }}
         </div>
       </div>
       <a-space wrap>
         <a-dropdown :trigger="['click']">
           <a-button :disabled="!dashboard?.runId">
             <template #icon><DownloadOutlined /></template>
-            导出报告
+            {{ tr("导出报告") }}
           </a-button>
           <template #overlay>
             <a-menu @click="handleExportMenu">
               <a-menu-item key="markdown">
                 <FileMarkdownOutlined />
-                导出 Markdown
+                {{ tr("导出 Markdown") }}
               </a-menu-item>
               <a-menu-item key="html">
                 <FileTextOutlined />
-                导出 HTML
+                {{ tr("导出 HTML") }}
               </a-menu-item>
               <a-menu-divider />
               <a-menu-item key="print">
                 <PrinterOutlined />
-                打印 / 保存 PDF
+                {{ tr("打印 / 保存 PDF") }}
               </a-menu-item>
             </a-menu>
           </template>
         </a-dropdown>
         <a-button @click="load" :loading="loading">
           <template #icon><ReloadOutlined /></template>
-          刷新报告
+          {{ tr("刷新报告") }}
         </a-button>
         <a-button type="primary" @click="openShareModal">
           <template #icon><ShareAltOutlined /></template>
-          分享报告
+          {{ tr("分享报告") }}
         </a-button>
         <a-button @click="openActionBoard">
           <template #icon><CheckSquareOutlined /></template>
-          行动看板
+          {{ tr("行动看板") }}
         </a-button>
         <a-tag :color="dashboard?.runId ? 'green' : 'default'">
-          {{ dashboard?.runId ? "已生成分析结果" : "等待首次分析" }}
+          {{ tr(dashboard?.runId ? "已生成分析结果" : "等待首次分析") }}
         </a-tag>
       </a-space>
     </div>
 
     <a-modal
       :open="showShareModal"
-      title="分享分析报告"
+      :title="tr('分享分析报告')"
       width="720px"
       :footer="null"
       @cancel="showShareModal = false"
@@ -68,39 +68,39 @@
         <div class="share-panel-head">
           <div>
             <div class="panel-label">Public Link</div>
-            <div class="settings-section-title">只读报告链接</div>
-            <div class="settings-help">外部访问者无需登录，只能查看当前任务的报告汇总和图表。</div>
+            <div class="settings-section-title">{{ tr("只读报告链接") }}</div>
+            <div class="settings-help">{{ tr("外部访问者无需登录，只能查看当前任务的报告汇总和图表。") }}</div>
           </div>
           <a-space wrap>
             <a-segmented v-model:value="shareSnapshotMode" :options="shareSnapshotModeOptions" />
             <a-button type="primary" :loading="shareCreating" @click="createShareLink">
               <template #icon><ShareAltOutlined /></template>
-              生成链接
+              {{ tr("生成链接") }}
             </a-button>
           </a-space>
         </div>
 
         <a-spin :spinning="shareLoading">
-          <a-empty v-if="shares.length === 0" description="还没有分享链接" />
+          <a-empty v-if="shares.length === 0" :description="tr('还没有分享链接')" />
           <div v-else class="share-link-list">
             <article v-for="share in shares" :key="share.id" class="share-link-card" :class="{ disabled: !share.enabled || share.revokedAt }">
               <div class="share-link-main">
                 <strong>{{ share.title || selectedTask?.productName || selectedTask?.name }}</strong>
                 <a-input :value="share.shareUrl" readonly />
                 <div class="muted">
-                  浏览 {{ share.viewCount }} 次 · 创建于 {{ formatTime(share.createdAt) }}
-                  <span> · {{ share.snapshotMode === "snapshot" ? "固定快照" : "实时报告" }}</span>
-                  <span v-if="share.snapshotCreatedAt"> · 快照 {{ formatTime(share.snapshotCreatedAt) }}</span>
-                  <span v-if="share.revokedAt"> · 已撤销</span>
+                  {{ tr(`浏览 ${share.viewCount} 次`) }} · {{ tr(`创建于 ${formatTime(share.createdAt)}`) }}
+                  <span> · {{ tr(share.snapshotMode === "snapshot" ? "固定快照" : "实时报告") }}</span>
+                  <span v-if="share.snapshotCreatedAt"> · {{ tr(`快照 ${formatTime(share.snapshotCreatedAt)}`) }}</span>
+                  <span v-if="share.revokedAt"> · {{ tr("已撤销") }}</span>
                 </div>
               </div>
               <a-space wrap>
                 <a-button size="small" :disabled="!share.enabled || Boolean(share.revokedAt)" @click="copyShareLink(share.shareUrl)">
                   <template #icon><CopyOutlined /></template>
-                  复制
+                  {{ tr("复制") }}
                 </a-button>
                 <a-button size="small" danger :disabled="!share.enabled || Boolean(share.revokedAt)" @click="revokeShareLink(share)">
-                  撤销
+                  {{ tr("撤销") }}
                 </a-button>
               </a-space>
             </article>
@@ -111,40 +111,40 @@
 
     <section class="report-hero">
       <div class="overview-copy">
-        <div class="overview-kicker">当前报告</div>
+        <div class="overview-kicker">{{ tr("当前报告") }}</div>
         <h2>{{ reportTitle }}</h2>
-        <p>{{ selectedTask.name }} · {{ selectedTask.sourceChannel }} · {{ analysisTypeLabel(selectedTask.analysisType) }} · {{ selectedTask.status }}</p>
+        <p>{{ selectedTask.name }} · {{ selectedTask.sourceChannel }} · {{ tr(analysisTypeLabel(selectedTask.analysisType)) }} · {{ tr(selectedTask.status) }}</p>
         <div class="report-meta-row">
-          <a-tag :color="dashboard?.runId ? 'green' : 'default'">{{ dashboard?.runId ? "已生成分析结果" : "等待首次分析" }}</a-tag>
-          <span>生成时间 {{ exportedAt }}</span>
+          <a-tag :color="dashboard?.runId ? 'green' : 'default'">{{ tr(dashboard?.runId ? "已生成分析结果" : "等待首次分析") }}</a-tag>
+          <span>{{ tr(`生成时间 ${exportedAt}`) }}</span>
           <span v-if="dashboard?.runId">Run {{ dashboard.runId.slice(0, 8) }}</span>
         </div>
       </div>
       <div class="pipeline-strip">
         <div v-for="step in pipelineSteps" :key="step.label" class="pipeline-step" :class="{ active: step.active }">
           <component :is="step.icon" />
-          <span>{{ step.label }}</span>
+          <span>{{ tr(step.label) }}</span>
         </div>
       </div>
     </section>
 
     <section class="report-executive-panel">
-      <div class="report-executive-main">
+        <div class="report-executive-main">
         <div class="panel-label">Executive Summary</div>
-        <h3>{{ executiveHeadline }}</h3>
-        <p>{{ dashboard?.aiSummary || emptySummaryText }}</p>
+        <h3>{{ tr(executiveHeadline) }}</h3>
+        <p>{{ dashboard?.aiSummary || tr(emptySummaryText) }}</p>
       </div>
       <div class="report-snapshot-grid">
         <article v-for="item in reportSnapshots" :key="item.label" class="report-snapshot-card" :class="item.tone">
-          <span>{{ item.label }}</span>
+          <span>{{ tr(item.label) }}</span>
           <strong>{{ item.value }}</strong>
-          <small>{{ item.note }}</small>
+          <small>{{ tr(item.note) }}</small>
         </article>
       </div>
     </section>
 
     <section v-if="dashboard?.aiSummary" class="ai-summary-card">
-      <div class="panel-label">AI 总结</div>
+      <div class="panel-label">{{ tr("AI 总结") }}</div>
       <div class="ai-summary-text">{{ dashboard.aiSummary }}</div>
     </section>
 
@@ -152,7 +152,7 @@
       <div class="settings-section-head">
         <div>
           <div class="panel-label">Quality Check</div>
-          <div class="settings-section-title">分析质量提醒</div>
+          <div class="settings-section-title">{{ tr("分析质量提醒") }}</div>
         </div>
       </div>
       <div class="quality-alert-list">
@@ -175,35 +175,34 @@
 
     <div class="summary-grid">
       <div class="stat-card stat-card-primary">
-        <div class="stat-label">评论总量</div>
+        <div class="stat-label">{{ tr("评论总量") }}</div>
         <div class="stat-value">{{ dashboard?.reviewCount || 0 }}</div>
-        <div class="stat-note">已纳入本次洞察样本</div>
+        <div class="stat-note">{{ tr("已纳入本次洞察样本") }}</div>
       </div>
 
       <div class="stat-card stat-card-accent">
-        <div class="stat-label">{{ negativeMetricLabel }}</div>
+        <div class="stat-label">{{ tr(negativeMetricLabel) }}</div>
         <div class="stat-value">{{ dashboard?.negativeCount || 0 }}</div>
-        <div class="stat-note">{{ negativeMetricNote }}</div>
+        <div class="stat-note">{{ tr(negativeMetricNote) }}</div>
       </div>
 
       <div class="stat-card stat-card-success">
-        <div class="stat-label">{{ scoreLabel }}</div>
+        <div class="stat-label">{{ tr(scoreLabel) }}</div>
         <div class="stat-value">{{ dashboard?.nps || 0 }}</div>
-        <div class="stat-note">{{ scoreDescription }}</div>
+        <div class="stat-note">{{ tr(scoreDescription) }}</div>
       </div>
 
       <div class="stat-card stat-card-ink">
-        <div class="stat-label">有效评论</div>
+        <div class="stat-label">{{ tr("有效评论") }}</div>
         <div class="stat-value">{{ dashboard?.contentProfile?.valuableCommentCount || 0 }}</div>
-        <div class="stat-note">低价值评论 {{ dashboard?.contentProfile?.lowValueCommentRate || 0 }}% 已降权</div>
+        <div class="stat-note">{{ tr(`低价值评论 ${dashboard?.contentProfile?.lowValueCommentRate || 0}% 已降权`) }}</div>
       </div>
 
       <div class="stat-card stat-card-cool">
-        <div class="stat-label">语言画像</div>
+        <div class="stat-label">{{ tr("语言画像") }}</div>
         <div class="stat-value">{{ dashboard?.languageProfile?.nonChineseRate || 0 }}%</div>
         <div class="stat-note">
-          主语言 {{ dashboard?.languageProfile?.primaryLanguage || "-" }} · 翻译覆盖
-          {{ dashboard?.languageProfile?.translationCoverageRate || 0 }}% · 混合 {{ dashboard?.languageProfile?.mixedLanguageRate || 0 }}%
+          {{ tr(`主语言 ${dashboard?.languageProfile?.primaryLanguage || "-"} · 翻译覆盖 ${dashboard?.languageProfile?.translationCoverageRate || 0}% · 混合 ${dashboard?.languageProfile?.mixedLanguageRate || 0}%`) }}
         </div>
       </div>
     </div>
@@ -212,8 +211,8 @@
       <div class="chart-card">
         <div class="chart-header">
           <div>
-            <div class="chart-title">{{ scoreChartTitle }}</div>
-            <div class="chart-subtitle">{{ scoreChartSubtitle }}</div>
+            <div class="chart-title">{{ tr(scoreChartTitle) }}</div>
+            <div class="chart-subtitle">{{ tr(scoreChartSubtitle) }}</div>
           </div>
         </div>
         <div class="nps-layout">
@@ -230,27 +229,27 @@
       </div>
 
       <div class="insight-panel">
-        <div class="insight-title">{{ voiceSummaryTitle }}</div>
+        <div class="insight-title">{{ tr(voiceSummaryTitle) }}</div>
         <div class="insight-list">
           <div class="insight-item">
             <span class="insight-dot positive" />
             <div>
               <strong>{{ positivePercent }}%</strong>
-              <span>正向情感占比</span>
+              <span>{{ tr("正向情感占比") }}</span>
             </div>
           </div>
           <div class="insight-item">
             <span class="insight-dot warning" />
             <div>
               <strong>{{ issueCount }}</strong>
-              <span>{{ issueMetricLabel }}</span>
+              <span>{{ tr(issueMetricLabel) }}</span>
             </div>
           </div>
           <div class="insight-item">
             <span class="insight-dot neutral" />
             <div>
               <strong>{{ dashboard?.wordCloud?.length || 0 }}</strong>
-              <span>核心关键词</span>
+              <span>{{ tr("核心关键词") }}</span>
             </div>
           </div>
         </div>
@@ -259,47 +258,47 @@
 
     <EChartCard
       v-if="showRatingCharts"
-      title="各星级情感倾向"
+      :title="tr('各星级情感倾向')"
       :option="ratingSentimentOption"
       clickable
       @chart-click="openRatingSentimentReviews"
     />
 
     <div class="chart-row">
-      <EChartCard title="整体情感分布" :option="sentimentOption" clickable @chart-click="openSentimentReviews" />
-      <EChartCard title="评论来源分布" :option="sourceOption" clickable @chart-click="openSourceReviews" />
+      <EChartCard :title="tr('整体情感分布')" :option="sentimentOption" clickable @chart-click="openSentimentReviews" />
+      <EChartCard :title="tr('评论来源分布')" :option="sourceOption" clickable @chart-click="openSourceReviews" />
     </div>
 
     <div class="chart-row">
-      <EChartCard v-if="dashboard?.contentProfile?.categoryDistribution?.length" title="内容类别分布" :option="contentCategoryOption" />
-      <EChartCard v-if="dashboard?.languageProfile?.distribution?.length" title="评论语言分布" :option="languageOption" />
+      <EChartCard v-if="dashboard?.contentProfile?.categoryDistribution?.length" :title="tr('内容类别分布')" :option="contentCategoryOption" />
+      <EChartCard v-if="dashboard?.languageProfile?.distribution?.length" :title="tr('评论语言分布')" :option="languageOption" />
       <EChartCard
         v-if="dashboard?.intentDistribution?.length"
-        title="评论意图分布"
+        :title="tr('评论意图分布')"
         :option="intentOption"
         clickable
         @chart-click="openIntentReviews"
       />
-      <EChartCard title="用户声音词云" :option="wordCloudOption" clickable @chart-click="openKeywordReviews" />
-      <EChartCard title="用户问题统计" :option="issueOption" clickable @chart-click="openIssueChartReviews" />
+      <EChartCard :title="tr('用户声音词云')" :option="wordCloudOption" clickable @chart-click="openKeywordReviews" />
+      <EChartCard :title="tr('用户问题统计')" :option="issueOption" clickable @chart-click="openIssueChartReviews" />
     </div>
 
     <section v-if="dashboard?.dynamicContentTags?.length" class="dynamic-tags-panel">
       <div class="settings-section-head">
         <div>
           <div class="panel-label">Dynamic Topics</div>
-          <div class="settings-section-title">动态内容标签</div>
+          <div class="settings-section-title">{{ tr("动态内容标签") }}</div>
         </div>
       </div>
       <div class="dynamic-tag-grid">
         <article v-for="tag in dashboard.dynamicContentTags.slice(0, 12)" :key="tag.label" class="dynamic-tag-card">
           <div class="dynamic-tag-head">
-            <a-tag :color="dynamicTagColor(tag.kind)">{{ dynamicTagKindText(tag.kind) }}</a-tag>
-            <span>{{ tag.count }} 条 · {{ tag.percent }}%</span>
+            <a-tag :color="dynamicTagColor(tag.kind)">{{ tr(dynamicTagKindText(tag.kind)) }}</a-tag>
+            <span>{{ tr(`${tag.count} 条`) }} · {{ tag.percent }}%</span>
           </div>
           <div class="dynamic-tag-title">{{ tag.label }}</div>
-          <div class="dynamic-tag-meta">{{ sentimentText(tag.sentiment) }}为主 · {{ tag.sampleReviewIds.length }} 条证据</div>
-          <a-button size="small" type="link" @click="openDynamicTagEvidence(tag)">查看证据</a-button>
+          <div class="dynamic-tag-meta">{{ tr(`${sentimentText(tag.sentiment)}为主 · ${tag.sampleReviewIds.length} 条证据`) }}</div>
+          <a-button size="small" type="link" @click="openDynamicTagEvidence(tag)">{{ tr("查看证据") }}</a-button>
         </article>
       </div>
     </section>
@@ -308,31 +307,31 @@
       <div class="settings-section-head">
         <div>
           <div class="panel-label">Noise Control</div>
-          <div class="settings-section-title">重复/相似评论聚合</div>
+          <div class="settings-section-title">{{ tr("重复/相似评论聚合") }}</div>
         </div>
       </div>
       <div class="duplicate-summary-strip">
         <div>
           <strong>{{ dashboard.duplicateProfile.duplicateRate }}%</strong>
-          <span>重复评论占比</span>
+          <span>{{ tr("重复评论占比") }}</span>
         </div>
         <div>
           <strong>{{ dashboard.duplicateProfile.duplicateGroupCount }}</strong>
-          <span>重复评论簇</span>
+          <span>{{ tr("重复评论簇") }}</span>
         </div>
         <div>
           <strong>{{ dashboard.duplicateProfile.largestGroupPercent }}%</strong>
-          <span>最大重复簇占比</span>
+          <span>{{ tr("最大重复簇占比") }}</span>
         </div>
       </div>
       <div class="duplicate-group-grid">
         <article v-for="group in dashboard.duplicateProfile.topGroups" :key="group.sampleText" class="duplicate-group-card">
           <div class="duplicate-group-head">
-            <a-tag :color="sentimentColor(group.sentiment)">{{ sentimentText(group.sentiment) }}</a-tag>
-            <span>{{ group.count }} 条 · {{ group.percent }}%</span>
+            <a-tag :color="sentimentColor(group.sentiment)">{{ tr(sentimentText(group.sentiment)) }}</a-tag>
+            <span>{{ tr(`${group.count} 条`) }} · {{ group.percent }}%</span>
           </div>
           <p>{{ truncate(group.sampleText, 120) }}</p>
-          <a-button size="small" type="link" @click="openEvidenceReviews(group.sampleReviewIds, '重复评论', 'duplicate')">查看证据</a-button>
+          <a-button size="small" type="link" @click="openEvidenceReviews(group.sampleReviewIds, '重复评论', 'duplicate')">{{ tr("查看证据") }}</a-button>
         </article>
       </div>
     </section>
@@ -341,7 +340,7 @@
       <div class="settings-section-head">
         <div>
           <div class="panel-label">Opinion Clusters</div>
-          <div class="settings-section-title">观点聚类与证据评论</div>
+          <div class="settings-section-title">{{ tr("观点聚类与证据评论") }}</div>
         </div>
       </div>
       <div class="insight-cluster-grid">
@@ -349,9 +348,9 @@
           <div class="insight-cluster-head">
             <div>
               <div class="insight-cluster-title">{{ cluster.title }}</div>
-              <div class="muted">{{ cluster.count }} 条评论 · {{ cluster.percent }}% · {{ sentimentText(cluster.sentiment) }}</div>
+              <div class="muted">{{ tr(`${cluster.count} 条评论`) }} · {{ cluster.percent }}% · {{ tr(sentimentText(cluster.sentiment)) }}</div>
             </div>
-            <a-button size="small" type="primary" ghost @click="openClusterEvidence(cluster.sampleReviewIds)">查看证据</a-button>
+            <a-button size="small" type="primary" ghost @click="openClusterEvidence(cluster.sampleReviewIds)">{{ tr("查看证据") }}</a-button>
           </div>
           <p class="insight-cluster-summary">{{ cluster.summary }}</p>
           <a-space wrap>
@@ -371,21 +370,21 @@
       <div class="settings-section-head">
         <div>
           <div class="panel-label">Evidence</div>
-          <div class="settings-section-title">问题证据与行动项</div>
+          <div class="settings-section-title">{{ tr("问题证据与行动项") }}</div>
         </div>
       </div>
       <div class="evidence-grid">
         <article v-for="item in dashboard.issues.slice(0, 8)" :key="item.issueName" class="evidence-card">
           <div>
             <div class="evidence-title">{{ item.issueName }}</div>
-            <div class="muted">{{ item.count }} 条相关评论 · {{ item.sampleReviewIds.length }} 条样本</div>
+            <div class="muted">{{ tr(`${item.count} 条相关评论`) }} · {{ tr(`${item.sampleReviewIds.length} 条样本`) }}</div>
           </div>
           <a-space wrap>
             <a-button size="small" type="primary" ghost @click="openIssueEvidence(item.issueName)">
-              查看证据
+              {{ tr("查看证据") }}
             </a-button>
             <a-button size="small" :loading="actionCreatingIssue === item.issueName" @click="createActionFromIssue(item)">
-              生成行动项
+              {{ tr("生成行动项") }}
             </a-button>
           </a-space>
         </article>
@@ -395,12 +394,12 @@
       <div class="settings-section-head">
         <div>
           <div class="panel-label">Product Insights</div>
-          <div class="settings-section-title">{{ insightReportTitle }}</div>
+          <div class="settings-section-title">{{ tr(insightReportTitle) }}</div>
         </div>
       </div>
       <div class="product-insights-grid">
         <article v-for="item in productInsightSections" :key="item.key" class="product-insight-card">
-          <div class="product-insight-title">{{ item.title }}</div>
+          <div class="product-insight-title">{{ tr(item.title) }}</div>
           <div class="product-insight-body">{{ item.content }}</div>
         </article>
       </div>
@@ -482,16 +481,16 @@ type ChartDataPayload = {
 
 type QualityAlert = DashboardDTO["qualityAlerts"][number];
 
-const shareSnapshotModeOptions = [
-  { label: "固定当前版本", value: "snapshot" },
-  { label: "实时报告", value: "live" }
-];
+const shareSnapshotModeOptions = computed(() => [
+  { label: tr("固定当前版本"), value: "snapshot" },
+  { label: tr("实时报告"), value: "live" }
+]);
 
-const npsColumns = [
-  { title: "分类", dataIndex: "label", key: "label" },
-  { title: "占比", dataIndex: "percent", key: "percent", customRender: ({ text }: { text: number }) => `${text}%` },
-  { title: "数量", dataIndex: "count", key: "count" }
-];
+const npsColumns = computed(() => [
+  { title: tr("分类"), dataIndex: "label", key: "label" },
+  { title: tr("占比"), dataIndex: "percent", key: "percent", customRender: ({ text }: { text: number }) => `${text}%` },
+  { title: tr("数量"), dataIndex: "count", key: "count" }
+]);
 
 const pipelineSteps = computed(() => [
   { label: "导入", icon: DatabaseOutlined, active: Boolean(selectedTask.value) },
@@ -901,7 +900,7 @@ async function loadShares() {
 
 async function openShareModal() {
   if (!selectedTask.value) {
-    message.warning("请先选择分析任务。");
+    message.warning(tr("请先选择分析任务。"));
     return;
   }
   showShareModal.value = true;
@@ -921,9 +920,9 @@ async function createShareLink() {
     await loadShares();
     const copied = await copyShareLink(share.shareUrl, false);
     if (copied) {
-      message.success(share.snapshotMode === "snapshot" ? "固定快照链接已生成并复制。" : "实时报告链接已生成并复制。");
+      message.success(tr(share.snapshotMode === "snapshot" ? "固定快照链接已生成并复制。" : "实时报告链接已生成并复制。"));
     } else {
-      message.warning("分享链接已生成，但浏览器未允许自动复制，请手动复制输入框中的链接。");
+      message.warning(tr("分享链接已生成，但浏览器未允许自动复制，请手动复制输入框中的链接。"));
     }
   } finally {
     shareCreating.value = false;
@@ -934,9 +933,9 @@ async function copyShareLink(shareUrl: string, showMessage = true) {
   const copied = await copyTextToClipboard(shareUrl);
   if (showMessage) {
     if (copied) {
-      message.success("分享链接已复制。");
+      message.success(tr("分享链接已复制。"));
     } else {
-      message.warning("浏览器未允许自动复制，请手动复制输入框中的链接。");
+      message.warning(tr("浏览器未允许自动复制，请手动复制输入框中的链接。"));
     }
   }
   return copied;
@@ -951,7 +950,7 @@ function handleExportMenu(info: { key: string | number }) {
 
 function exportReport(format: ExportFormat) {
   if (!selectedTask.value || !dashboard.value?.runId) {
-    message.warning("当前报告还没有生成分析结果，暂时无法导出。");
+    message.warning(tr("当前报告还没有生成分析结果，暂时无法导出。"));
     return;
   }
 
@@ -963,12 +962,12 @@ function exportReport(format: ExportFormat) {
   const fileBaseName = sanitizeFileName(`${reportTitle.value}-${tr("分析报告")}-${formatDateForFile(new Date())}`);
   if (format === "markdown") {
     downloadTextFile(`${fileBaseName}.md`, buildMarkdownReport(), "text/markdown;charset=utf-8");
-    message.success("Markdown 报告已导出。");
+    message.success(tr("Markdown 报告已导出。"));
     return;
   }
 
   downloadTextFile(`${fileBaseName}.html`, buildHtmlReport(), "text/html;charset=utf-8");
-  message.success("HTML 报告已导出。");
+  message.success(tr("HTML 报告已导出。"));
 }
 
 function buildMarkdownReport() {
@@ -1252,17 +1251,17 @@ async function revokeShareLink(share: ReportShareDTO) {
     return;
   }
   Modal.confirm({
-    title: "撤销分享链接",
-    content: "撤销后外部访问者将无法继续查看。",
-    okText: "撤销",
-    cancelText: "取消",
+    title: tr("撤销分享链接"),
+    content: tr("撤销后外部访问者将无法继续查看。"),
+    okText: tr("撤销"),
+    cancelText: tr("取消"),
     okButtonProps: { danger: true },
     async onOk() {
       if (!selectedTask.value) {
         return;
       }
       await revokeTaskReportShare(selectedTask.value.id, share.id);
-      message.success("分享链接已撤销。");
+      message.success(tr("分享链接已撤销。"));
       await loadShares();
     }
   });
@@ -1292,7 +1291,7 @@ async function createActionFromIssue(issue: DashboardDTO["issues"][number]) {
       relatedReviewIds: issue.sampleReviewIds,
       dueAt
     });
-    message.success("行动项已创建。");
+    message.success(tr("行动项已创建。"));
     router.push(`/tasks/${selectedTask.value.id}/actions`);
   } finally {
     actionCreatingIssue.value = null;

@@ -2,35 +2,35 @@
   <div class="help-page">
     <div class="page-toolbar help-hero">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">帮助中心</div>
-        <div class="toolbar-subtitle">真实使用中常见的问题、处理建议和排错口径。适合用户自查，也适合管理员统一回复。</div>
+        <div class="toolbar-title">{{ tr("帮助中心") }}</div>
+        <div class="toolbar-subtitle">{{ tr("真实使用中常见的问题、处理建议和排错口径。适合用户自查，也适合管理员统一回复。") }}</div>
       </div>
       <a-space wrap>
         <a-button href="/downloads/ReviewIQ-ordinary-user-manual.docx" download="ReviewIQ-普通用户操作手册.docx">
           <template #icon><DownloadOutlined /></template>
-          下载操作手册
+          {{ tr("下载操作手册") }}
         </a-button>
         <a-button @click="router.push('/crawl-jobs')">
           <template #icon><CloudDownloadOutlined /></template>
-          评论采集
+          {{ tr("评论采集") }}
         </a-button>
         <a-button type="primary" @click="router.push('/analysis-runs')">
           <template #icon><UnorderedListOutlined /></template>
-          分析记录
+          {{ tr("分析记录") }}
         </a-button>
       </a-space>
     </div>
 
     <section class="help-band">
       <div>
-        <div class="overview-kicker">使用前先确认</div>
-        <h2>链接公开可访问，分析类型一定选对，报告结论回到评论原文抽查验证。</h2>
-        <p>大多数用户问题都可以先按这三步判断：链接是否可采、任务类型是否匹配、AI 结论是否有原始评论证据。</p>
+        <div class="overview-kicker">{{ tr("使用前先确认") }}</div>
+        <h2>{{ tr("链接公开可访问，分析类型一定选对，报告结论回到评论原文抽查验证。") }}</h2>
+        <p>{{ tr("大多数用户问题都可以先按这三步判断：链接是否可采、任务类型是否匹配、AI 结论是否有原始评论证据。") }}</p>
       </div>
       <div class="help-quick-grid">
         <div v-for="item in quickStats" :key="item.label" class="help-quick-item">
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
+          <span>{{ tr(item.label) }}</span>
+          <strong>{{ tr(item.value) }}</strong>
         </div>
       </div>
     </section>
@@ -39,27 +39,27 @@
       <div class="help-panel-head">
         <div>
           <div class="panel-label">FAQ</div>
-          <div class="settings-section-title">用户可能会问到的问题</div>
+          <div class="settings-section-title">{{ tr("用户可能会问到的问题") }}</div>
         </div>
-        <a-input-search v-model:value="keyword" allow-clear placeholder="搜索问题或答案" class="help-search" />
+        <a-input-search v-model:value="keyword" allow-clear :placeholder="tr('搜索问题或答案')" class="help-search" />
       </div>
 
       <div class="help-filter-row">
         <a-segmented v-model:value="activeCategory" :options="categoryOptions" />
-        <span>{{ filteredFaqs.length }} 个问题</span>
+        <span>{{ tr(`${filteredFaqs.length} 个问题`) }}</span>
       </div>
 
       <div v-if="filteredFaqs.length" class="help-faq-list">
         <article v-for="faq in filteredFaqs" :key="faq.id" class="help-qa-card">
           <div class="help-qa-meta">
-            <a-tag>{{ faq.category }}</a-tag>
+            <a-tag>{{ tr(faq.category) }}</a-tag>
             <span>#{{ faq.id.toString().padStart(2, "0") }}</span>
           </div>
-          <h3>{{ faq.question }}</h3>
-          <p>{{ faq.answer }}</p>
+          <h3>{{ tr(faq.question) }}</h3>
+          <p>{{ tr(faq.answer) }}</p>
         </article>
       </div>
-      <a-empty v-else description="没有匹配的问题，换个关键词试试。" />
+      <a-empty v-else :description="tr('没有匹配的问题，换个关键词试试。')" />
     </section>
   </div>
 </template>
@@ -68,6 +68,7 @@
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { CloudDownloadOutlined, DownloadOutlined, UnorderedListOutlined } from "@ant-design/icons-vue";
+import { translateStaticText } from "@/static-i18n";
 
 type FaqItem = {
   id: number;
@@ -79,6 +80,7 @@ type FaqItem = {
 const router = useRouter();
 const keyword = ref("");
 const activeCategory = ref("全部");
+const tr = (value: string) => translateStaticText(value);
 
 const faqs: FaqItem[] = [
   {
@@ -276,7 +278,10 @@ const faqs: FaqItem[] = [
 ];
 
 const categories = Array.from(new Set(faqs.map((faq) => faq.category)));
-const categoryOptions = computed(() => ["全部", ...categories]);
+const categoryOptions = computed(() => [
+  { label: tr("全部"), value: "全部" },
+  ...categories.map((category) => ({ label: tr(category), value: category }))
+]);
 const quickStats = computed(() => [
   { label: "问题清单", value: `${faqs.length} 条` },
   { label: "覆盖模块", value: `${categories.length} 类` },
@@ -287,7 +292,7 @@ const filteredFaqs = computed(() => {
   const normalizedKeyword = keyword.value.trim().toLowerCase();
   return faqs.filter((faq) => {
     const matchesCategory = activeCategory.value === "全部" || faq.category === activeCategory.value;
-    const searchable = `${faq.question} ${faq.answer} ${faq.category}`.toLowerCase();
+    const searchable = `${faq.question} ${faq.answer} ${faq.category} ${tr(faq.question)} ${tr(faq.answer)} ${tr(faq.category)}`.toLowerCase();
     return matchesCategory && (!normalizedKeyword || searchable.includes(normalizedKeyword));
   });
 });
