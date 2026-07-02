@@ -978,6 +978,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "主要问题证据": "Main issue evidence",
     "问题证据与行动项": "Issue evidence and action items",
     "生成行动项": "Create action item",
+    "跟进问题": "Follow up issue",
     "查看证据": "View evidence",
     "代表性评论": "Representative comments",
     "正向代表评论": "Positive representative comments",
@@ -2053,6 +2054,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "主要问题证据": "หลักฐานประเด็นหลัก",
     "问题证据与行动项": "หลักฐานปัญหาและงานติดตาม",
     "生成行动项": "สร้างงานติดตาม",
+    "跟进问题": "ติดตามปัญหา",
     "查看证据": "ดูหลักฐาน",
     "代表性评论": "คอมเมนต์ตัวแทน",
     "正向代表评论": "คอมเมนต์ตัวแทนเชิงบวก",
@@ -2303,9 +2305,22 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">): s
   if (starCount) {
     return locale === "en-US" ? `${starCount[1]} star${starCount[1] === "1" ? "" : "s"}` : `${starCount[1]} ดาว`;
   }
+  const starSentiment = value.match(/^(\d+)\s*星(正向|中性|负向)$/);
+  if (starSentiment) {
+    const sentiment = staticText[locale][starSentiment[2]] || starSentiment[2];
+    return locale === "en-US"
+      ? `${starSentiment[1]} star${starSentiment[1] === "1" ? "" : "s"} ${sentiment}`
+      : `${starSentiment[1]} ดาว ${sentiment}`;
+  }
   const activeFilterCount = value.match(/^已启用\s+(\d+)\s+个筛选$/);
   if (activeFilterCount) {
     return locale === "en-US" ? `${activeFilterCount[1]} filters enabled` : `เปิดใช้ตัวกรอง ${activeFilterCount[1]} รายการ`;
+  }
+  const reportIssueAction = value.match(/^报告中发现\s+([\d,]+)\s+条相关评论。建议定位样本证据、确认影响范围，并安排负责人跟进解决。$/);
+  if (reportIssueAction) {
+    return locale === "en-US"
+      ? `The report found ${reportIssueAction[1]} related comments. Review sample evidence, confirm the impact scope, and assign an owner to follow up.`
+      : `รายงานพบคอมเมนต์ที่เกี่ยวข้อง ${reportIssueAction[1]} รายการ ควรตรวจหลักฐานตัวอย่าง ยืนยันขอบเขตผลกระทบ และมอบหมายผู้รับผิดชอบติดตาม`;
   }
   const linkedEvidenceCount = value.match(/^正在查看「(.+)」关联的\s+([\d,]+)\s+条评论证据$/);
   if (linkedEvidenceCount) {

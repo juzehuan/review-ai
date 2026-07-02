@@ -853,7 +853,7 @@ function renderGauge() {
             color: "#111827"
           },
           title: { offsetCenter: [0, "8%"], color: "#6b7280", fontSize: 13 },
-          data: [{ value: npsValue, name: scoreLabel.value }]
+          data: [{ value: npsValue, name: tr(scoreLabel.value) }]
         }
       ]
     },
@@ -1282,8 +1282,8 @@ async function createActionFromIssue(issue: DashboardDTO["issues"][number]) {
   try {
     const dueAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     await createActionItem(selectedTask.value.id, {
-      title: `跟进问题：${issue.issueName}`,
-      description: `报告中发现 ${issue.count} 条相关评论。建议定位样本证据、确认影响范围，并安排负责人跟进解决。`,
+      title: `${tr("跟进问题")}：${issue.issueName}`,
+      description: tr(`报告中发现 ${issue.count} 条相关评论。建议定位样本证据、确认影响范围，并安排负责人跟进解决。`),
       priority: issue.count >= 10 ? "high" : "medium",
       status: "open",
       source: "report_issue",
@@ -1390,7 +1390,7 @@ function openRatingSentimentReviews(params: unknown) {
   }
   openFilteredReviews(
     { ratingStar: String(data.ratingStar), sentiment: data.sentiment },
-    `${data.ratingStar} 星${sentimentText(data.sentiment)}`,
+    tr(`${data.ratingStar} 星${sentimentText(data.sentiment)}`),
     "rating-sentiment"
   );
 }
@@ -1447,16 +1447,16 @@ const sentimentColors = getSentimentColors();
 
 const ratingSentimentOption = computed<EChartsOption>(() => ({
   tooltip: getTooltip() as EChartsOption["tooltip"],
-  legend: getLegend({ data: ["正向", "中性", "负向"] }) as EChartsOption["legend"],
+  legend: getLegend({ data: [tr("正向"), tr("中性"), tr("负向")] }) as EChartsOption["legend"],
   color: [sentimentColors.positive, sentimentColors.neutral, sentimentColors.negative],
   xAxis: getXAxis({
-    data: (dashboard.value?.ratingSentiment || []).map((item) => `${item.ratingStar} 星`)
+    data: (dashboard.value?.ratingSentiment || []).map((item) => tr(`${item.ratingStar} 星`))
   }) as EChartsOption["xAxis"],
   yAxis: getYAxis() as EChartsOption["yAxis"],
   grid: getGrid() as EChartsOption["grid"],
   series: [
     {
-      name: "正向",
+      name: tr("正向"),
       type: "bar",
       stack: "sentiment",
       barWidth: 38,
@@ -1468,7 +1468,7 @@ const ratingSentimentOption = computed<EChartsOption>(() => ({
       }))
     },
     {
-      name: "中性",
+      name: tr("中性"),
       type: "bar",
       stack: "sentiment",
       barWidth: 38,
@@ -1480,7 +1480,7 @@ const ratingSentimentOption = computed<EChartsOption>(() => ({
       }))
     },
     {
-      name: "负向",
+      name: tr("负向"),
       type: "bar",
       stack: "sentiment",
       barWidth: 38,
@@ -1502,7 +1502,7 @@ const sentimentOption = computed<EChartsOption>(() => ({
     {
       ...(getPieItem(["46%", "74%"]) as Record<string, unknown>),
       data: (dashboard.value?.sentimentDistribution || []).map((item) => ({
-        name: sentimentText(item.sentiment),
+        name: tr(sentimentText(item.sentiment)),
         value: item.count,
         sentiment: item.sentiment
       }))
