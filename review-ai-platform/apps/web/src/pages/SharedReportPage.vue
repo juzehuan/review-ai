@@ -3,11 +3,11 @@
     <a-result
       v-if="error"
       status="404"
-      title="报告不可访问"
-      :sub-title="error"
+      :title="tr('报告不可访问')"
+      :sub-title="tr(error)"
     />
 
-    <a-spin v-else-if="loading" tip="正在加载报告">
+    <a-spin v-else-if="loading" :tip="tr('正在加载报告')">
       <div class="shared-report-loading" />
     </a-spin>
 
@@ -16,14 +16,14 @@
         <div>
           <div class="shared-kicker">ReviewIQ Shared Report</div>
           <h1>{{ report.share.title || report.task.productName || report.task.name }}</h1>
-          <p>{{ report.task.name }} · {{ report.task.sourceChannel }} · {{ analysisTypeLabel(report.task.analysisType) }}</p>
+          <p>{{ report.task.name }} · {{ report.task.sourceChannel }} · {{ tr(analysisTypeLabel(report.task.analysisType)) }}</p>
         </div>
         <div class="shared-meta">
-          <span>评论 {{ report.dashboard.reviewCount }}</span>
-          <span>{{ scoreLabel }} {{ report.dashboard.nps }}</span>
-          <span>浏览 {{ report.share.viewCount }}</span>
-          <span>{{ report.share.snapshotMode === "snapshot" ? "固定快照" : "实时报告" }}</span>
-          <a-button size="small" @click="printReport">打印/PDF</a-button>
+          <span>{{ tr(`评论 ${report.dashboard.reviewCount}`) }}</span>
+          <span>{{ tr(scoreLabel) }} {{ report.dashboard.nps }}</span>
+          <span>{{ tr(`浏览 ${report.share.viewCount}`) }}</span>
+          <span>{{ tr(report.share.snapshotMode === "snapshot" ? "固定快照" : "实时报告") }}</span>
+          <a-button size="small" @click="printReport">{{ tr("打印/PDF") }}</a-button>
         </div>
       </section>
 
@@ -36,7 +36,7 @@
         <div class="settings-section-head">
           <div>
             <div class="panel-label">Quality Check</div>
-            <div class="settings-section-title">分析质量提醒</div>
+            <div class="settings-section-title">{{ tr("分析质量提醒") }}</div>
           </div>
         </div>
         <div class="quality-alert-list">
@@ -45,68 +45,68 @@
             :key="alert.id"
             show-icon
             :type="qualityAlertType(alert.level)"
-            :message="alert.title"
-            :description="`${alert.detail} ${alert.recommendation}`"
+            :message="tr(alert.title)"
+            :description="tr(`${alert.detail} ${alert.recommendation}`)"
           />
         </div>
       </section>
 
       <div class="shared-stat-grid">
         <article class="stat-card stat-card-primary">
-          <div class="stat-label">评论总量</div>
+          <div class="stat-label">{{ tr("评论总量") }}</div>
           <div class="stat-value">{{ report.dashboard.reviewCount }}</div>
-          <div class="stat-note">进入本次报告的样本量</div>
+          <div class="stat-note">{{ tr("进入本次报告的样本量") }}</div>
         </article>
         <article class="stat-card stat-card-success">
-          <div class="stat-label">正向占比</div>
+          <div class="stat-label">{{ tr("正向占比") }}</div>
           <div class="stat-value">{{ positivePercent }}%</div>
-          <div class="stat-note">用户认可和可放大的反馈</div>
+          <div class="stat-note">{{ tr("用户认可和可放大的反馈") }}</div>
         </article>
         <article class="stat-card stat-card-accent">
-          <div class="stat-label">{{ negativeMetricLabel }}</div>
+          <div class="stat-label">{{ tr(negativeMetricLabel) }}</div>
           <div class="stat-value">{{ report.dashboard.negativeCount }}</div>
-          <div class="stat-note">{{ negativeMetricNote }}</div>
+          <div class="stat-note">{{ tr(negativeMetricNote) }}</div>
         </article>
         <article class="stat-card stat-card-ink">
-          <div class="stat-label">有效评论</div>
+          <div class="stat-label">{{ tr("有效评论") }}</div>
           <div class="stat-value">{{ report.dashboard.contentProfile?.valuableCommentCount || 0 }}</div>
-          <div class="stat-note">低价值评论 {{ report.dashboard.contentProfile?.lowValueCommentRate || 0 }}% 已降权</div>
+          <div class="stat-note">{{ tr(`低价值评论 ${report.dashboard.contentProfile?.lowValueCommentRate || 0}% 已降权`) }}</div>
         </article>
         <article class="stat-card stat-card-cool">
-          <div class="stat-label">语言画像</div>
+          <div class="stat-label">{{ tr("语言画像") }}</div>
           <div class="stat-value">{{ report.dashboard.languageProfile?.nonChineseRate || 0 }}%</div>
-          <div class="stat-note">非中文/混合评论，主语言 {{ report.dashboard.languageProfile?.primaryLanguage || "-" }}</div>
+          <div class="stat-note">{{ tr(`非中文/混合评论，主语言 ${report.dashboard.languageProfile?.primaryLanguage || "-"}`) }}</div>
         </article>
       </div>
 
       <div class="chart-row">
-        <EChartCard title="整体情感分布" :option="sentimentOption" />
-        <EChartCard title="评论来源分布" :option="sourceOption" />
+        <EChartCard :title="tr('整体情感分布')" :option="sentimentOption" />
+        <EChartCard :title="tr('评论来源分布')" :option="sourceOption" />
       </div>
 
       <div class="chart-row">
-        <EChartCard v-if="report.dashboard.contentProfile?.categoryDistribution?.length" title="内容类别分布" :option="contentCategoryOption" />
-        <EChartCard v-if="report.dashboard.languageProfile?.distribution?.length" title="评论语言分布" :option="languageOption" />
-        <EChartCard title="高频问题统计" :option="issueOption" />
-        <EChartCard v-if="report.dashboard.intentDistribution?.length" title="评论意图分布" :option="intentOption" />
-        <EChartCard title="用户声音词云" :option="wordCloudOption" />
+        <EChartCard v-if="report.dashboard.contentProfile?.categoryDistribution?.length" :title="tr('内容类别分布')" :option="contentCategoryOption" />
+        <EChartCard v-if="report.dashboard.languageProfile?.distribution?.length" :title="tr('评论语言分布')" :option="languageOption" />
+        <EChartCard :title="tr('高频问题统计')" :option="issueOption" />
+        <EChartCard v-if="report.dashboard.intentDistribution?.length" :title="tr('评论意图分布')" :option="intentOption" />
+        <EChartCard :title="tr('用户声音词云')" :option="wordCloudOption" />
       </div>
 
       <section v-if="report.dashboard.dynamicContentTags?.length" class="dynamic-tags-panel">
         <div class="settings-section-head">
           <div>
             <div class="panel-label">Dynamic Topics</div>
-            <div class="settings-section-title">动态内容标签</div>
+            <div class="settings-section-title">{{ tr("动态内容标签") }}</div>
           </div>
         </div>
         <div class="dynamic-tag-grid">
           <article v-for="tag in report.dashboard.dynamicContentTags.slice(0, 12)" :key="tag.label" class="dynamic-tag-card">
             <div class="dynamic-tag-head">
-              <a-tag :color="dynamicTagColor(tag.kind)">{{ dynamicTagKindText(tag.kind) }}</a-tag>
-              <span>{{ tag.count }} 条 · {{ tag.percent }}%</span>
+              <a-tag :color="dynamicTagColor(tag.kind)">{{ tr(dynamicTagKindText(tag.kind)) }}</a-tag>
+              <span>{{ tr(`${tag.count} 条评论`) }} · {{ tag.percent }}%</span>
             </div>
             <div class="dynamic-tag-title">{{ tag.label }}</div>
-            <div class="dynamic-tag-meta">{{ sentimentText(tag.sentiment) }}为主 · {{ tag.sampleReviewIds.length }} 条证据</div>
+            <div class="dynamic-tag-meta">{{ tr(`${sentimentText(tag.sentiment)}为主 · ${tag.sampleReviewIds.length} 条证据`) }}</div>
           </article>
         </div>
       </section>
@@ -115,28 +115,28 @@
         <div class="settings-section-head">
           <div>
             <div class="panel-label">Noise Control</div>
-            <div class="settings-section-title">重复/相似评论聚合</div>
+            <div class="settings-section-title">{{ tr("重复/相似评论聚合") }}</div>
           </div>
         </div>
         <div class="duplicate-summary-strip">
           <div>
             <strong>{{ report.dashboard.duplicateProfile.duplicateRate }}%</strong>
-            <span>重复评论占比</span>
+            <span>{{ tr("重复评论占比") }}</span>
           </div>
           <div>
             <strong>{{ report.dashboard.duplicateProfile.duplicateGroupCount }}</strong>
-            <span>重复评论簇</span>
+            <span>{{ tr("重复评论簇") }}</span>
           </div>
           <div>
             <strong>{{ report.dashboard.duplicateProfile.largestGroupPercent }}%</strong>
-            <span>最大重复簇占比</span>
+            <span>{{ tr("最大重复簇占比") }}</span>
           </div>
         </div>
         <div class="duplicate-group-grid">
           <article v-for="group in report.dashboard.duplicateProfile.topGroups" :key="group.sampleText" class="duplicate-group-card">
             <div class="duplicate-group-head">
-              <a-tag :color="sentimentColor(group.sentiment)">{{ sentimentText(group.sentiment) }}</a-tag>
-              <span>{{ group.count }} 条 · {{ group.percent }}%</span>
+              <a-tag :color="sentimentColor(group.sentiment)">{{ tr(sentimentText(group.sentiment)) }}</a-tag>
+              <span>{{ tr(`${group.count} 条评论`) }} · {{ group.percent }}%</span>
             </div>
             <p>{{ truncate(group.sampleText, 120) }}</p>
           </article>
@@ -147,7 +147,7 @@
         <div class="settings-section-head">
           <div>
             <div class="panel-label">Opinion Clusters</div>
-            <div class="settings-section-title">观点聚类与证据评论</div>
+            <div class="settings-section-title">{{ tr("观点聚类与证据评论") }}</div>
           </div>
         </div>
         <div class="insight-cluster-grid">
@@ -155,7 +155,7 @@
             <div class="insight-cluster-head">
               <div>
                 <div class="insight-cluster-title">{{ cluster.title }}</div>
-                <div class="muted">{{ cluster.count }} 条评论 · {{ cluster.percent }}% · {{ sentimentText(cluster.sentiment) }}</div>
+                <div class="muted">{{ tr(`${cluster.count} 条评论 · ${cluster.percent}% · ${sentimentText(cluster.sentiment)}`) }}</div>
               </div>
             </div>
             <p class="insight-cluster-summary">{{ cluster.summary }}</p>
@@ -176,7 +176,7 @@
         <div class="settings-section-head">
           <div>
             <div class="panel-label">Strategic Insights</div>
-            <div class="settings-section-title">{{ insightReportTitle }}</div>
+            <div class="settings-section-title">{{ tr(insightReportTitle) }}</div>
           </div>
         </div>
         <div class="product-insights-grid">
@@ -191,14 +191,14 @@
         <div class="settings-section-head">
           <div>
             <div class="panel-label">Evidence</div>
-            <div class="settings-section-title">主要问题证据</div>
+            <div class="settings-section-title">{{ tr("主要问题证据") }}</div>
           </div>
         </div>
         <div class="evidence-grid">
           <article v-for="item in report.dashboard.issues.slice(0, 8)" :key="item.issueName" class="evidence-card">
             <div>
               <div class="evidence-title">{{ item.issueName }}</div>
-              <div class="muted">{{ item.count }} 条相关评论 · {{ item.sampleReviewIds.length }} 条样本</div>
+              <div class="muted">{{ tr(`${item.count} 条相关评论 · ${item.sampleReviewIds.length} 条样本`) }}</div>
             </div>
           </article>
         </div>
@@ -213,6 +213,7 @@ import { useRoute } from "vue-router";
 import type { EChartsOption } from "echarts";
 import EChartCard from "@/components/EChartCard.vue";
 import { fetchSharedReport } from "@/api";
+import { translateStaticText } from "@/static-i18n";
 import type { Sentiment, SharedReportDTO } from "@review-ai/shared";
 import {
   CHART_COLORS,
@@ -228,6 +229,7 @@ import {
 } from "@/composables/useChartConfig";
 
 const route = useRoute();
+const tr = (value: string) => translateStaticText(value);
 const report = ref<SharedReportDTO | null>(null);
 const loading = ref(true);
 const error = ref("");
@@ -265,21 +267,21 @@ const productInsightSections = computed(() => {
   }
   if (type === "video") {
     return [
-      { key: "userPersonas", title: "观众画像", content: insights.userPersonas },
-      { key: "usageScenarios", title: "观看场景", content: insights.usageScenarios },
-      { key: "sellingPoints", title: "传播理由", content: insights.sellingPoints },
-      { key: "advantages", title: "内容优势", content: insights.advantages },
-      { key: "improvements", title: "待优化点", content: insights.improvements },
-      { key: "expectations", title: "观众期待", content: insights.expectations }
+      { key: "userPersonas", title: tr("观众画像"), content: insights.userPersonas },
+      { key: "usageScenarios", title: tr("观看场景"), content: insights.usageScenarios },
+      { key: "sellingPoints", title: tr("传播理由"), content: insights.sellingPoints },
+      { key: "advantages", title: tr("内容优势"), content: insights.advantages },
+      { key: "improvements", title: tr("待优化点"), content: insights.improvements },
+      { key: "expectations", title: tr("观众期待"), content: insights.expectations }
     ].filter((item) => item.content);
   }
   return [
-    { key: "userPersonas", title: "用户画像", content: insights.userPersonas },
-    { key: "usageScenarios", title: "使用场景", content: insights.usageScenarios },
-    { key: "sellingPoints", title: "核心理由", content: insights.sellingPoints },
-    { key: "advantages", title: "优势信号", content: insights.advantages },
-    { key: "improvements", title: "改进机会", content: insights.improvements },
-    { key: "expectations", title: "用户期待", content: insights.expectations }
+    { key: "userPersonas", title: tr("用户画像"), content: insights.userPersonas },
+    { key: "usageScenarios", title: tr("使用场景"), content: insights.usageScenarios },
+    { key: "sellingPoints", title: tr("核心理由"), content: insights.sellingPoints },
+    { key: "advantages", title: tr("优势信号"), content: insights.advantages },
+    { key: "improvements", title: tr("改进机会"), content: insights.improvements },
+    { key: "expectations", title: tr("用户期待"), content: insights.expectations }
   ].filter((item) => item.content);
 });
 
@@ -363,7 +365,7 @@ const sentimentOption = computed<EChartsOption>(() => ({
     {
       ...(getPieItem(["46%", "74%"]) as Record<string, unknown>),
       data: (report.value?.dashboard.sentimentDistribution || []).map((item) => ({
-        name: sentimentText(item.sentiment),
+        name: tr(sentimentText(item.sentiment)),
         value: item.count
       }))
     }
