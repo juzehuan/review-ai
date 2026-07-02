@@ -140,6 +140,10 @@ function readOptionalScalarString(value: unknown) {
   return null;
 }
 
+function readStringArray(value: unknown) {
+  return Array.isArray(value) ? value.map((item) => String(item || "").trim()).filter(Boolean) : [];
+}
+
 function readCrawlTotalComments(rawResult: Record<string, unknown> | null) {
   const directTotal = readOptionalNumber(rawResult?.totalComments);
   if (directTotal !== null) {
@@ -177,6 +181,13 @@ function truncateText(value: string | null | undefined, maxLength = 80) {
 function buildMetricSummary(parts: Array<string | null | undefined>) {
   const values = parts.filter((item): item is string => Boolean(item));
   return values.length ? values.join(" · ") : null;
+}
+
+function firstChannelErrorSummary(errors: string[]) {
+  if (!errors.length) {
+    return null;
+  }
+  return truncateText(errors[0], 120);
 }
 
 function formatCrawlStopReason(value: string) {
@@ -245,6 +256,8 @@ function buildCrawlStalledInsight(job: {
   const cursor = readOptionalScalarString(rawResult?.cursor);
   const hasMore = readOptionalBoolean(rawResult?.hasMore);
   const lastRequestStatus = readOptionalNumber(rawResult?.lastRequestStatus);
+  const channelErrors = readStringArray(rawResult?.channelErrors);
+  const firstChannelError = firstChannelErrorSummary(channelErrors);
   const metricSummary = buildMetricSummary([
     totalComments !== null ? `平台总量 ${totalComments}` : null,
     nextRequests !== null ? `接口请求 ${nextRequests}` : null,
@@ -259,7 +272,9 @@ function buildCrawlStalledInsight(job: {
     commentSortOpened !== null ? `排序菜单 ${commentSortOpened ? "已打开" : "未打开"}` : null,
     progressEventAt ? `进度回传 ${progressEventAt}` : null,
     partialDueToTimeout ? "部分结果超时" : null,
-    stopReason ? `停止原因 ${formatCrawlStopReason(stopReason)}` : null
+    stopReason ? `停止原因 ${formatCrawlStopReason(stopReason)}` : null,
+    channelErrors.length ? `通道异常 ${channelErrors.length} 条` : null,
+    firstChannelError ? `首条通道异常 ${firstChannelError}` : null
   ]);
 
   if (job.status === "queued") {

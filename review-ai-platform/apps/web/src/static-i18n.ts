@@ -1884,7 +1884,7 @@ function replaceKnownParts(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   return result;
 }
 
-function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
+function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">): string | null {
   const unlimited = staticText[locale]["不限"];
   const quotaReset = value.match(/^剩余\s+(\d+)\s+天\s+·\s+(.+)\s+重置$/);
   if (quotaReset) {
@@ -2275,6 +2275,11 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const channelErrors = value.match(/^通道异常\s+(\d+)\s+条$/);
   if (channelErrors) {
     return locale === "en-US" ? `${channelErrors[1]} channel issues` : `ปัญหาช่องทาง ${channelErrors[1]} รายการ`;
+  }
+  const firstChannelError = value.match(/^首条通道异常\s+(.+)$/);
+  if (firstChannelError) {
+    const detail: string = translatePattern(firstChannelError[1], locale) || replaceKnownParts(firstChannelError[1], locale);
+    return locale === "en-US" ? `First channel issue ${detail}` : `ปัญหาช่องทางรายการแรก ${detail}`;
   }
   const crawlMetricPart = (part: string) => {
     if (part === "部分结果超时") {
