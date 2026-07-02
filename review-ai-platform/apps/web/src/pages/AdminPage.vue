@@ -1,11 +1,11 @@
 <template>
   <div v-if="forbidden" class="dashboard-grid">
     <div class="table-shell">
-      <a-result status="403" title="需要超管权限" sub-title="当前账号没有平台超管权限。">
+      <a-result status="403" :title="tr('需要超管权限')" :sub-title="tr('当前账号没有平台超管权限。')">
         <template #extra>
           <a-button type="primary" @click="$router.push('/dashboard')">
             <template #icon><ArrowLeftOutlined /></template>
-            返回用户后台
+            {{ tr("返回用户后台") }}
           </a-button>
         </template>
       </a-result>
@@ -15,47 +15,47 @@
   <div v-else class="dashboard-grid">
     <div class="page-toolbar dashboard-toolbar">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">超管后台</div>
-        <div class="toolbar-subtitle">管理平台注册入口、普通用户配额和超管账号。普通用户后台只保留分析任务与个人设置。</div>
+        <div class="toolbar-title">{{ tr("超管后台") }}</div>
+        <div class="toolbar-subtitle">{{ tr("管理平台注册入口、普通用户配额和超管账号。普通用户后台只保留分析任务与个人设置。") }}</div>
       </div>
       <a-space wrap>
         <a-button @click="load" :loading="loading">
           <template #icon><ReloadOutlined /></template>
-          刷新
+          {{ tr("刷新") }}
         </a-button>
         <a-button type="primary" @click="openInviteModal">
           <template #icon><KeyOutlined /></template>
-          生成邀请码
+          {{ tr("生成邀请码") }}
         </a-button>
         <a-button @click="openUserModal">
           <template #icon><UserAddOutlined /></template>
-          新建账号
+          {{ tr("新建账号") }}
         </a-button>
       </a-space>
     </div>
 
     <div class="summary-grid">
       <div class="stat-card stat-card-primary">
-        <div class="stat-label">平台用户</div>
+        <div class="stat-label">{{ tr("平台用户") }}</div>
         <div class="stat-value">{{ overview?.userCount || 0 }}</div>
-        <div class="stat-note">包含超管与普通用户</div>
+        <div class="stat-note">{{ tr("包含超管与普通用户") }}</div>
       </div>
       <div class="stat-card stat-card-success">
-        <div class="stat-label">可用邀请码</div>
+        <div class="stat-label">{{ tr("可用邀请码") }}</div>
         <div class="stat-value">{{ overview?.availableInviteCodeCount || 0 }}</div>
-        <div class="stat-note">已使用的邀请码无法再次注册</div>
+        <div class="stat-note">{{ tr("已使用的邀请码无法再次注册") }}</div>
       </div>
       <div class="stat-card stat-card-accent">
-        <div class="stat-label">分析任务</div>
+        <div class="stat-label">{{ tr("分析任务") }}</div>
         <div class="stat-value">{{ overview?.taskCount || 0 }}</div>
-        <div class="stat-note">全平台累计任务</div>
+        <div class="stat-note">{{ tr("全平台累计任务") }}</div>
       </div>
     </div>
 
     <a-tabs v-model:activeKey="activeTab" class="admin-tabs">
-      <a-tab-pane key="users" tab="用户与配额">
+      <a-tab-pane key="users" :tab="tr('用户与配额')">
         <div class="table-shell">
-          <div class="table-title">用户管理</div>
+          <div class="table-title">{{ tr("用户管理") }}</div>
           <a-table :columns="userColumns" :data-source="users" :loading="loading" row-key="id" :scroll="{ x: 1360 }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'user'">
@@ -70,8 +70,8 @@
               <template v-else-if="column.key === 'role'">
                 <a-switch
                   :checked="record.isSuperAdmin"
-                  checked-children="超管"
-                  un-checked-children="用户"
+                  :checked-children="tr('超管')"
+                  :un-checked-children="tr('用户')"
                   :loading="savingUserId === record.id"
                   @change="(checked: unknown) => saveUser(record, { isSuperAdmin: Boolean(checked) })"
                 />
@@ -79,58 +79,58 @@
               <template v-else-if="column.key === 'status'">
                 <a-switch
                   :checked="record.isActive"
-                  checked-children="启用"
-                  un-checked-children="禁用"
+                  :checked-children="tr('启用')"
+                  :un-checked-children="tr('禁用')"
                   :disabled="record.id === currentUser?.id"
                   :loading="savingUserId === record.id"
                   @change="(checked: unknown) => saveUser(record, { isActive: Boolean(checked) }, '用户状态已更新')"
                 />
               </template>
               <template v-else-if="column.key === 'quota'">
-                <a-tag v-if="record.isSuperAdmin" color="purple">超管不限额</a-tag>
+                <a-tag v-if="record.isSuperAdmin" color="purple">{{ tr("超管不限额") }}</a-tag>
                 <div v-else class="quota-editor">
                   <a-input-number
                     :value="record.monthlyReviewLimit"
                     :min="0"
                     :step="1000"
-                    addon-after="评论"
+                    :addon-after="tr('评论')"
                     @change="(value: number | string | null) => updateDraft(record.id, 'monthlyReviewLimit', value)"
                   />
                   <a-input-number
                     :value="record.monthlyRunLimit"
                     :min="0"
                     :step="10"
-                    addon-after="分析"
+                    :addon-after="tr('分析')"
                     @change="(value: number | string | null) => updateDraft(record.id, 'monthlyRunLimit', value)"
                   />
                   <a-button size="small" type="primary" :loading="savingUserId === record.id" @click="saveQuota(record)">
-                    保存
+                    {{ tr("保存") }}
                   </a-button>
                 </div>
               </template>
               <template v-else-if="column.key === 'usage'">
                 <div v-if="record.isSuperAdmin" class="usage-cell">
-                  <span>不限额</span>
+                  <span>{{ tr("不限额") }}</span>
                 </div>
                 <div v-else class="usage-cell">
-                  <span>{{ record.currentPeriodReviewCount }}/{{ record.monthlyReviewLimit }} 评论</span>
+                  <span>{{ record.currentPeriodReviewCount }}/{{ record.monthlyReviewLimit }} {{ tr("评论") }}</span>
                   <a-progress :percent="reviewPercent(record)" size="small" :show-info="false" />
-                  <span>{{ record.currentPeriodRunCount }}/{{ record.monthlyRunLimit }} 分析</span>
-                  <div class="quota-period-mini">{{ quotaPeriodLabel(record) }}</div>
+                  <span>{{ record.currentPeriodRunCount }}/{{ record.monthlyRunLimit }} {{ tr("分析") }}</span>
+                  <div class="quota-period-mini">{{ tr(quotaPeriodLabel(record)) }}</div>
                 </div>
               </template>
               <template v-else-if="column.key === 'inviteCode'">
                 <a-tag v-if="record.inviteCode" color="blue">{{ record.inviteCode }}</a-tag>
-                <span v-else class="muted">无</span>
+                <span v-else class="muted">{{ tr("无") }}</span>
               </template>
               <template v-else-if="column.key === 'actions'">
                 <a-popconfirm
-                  title="确定将该用户密码重置为 123456？"
-                  ok-text="重置"
-                  cancel-text="取消"
+                  :title="tr('确定将该用户密码重置为 123456？')"
+                  :ok-text="tr('重置')"
+                  :cancel-text="tr('取消')"
                   @confirm="resetPassword(record)"
                 >
-                  <a-button size="small" :loading="savingUserId === record.id">重置密码</a-button>
+                  <a-button size="small" :loading="savingUserId === record.id">{{ tr("重置密码") }}</a-button>
                 </a-popconfirm>
               </template>
             </template>
@@ -138,61 +138,61 @@
         </div>
       </a-tab-pane>
 
-      <a-tab-pane key="invites" tab="邀请码">
+      <a-tab-pane key="invites" :tab="tr('邀请码')">
         <div class="table-shell">
-          <div class="table-title">邀请码池</div>
+          <div class="table-title">{{ tr("邀请码池") }}</div>
           <a-table :columns="inviteColumns" :data-source="inviteCodes" :loading="loading" row-key="id" :scroll="{ x: 1060 }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'code'">
                 <a-space>
                   <a-typography-text code>{{ record.code }}</a-typography-text>
-                  <a-button size="small" @click="copyCode(record.code)">复制</a-button>
+                  <a-button size="small" @click="copyCode(record.code)">{{ tr("复制") }}</a-button>
                 </a-space>
                 <div v-if="record.note" class="member-email">{{ record.note }}</div>
               </template>
               <template v-else-if="column.key === 'quota'">
-                {{ record.monthlyReviewLimit }} 评论 / {{ record.monthlyRunLimit }} 分析
+                {{ record.monthlyReviewLimit }} {{ tr("评论") }} / {{ record.monthlyRunLimit }} {{ tr("分析") }}
               </template>
               <template v-else-if="column.key === 'status'">
-                <a-tag :color="record.usedAt ? 'default' : 'green'">{{ record.usedAt ? '已使用' : '可使用' }}</a-tag>
+                <a-tag :color="record.usedAt ? 'default' : 'green'">{{ record.usedAt ? tr("已使用") : tr("可使用") }}</a-tag>
               </template>
               <template v-else-if="column.key === 'usedBy'">
                 <span v-if="record.usedBy">{{ record.usedBy.name }} · {{ record.usedBy.email }}</span>
-                <span v-else class="muted">尚未使用</span>
+                <span v-else class="muted">{{ tr("尚未使用") }}</span>
               </template>
             </template>
           </a-table>
         </div>
       </a-tab-pane>
 
-      <a-tab-pane key="queues" tab="队列健康">
+      <a-tab-pane key="queues" :tab="tr('队列健康')">
         <div class="table-shell">
-          <div class="table-title">任务队列状态</div>
-          <div class="member-email">更新时间：{{ formatTime(queueHealth?.updatedAt) }}</div>
+          <div class="table-title">{{ tr("任务队列状态") }}</div>
+          <div class="member-email">{{ tr("更新时间") }}：{{ formatTime(queueHealth?.updatedAt) }}</div>
           <a-alert
             class="queue-health-alert"
             :type="queueHealthSummary.type"
             show-icon
-            :message="queueHealthSummary.message"
-            :description="queueHealthSummary.description"
+            :message="tr(queueHealthSummary.message)"
+            :description="tr(queueHealthSummary.description)"
           />
           <div class="summary-grid">
             <div v-for="queue in queueHealth?.queues || []" :key="queue.name" class="stat-card" :class="queue.failed ? 'stat-card-alert' : 'stat-card-success'">
-              <div class="stat-label">{{ queue.label }}</div>
+              <div class="stat-label">{{ tr(queue.label) }}</div>
               <div class="stat-value">{{ queue.pending }}</div>
               <div class="stat-note">
-                等待 {{ queue.waiting }} · 运行 {{ queue.active }} · 延迟 {{ queue.delayed }} · 失败 {{ queue.failed }}
+                {{ tr("等待") }} {{ queue.waiting }} · {{ tr("运行") }} {{ queue.active }} · {{ tr("延迟") }} {{ queue.delayed }} · {{ tr("失败") }} {{ queue.failed }}
               </div>
-              <a-alert v-if="queue.error" type="error" show-icon :message="queue.error" />
+              <a-alert v-if="queue.error" type="error" show-icon :message="tr(queue.error)" />
               <div v-else class="queue-control-row">
-                <a-tag :color="queue.isPaused ? 'orange' : 'green'">{{ queue.isPaused ? "已暂停" : "消费中" }}</a-tag>
+                <a-tag :color="queue.isPaused ? 'orange' : 'green'">{{ queue.isPaused ? tr("已暂停") : tr("消费中") }}</a-tag>
                 <a-button size="small" :loading="queueControlName === queue.name" @click="toggleQueuePause(queue.name, queue.isPaused)">
-                  {{ queue.isPaused ? "恢复队列" : "暂停队列" }}
+                  {{ queue.isPaused ? tr("恢复队列") : tr("暂停队列") }}
                 </a-button>
               </div>
             </div>
           </div>
-          <div class="table-title workload-title">数据库任务健康</div>
+          <div class="table-title workload-title">{{ tr("数据库任务健康") }}</div>
           <div class="summary-grid">
             <div
               v-for="workload in queueHealth?.workloads || []"
@@ -200,19 +200,19 @@
               class="stat-card"
               :class="workload.stalled || workload.failed ? 'stat-card-alert' : 'stat-card-success'"
             >
-              <div class="stat-label">{{ workload.label }}</div>
+              <div class="stat-label">{{ tr(workload.label) }}</div>
               <div class="stat-value">{{ workload.queued + workload.running }}</div>
               <div class="stat-note">
-                排队 {{ workload.queued }} · 运行 {{ workload.running }} · 失败 {{ workload.failed }} · 疑似卡住 {{ workload.stalled }}
+                {{ tr("排队") }} {{ workload.queued }} · {{ tr("运行") }} {{ workload.running }} · {{ tr("失败") }} {{ workload.failed }} · {{ tr("疑似卡住") }} {{ workload.stalled }}
               </div>
-              <div class="member-email">最早活跃：{{ formatTime(workload.oldestActiveCreatedAt) }}</div>
-              <div class="member-email">最近失败：{{ formatTime(workload.lastFailureAt) }}</div>
+              <div class="member-email">{{ tr("最早活跃") }}：{{ formatTime(workload.oldestActiveCreatedAt) }}</div>
+              <div class="member-email">{{ tr("最近失败") }}：{{ formatTime(workload.lastFailureAt) }}</div>
               <a-tag :color="workloadStatusColor(workload)">
-                {{ workloadStatusLabel(workload) }}
+                {{ tr(workloadStatusLabel(workload)) }}
               </a-tag>
             </div>
           </div>
-          <div class="table-title workload-title">队列一致性告警</div>
+          <div class="table-title workload-title">{{ tr("队列一致性告警") }}</div>
           <a-table
             :columns="integrityColumns"
             :data-source="queueHealth?.integrityAlerts || []"
@@ -246,7 +246,7 @@
               </template>
               <template v-else-if="column.key === 'activity'">
                 <div>{{ formatTime(record.lastActivityAt) }}</div>
-                <div class="member-email">已排队 {{ durationLabel(record.ageSeconds) }}</div>
+                <div class="member-email">{{ tr(`已排队 ${durationLabel(record.ageSeconds)}`) }}</div>
               </template>
               <template v-else-if="column.key === 'actions'">
                 <a-space size="small">
@@ -260,7 +260,7 @@
                     :loading="queueRetryingId === record.id"
                     @click="repairQueueIntegrity(record)"
                   >
-                    补回队列
+                    {{ tr("补回队列") }}
                   </a-button>
                   <a-button
                     v-if="canCancelQueueCrawl(record)"
@@ -270,7 +270,7 @@
                     :loading="queueRetryingId === record.id"
                     @click="cancelQueueCrawl(record)"
                   >
-                    停止采集
+                    {{ tr("停止采集") }}
                   </a-button>
                   <a-button
                     v-if="canCancelQueueAnalysis(record)"
@@ -280,13 +280,13 @@
                     :loading="queueRetryingId === record.id"
                     @click="cancelQueueAnalysis(record)"
                   >
-                    停止分析
+                    {{ tr("停止分析") }}
                   </a-button>
                 </a-space>
               </template>
             </template>
           </a-table>
-          <div class="table-title workload-title">疑似卡住任务</div>
+          <div class="table-title workload-title">{{ tr("疑似卡住任务") }}</div>
           <a-table
             :columns="stalledColumns"
             :data-source="queueHealth?.stalledItems || []"
@@ -319,7 +319,7 @@
               </template>
               <template v-else-if="column.key === 'progress'">
                 <a-progress :percent="record.progressPercent" size="small" :status="record.kind === 'crawl' ? 'active' : 'normal'" />
-                <div class="member-email">{{ record.detail }}</div>
+                <div class="member-email">{{ tr(record.detail) }}</div>
               </template>
               <template v-else-if="column.key === 'diagnosis'">
                 <div class="stalled-diagnosis-cell">
@@ -333,7 +333,7 @@
               </template>
               <template v-else-if="column.key === 'activity'">
                 <div>{{ formatTime(record.lastActivityAt) }}</div>
-                <div class="member-email">已静默 {{ durationLabel(record.ageSeconds) }}</div>
+                <div class="member-email">{{ tr(`已静默 ${durationLabel(record.ageSeconds)}`) }}</div>
               </template>
               <template v-else-if="column.key === 'actions'">
                 <a-space size="small">
@@ -348,7 +348,7 @@
                     :loading="queueRetryingId === record.id"
                     @click="cancelQueueCrawl(record)"
                   >
-                    停止采集
+                    {{ tr("停止采集") }}
                   </a-button>
                   <a-button
                     v-if="canCancelQueueAnalysis(record)"
@@ -358,13 +358,13 @@
                     :loading="queueRetryingId === record.id"
                     @click="cancelQueueAnalysis(record)"
                   >
-                    停止分析
+                    {{ tr("停止分析") }}
                   </a-button>
                 </a-space>
               </template>
             </template>
           </a-table>
-          <div class="table-title workload-title">最近失败任务</div>
+          <div class="table-title workload-title">{{ tr("最近失败任务") }}</div>
           <a-table
             :columns="failureColumns"
             :data-source="queueHealth?.recentFailures || []"
@@ -417,7 +417,7 @@
                     :loading="queueRetryingId === record.id"
                     @click="retryQueueCrawl(record)"
                   >
-                    重新采集
+                    {{ tr("重新采集") }}
                   </a-button>
                   <a-button
                     v-if="canRetryQueueAnalysis(record)"
@@ -426,7 +426,7 @@
                     :loading="queueRetryingId === record.id"
                     @click="retryQueueAnalysis(record)"
                   >
-                    重新分析
+                    {{ tr("重新分析") }}
                   </a-button>
                 </a-space>
               </template>
@@ -435,16 +435,16 @@
         </div>
       </a-tab-pane>
 
-      <a-tab-pane key="audit" tab="操作日志">
+      <a-tab-pane key="audit" :tab="tr('操作日志')">
         <div class="table-shell">
           <div class="table-title-row">
             <div>
-              <div class="table-title">最近操作</div>
-              <div class="member-email">按动作、对象、操作人和空间定位审计记录</div>
+              <div class="table-title">{{ tr("最近操作") }}</div>
+              <div class="member-email">{{ tr("按动作、对象、操作人和空间定位审计记录") }}</div>
             </div>
             <a-button @click="refreshAuditLogs" :loading="loading">
               <template #icon><ReloadOutlined /></template>
-              刷新日志
+              {{ tr("刷新日志") }}
             </a-button>
           </div>
           <div class="audit-filter-row">
@@ -453,7 +453,7 @@
               allow-clear
               show-search
               option-filter-prop="label"
-              placeholder="操作类型"
+              :placeholder="tr('操作类型')"
               :options="auditActionOptions"
             />
             <a-select
@@ -461,7 +461,7 @@
               allow-clear
               show-search
               option-filter-prop="label"
-              placeholder="对象类型"
+              :placeholder="tr('对象类型')"
               :options="auditTargetTypeOptions"
             />
             <a-select
@@ -469,7 +469,7 @@
               allow-clear
               show-search
               option-filter-prop="label"
-              placeholder="操作人"
+              :placeholder="tr('操作人')"
               :options="auditActorOptions"
             />
             <a-select
@@ -477,12 +477,12 @@
               allow-clear
               show-search
               option-filter-prop="label"
-              placeholder="空间"
+              :placeholder="tr('空间')"
               :options="auditWorkspaceOptions"
             />
-            <a-input-number v-model:value="auditFilters.limit" class="audit-limit-input" :min="20" :max="300" :step="20" placeholder="条数" />
-            <a-button type="primary" ghost @click="refreshAuditLogs" :loading="loading">筛选</a-button>
-            <a-button @click="resetAuditFilters">重置</a-button>
+            <a-input-number v-model:value="auditFilters.limit" class="audit-limit-input" :min="20" :max="300" :step="20" :placeholder="tr('条数')" />
+            <a-button type="primary" ghost @click="refreshAuditLogs" :loading="loading">{{ tr("筛选") }}</a-button>
+            <a-button @click="resetAuditFilters">{{ tr("重置") }}</a-button>
           </div>
           <a-table :columns="auditColumns" :data-source="auditLogs" :loading="loading" row-key="id" :pagination="{ pageSize: 12 }" :scroll="{ x: 1340 }">
             <template #bodyCell="{ column, record }">
@@ -491,7 +491,7 @@
                 <div class="member-email">{{ record.action }}</div>
               </template>
               <template v-else-if="column.key === 'actor'">
-                <div>{{ record.actorName || "系统" }}</div>
+                <div>{{ record.actorName || tr("系统") }}</div>
                 <div class="member-email">{{ record.actorEmail || "-" }}</div>
               </template>
               <template v-else-if="column.key === 'target'">
@@ -500,7 +500,7 @@
               </template>
               <template v-else-if="column.key === 'workspace'">
                 <div>{{ workspaceLabel(record.workspaceId) }}</div>
-                <div class="member-email">{{ record.workspaceId || "平台级" }}</div>
+                <div class="member-email">{{ record.workspaceId || tr("平台级") }}</div>
               </template>
               <template v-else-if="column.key === 'metadata'">
                 <a-tooltip :title="metadataText(record.metadata)">
@@ -518,24 +518,24 @@
 
     <a-modal
       :open="inviteModalOpen"
-      title="生成邀请码"
-      ok-text="生成"
-      cancel-text="取消"
+      :title="tr('生成邀请码')"
+      :ok-text="tr('生成')"
+      :cancel-text="tr('取消')"
       :confirm-loading="saving"
       @ok="submitInvite"
       @cancel="inviteModalOpen = false"
     >
       <a-form layout="vertical">
-        <a-form-item label="备注">
-          <a-input v-model:value="inviteForm.note" placeholder="例如：5 月测试用户 / 某客户试用" />
+        <a-form-item :label="tr('备注')">
+          <a-input v-model:value="inviteForm.note" :placeholder="tr('例如：5 月测试用户 / 某客户试用')" />
         </a-form-item>
-        <a-form-item label="评论配额">
+        <a-form-item :label="tr('评论配额')">
           <a-input-number v-model:value="inviteForm.monthlyReviewLimit" class="full-input" :min="1" :step="1000" />
         </a-form-item>
-        <a-form-item label="分析次数配额">
+        <a-form-item :label="tr('分析次数配额')">
           <a-input-number v-model:value="inviteForm.monthlyRunLimit" class="full-input" :min="1" :step="10" />
         </a-form-item>
-        <a-form-item label="过期时间">
+        <a-form-item :label="tr('过期时间')">
           <a-date-picker v-model:value="inviteForm.expiresAt" class="full-input" show-time />
         </a-form-item>
       </a-form>
@@ -543,22 +543,22 @@
 
     <a-modal
       :open="userModalOpen"
-      title="新建平台账号"
-      ok-text="保存"
-      cancel-text="取消"
+      :title="tr('新建平台账号')"
+      :ok-text="tr('保存')"
+      :cancel-text="tr('取消')"
       :confirm-loading="saving"
       @ok="submitUser"
       @cancel="userModalOpen = false"
     >
       <a-form layout="vertical">
-        <a-form-item label="姓名">
+        <a-form-item :label="tr('姓名')">
           <a-input v-model:value="userForm.name" />
         </a-form-item>
-        <a-form-item label="邮箱">
+        <a-form-item :label="tr('邮箱')">
           <a-input v-model:value="userForm.email" />
         </a-form-item>
         <a-form-item>
-          <a-checkbox v-model:checked="userForm.isSuperAdmin">设为超管</a-checkbox>
+          <a-checkbox v-model:checked="userForm.isSuperAdmin">{{ tr("设为超管") }}</a-checkbox>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -722,67 +722,67 @@ const knownAuditTargetTypes = [
   "report_share"
 ];
 
-const userColumns = [
-  { title: "用户", key: "user", width: 280 },
-  { title: "后台权限", key: "role", width: 150 },
-  { title: "账号状态", key: "status", width: 130 },
-  { title: "配额调整", key: "quota", width: 390 },
-  { title: "本期用量", key: "usage", width: 230 },
-  { title: "注册邀请码", key: "inviteCode", width: 180 },
-  { title: "创建时间", dataIndex: "createdAt", key: "createdAt", width: 210 },
-  { title: "操作", key: "actions", width: 130, fixed: "right" }
-];
+const userColumns = computed(() => [
+  { title: tr("用户"), key: "user", width: 280 },
+  { title: tr("后台权限"), key: "role", width: 150 },
+  { title: tr("账号状态"), key: "status", width: 130 },
+  { title: tr("配额调整"), key: "quota", width: 390 },
+  { title: tr("本期用量"), key: "usage", width: 230 },
+  { title: tr("注册邀请码"), key: "inviteCode", width: 180 },
+  { title: tr("创建时间"), dataIndex: "createdAt", key: "createdAt", width: 210 },
+  { title: tr("操作"), key: "actions", width: 130, fixed: "right" }
+]);
 
-const inviteColumns = [
-  { title: "邀请码", key: "code", width: 310 },
-  { title: "配额", key: "quota", width: 220 },
-  { title: "状态", key: "status", width: 110 },
-  { title: "使用人", key: "usedBy", width: 260 },
-  { title: "创建人", dataIndex: ["createdBy", "name"], key: "createdBy", width: 130 },
-  { title: "创建时间", dataIndex: "createdAt", key: "createdAt", width: 210 }
-];
+const inviteColumns = computed(() => [
+  { title: tr("邀请码"), key: "code", width: 310 },
+  { title: tr("配额"), key: "quota", width: 220 },
+  { title: tr("状态"), key: "status", width: 110 },
+  { title: tr("使用人"), key: "usedBy", width: 260 },
+  { title: tr("创建人"), dataIndex: ["createdBy", "name"], key: "createdBy", width: 130 },
+  { title: tr("创建时间"), dataIndex: "createdAt", key: "createdAt", width: 210 }
+]);
 
-const auditColumns = [
-  { title: "时间", key: "time", width: 190 },
-  { title: "操作", key: "action", width: 210 },
-  { title: "操作人", key: "actor", width: 220 },
-  { title: "对象", key: "target", width: 260 },
-  { title: "空间", key: "workspace", width: 220 },
+const auditColumns = computed(() => [
+  { title: tr("时间"), key: "time", width: 190 },
+  { title: tr("操作"), key: "action", width: 210 },
+  { title: tr("操作人"), key: "actor", width: 220 },
+  { title: tr("对象"), key: "target", width: 260 },
+  { title: tr("空间"), key: "workspace", width: 220 },
   { title: "IP", dataIndex: "ipAddress", key: "ipAddress", width: 150 },
-  { title: "详情", key: "metadata", width: 260 }
-];
+  { title: tr("详情"), key: "metadata", width: 260 }
+]);
 
-const failureColumns = [
-  { title: "类型", key: "kind", width: 130 },
-  { title: "失败对象", key: "target", width: 280 },
-  { title: "空间", key: "workspace", width: 210 },
-  { title: "渠道/模型", key: "context", width: 180 },
-  { title: "错误摘要", key: "error", width: 280 },
-  { title: "诊断建议", key: "diagnosis", width: 420 },
-  { title: "失败时间", key: "time", width: 190 },
-  { title: "操作", key: "actions", width: 190, fixed: "right" }
-];
+const failureColumns = computed(() => [
+  { title: tr("类型"), key: "kind", width: 130 },
+  { title: tr("失败对象"), key: "target", width: 280 },
+  { title: tr("空间"), key: "workspace", width: 210 },
+  { title: tr("渠道/模型"), key: "context", width: 180 },
+  { title: tr("错误摘要"), key: "error", width: 280 },
+  { title: tr("诊断建议"), key: "diagnosis", width: 420 },
+  { title: tr("失败时间"), key: "time", width: 190 },
+  { title: tr("操作"), key: "actions", width: 190, fixed: "right" }
+]);
 
-const integrityColumns = [
-  { title: "类型", key: "kind", width: 130 },
-  { title: "排队对象", key: "target", width: 280 },
-  { title: "空间", key: "workspace", width: 210 },
-  { title: "队列", key: "queue", width: 160 },
-  { title: "诊断建议", key: "diagnosis", width: 420 },
-  { title: "排队时间", key: "activity", width: 190 },
-  { title: "操作", key: "actions", width: 150, fixed: "right" }
-];
+const integrityColumns = computed(() => [
+  { title: tr("类型"), key: "kind", width: 130 },
+  { title: tr("排队对象"), key: "target", width: 280 },
+  { title: tr("空间"), key: "workspace", width: 210 },
+  { title: tr("队列"), key: "queue", width: 160 },
+  { title: tr("诊断建议"), key: "diagnosis", width: 420 },
+  { title: tr("排队时间"), key: "activity", width: 190 },
+  { title: tr("操作"), key: "actions", width: 150, fixed: "right" }
+]);
 
-const stalledColumns = [
-  { title: "类型", key: "kind", width: 130 },
-  { title: "任务对象", key: "target", width: 280 },
-  { title: "空间", key: "workspace", width: 210 },
-  { title: "渠道/模型", key: "context", width: 180 },
-  { title: "进度", key: "progress", width: 240 },
-  { title: "诊断建议", key: "diagnosis", width: 360 },
-  { title: "最后活动", key: "activity", width: 190 },
-  { title: "操作", key: "actions", width: 130, fixed: "right" }
-];
+const stalledColumns = computed(() => [
+  { title: tr("类型"), key: "kind", width: 130 },
+  { title: tr("任务对象"), key: "target", width: 280 },
+  { title: tr("空间"), key: "workspace", width: 210 },
+  { title: tr("渠道/模型"), key: "context", width: 180 },
+  { title: tr("进度"), key: "progress", width: 240 },
+  { title: tr("诊断建议"), key: "diagnosis", width: 360 },
+  { title: tr("最后活动"), key: "activity", width: 190 },
+  { title: tr("操作"), key: "actions", width: 130, fixed: "right" }
+]);
 
 const auditActionOptions = computed(() =>
   buildAuditOptions(knownAuditActions, auditLogs.value.map((item) => item.action), actionLabel)
@@ -948,7 +948,7 @@ async function toggleQueuePause(queueName: string, isPaused: boolean) {
   queueControlName.value = queueName;
   try {
     await controlAdminQueue({ queueName, action: isPaused ? "resume" : "pause" });
-    message.success(isPaused ? "队列已恢复" : "队列已暂停");
+    message.success(isPaused ? tr("队列已恢复") : tr("队列已暂停"));
     await loadQueueHealth();
     await loadAuditLogs();
   } catch (error) {
@@ -1016,7 +1016,7 @@ async function load() {
       forbidden.value = true;
       return;
     }
-    message.error("加载超管数据失败");
+    message.error(tr("加载超管数据失败"));
   } finally {
     loading.value = false;
   }
@@ -1051,9 +1051,9 @@ function updateDraft(userId: string, key: "monthlyReviewLimit" | "monthlyRunLimi
 
 function readErrorMessage(error: unknown, fallback: string) {
   if (axios.isAxiosError(error) && typeof error.response?.data?.message === "string") {
-    return error.response.data.message;
+    return tr(error.response.data.message);
   }
-  return fallback;
+  return tr(fallback);
 }
 
 function formatTime(value?: string | null) {
@@ -1093,7 +1093,7 @@ type QueueItemKind = QueueFailureDTO["kind"] | QueueIntegrityAlertDTO["kind"] | 
 type QueueHealthItem = QueueFailureDTO | QueueIntegrityAlertDTO | QueueStalledDTO;
 
 function failureKindLabel(kind: QueueItemKind) {
-  return kind === "crawl" ? "采集" : "分析";
+  return kind === "crawl" ? tr("采集") : tr("分析");
 }
 
 function failureKindColor(kind: QueueItemKind) {
@@ -1101,7 +1101,7 @@ function failureKindColor(kind: QueueItemKind) {
 }
 
 function queueContextActionLabel(record: QueueHealthItem) {
-  return record.kind === "crawl" ? "打开采集" : "查看分析";
+  return record.kind === "crawl" ? tr("打开采集") : tr("查看分析");
 }
 
 function canOpenQueueContext(record: QueueHealthItem) {
@@ -1147,7 +1147,7 @@ function hasFailureRecovery(record: QueueHealthItem) {
 }
 
 function recoveryStatusLabel(status?: string | null) {
-  return (
+  return tr(
     {
       queued: "已重新排队",
       running: "处理中",
@@ -1175,7 +1175,7 @@ async function retryQueueCrawl(record: QueueHealthItem) {
   queueRetryingId.value = record.id;
   try {
     await retryCrawlJob(record.id);
-    message.success("采集任务已重新加入队列");
+    message.success(tr("采集任务已重新加入队列"));
     await loadQueueHealth();
     await loadAuditLogs();
   } catch (error) {
@@ -1192,7 +1192,7 @@ async function repairQueueIntegrity(record: QueueHealthItem) {
   queueRetryingId.value = record.id;
   try {
     const result = await repairQueueIntegrityAlert({ kind: record.kind, id: record.id });
-    message.success(result.requeued ? "队列 job 已补回" : "队列 job 已存在");
+    message.success(result.requeued ? tr("队列 job 已补回") : tr("队列 job 已存在"));
     await loadQueueHealth();
     await loadAuditLogs();
   } catch (error) {
@@ -1209,7 +1209,7 @@ async function cancelQueueCrawl(record: QueueHealthItem) {
   queueRetryingId.value = record.id;
   try {
     await stopCrawlJob(record.id);
-    message.success("采集任务已停止");
+    message.success(tr("采集任务已停止"));
     await loadQueueHealth();
     await loadAuditLogs();
   } catch (error) {
@@ -1226,7 +1226,7 @@ async function retryQueueAnalysis(record: QueueHealthItem) {
   queueRetryingId.value = record.id;
   try {
     await createRun(record.taskId);
-    message.success("分析任务已重新加入队列");
+    message.success(tr("分析任务已重新加入队列"));
     await loadQueueHealth();
     await loadAuditLogs();
   } catch (error) {
@@ -1243,7 +1243,7 @@ async function cancelQueueAnalysis(record: QueueHealthItem) {
   queueRetryingId.value = record.id;
   try {
     await cancelRun(record.taskId, record.id);
-    message.success("分析任务已停止");
+    message.success(tr("分析任务已停止"));
     await loadQueueHealth();
     await loadAuditLogs();
   } catch (error) {
@@ -1298,7 +1298,7 @@ function workloadStatusLabel(workload: WorkloadHealthSnapshotDTO) {
 }
 
 function actionLabel(action: string) {
-  return (
+  return tr(
     {
       "admin.user.upsert": "保存账号",
       "admin.user.update": "更新用户",
@@ -1344,7 +1344,7 @@ function actionLabel(action: string) {
 }
 
 function targetTypeLabel(type: string) {
-  return (
+  return tr(
     {
       user: "用户",
       workspace_member: "空间成员",
@@ -1369,7 +1369,7 @@ function targetTypeLabel(type: string) {
 
 function workspaceLabel(workspaceId?: string | null) {
   if (!workspaceId) {
-    return "平台级";
+    return tr("平台级");
   }
   const workspace = workspaces.value.find((item) => item.id === workspaceId);
   return workspace ? workspace.name : workspaceId;
@@ -1400,7 +1400,7 @@ async function saveUser(record: AdminUserDTO, patch: { isSuperAdmin?: boolean; i
     const updated = await updateAdminUser(record.id, patch);
     users.value = users.value.map((item) => (item.id === updated.id ? updated : item));
     await loadAuditLogs();
-    message.success(successMessage);
+    message.success(tr(successMessage));
   } catch (error) {
     message.error(readErrorMessage(error, "用户信息更新失败"));
   } finally {
@@ -1413,7 +1413,7 @@ async function resetPassword(record: AdminUserDTO) {
   try {
     const result = await resetAdminUserPassword(record.id);
     await loadAuditLogs();
-    message.success(`密码已重置为 ${result.password}`);
+    message.success(tr(`密码已重置为 ${result.password}`));
   } catch (error) {
     message.error(readErrorMessage(error, "密码重置失败"));
   } finally {
@@ -1435,9 +1435,9 @@ async function saveQuota(record: AdminUserDTO) {
       monthlyRunLimit: updated.monthlyRunLimit
     };
     await loadAuditLogs();
-    message.success("用户配额已更新");
+    message.success(tr("用户配额已更新"));
   } catch {
-    message.error("用户配额更新失败");
+    message.error(tr("用户配额更新失败"));
   } finally {
     savingUserId.value = "";
   }
@@ -1445,18 +1445,18 @@ async function saveQuota(record: AdminUserDTO) {
 
 async function submitUser() {
   if (!userForm.name || !userForm.email) {
-    message.error("请填写姓名和邮箱");
+    message.error(tr("请填写姓名和邮箱"));
     return;
   }
 
   saving.value = true;
   try {
     await createAdminUser({ ...userForm });
-    message.success("用户已保存，初始密码为 123456");
+    message.success(tr("用户已保存，初始密码为 123456"));
     userModalOpen.value = false;
     await load();
   } catch {
-    message.error("保存用户失败");
+    message.error(tr("保存用户失败"));
   } finally {
     saving.value = false;
   }
@@ -1471,11 +1471,11 @@ async function submitInvite() {
       monthlyRunLimit: inviteForm.monthlyRunLimit,
       expiresAt: inviteForm.expiresAt?.toISOString() || null
     });
-    message.success(`邀请码已生成：${created.code}`);
+    message.success(tr(`邀请码已生成：${created.code}`));
     inviteModalOpen.value = false;
     await load();
   } catch {
-    message.error("生成邀请码失败");
+    message.error(tr("生成邀请码失败"));
   } finally {
     saving.value = false;
   }
@@ -1484,9 +1484,9 @@ async function submitInvite() {
 async function copyCode(code: string) {
   const copied = await copyTextToClipboard(code);
   if (copied) {
-    message.success("邀请码已复制");
+    message.success(tr("邀请码已复制"));
   } else {
-    message.warning("浏览器未允许自动复制，请手动复制邀请码。");
+    message.warning(tr("浏览器未允许自动复制，请手动复制邀请码。"));
   }
 }
 
