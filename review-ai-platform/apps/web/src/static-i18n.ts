@@ -1897,6 +1897,36 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
     return unit === "秒" ? "วินาที" : unit === "分钟" ? "นาที" : unit === "小时" ? "ชั่วโมง" : unit === "天" ? "วัน" : unit;
   };
   const translateDuration = (text: string) => text.replace(/(秒|分钟|小时|天)/g, (unit) => translateUnit(unit));
+  const translateStopReasonCode = (reason: string) => {
+    const labels: Record<string, string> = {
+      max_reviews: staticText[locale]["达到采集上限"],
+      no_more_comments: staticText[locale]["没有更多评论"],
+      cursor_stalled: staticText[locale]["游标未推进"],
+      idle_no_progress: staticText[locale]["连续无新增"],
+      timeout: staticText[locale]["采集超时"],
+      no_comments_found: staticText[locale]["未发现评论"],
+      no_rows: locale === "en-US" ? "No valid rows" : "ไม่มีรายการที่ใช้ได้"
+    };
+    return labels[reason] || reason;
+  };
+  const translateChannelErrorDetail = (text: string) =>
+    text
+      .split("，")
+      .map((part) => {
+        const apiRequests = part.match(/^请求\s+(\d+)$/);
+        if (apiRequests) return locale === "en-US" ? `requests ${apiRequests[1]}` : `คำขอ ${apiRequests[1]}`;
+        const apiComments = part.match(/^接口评论\s+(\d+)$/);
+        if (apiComments) return locale === "en-US" ? `API comments ${apiComments[1]}` : `คอมเมนต์ API ${apiComments[1]}`;
+        const cursor = part.match(/^游标\s+(.+)$/);
+        if (cursor) return locale === "en-US" ? `cursor ${cursor[1]}` : `เคอร์เซอร์ ${cursor[1]}`;
+        const hasMore = part.match(/^还有更多\s+(是|否)$/);
+        if (hasMore) {
+          const value = hasMore[1] === "是";
+          return locale === "en-US" ? `has more ${value ? "yes" : "no"}` : `ยังมีต่อ ${value ? "ใช่" : "ไม่ใช่"}`;
+        }
+        return translateStopReasonCode(part);
+      })
+      .join(locale === "en-US" ? ", " : ", ");
   const translateQueueIssuePart = (part: string) => {
     const queueError = part.match(/^(\d+)\s+个队列连接异常$/);
     if (queueError) return locale === "en-US" ? `${queueError[1]} queue connection errors` : `คิวเชื่อมต่อผิดปกติ ${queueError[1]} รายการ`;
@@ -2228,6 +2258,19 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">) {
   const recentError = value.match(/^最近错误：(.+)$/);
   if (recentError) {
     return locale === "en-US" ? `Recent error: ${recentError[1]}` : `ข้อผิดพลาดล่าสุด: ${recentError[1]}`;
+  }
+  const tiktokDirectFallback = value.match(/^TikTok 直连接口：直连接口未返回有效评论（(.+)），已切换浏览器兜底$/);
+  if (tiktokDirectFallback) {
+    const detail = translateChannelErrorDetail(tiktokDirectFallback[1]);
+    return locale === "en-US"
+      ? `TikTok direct API: no valid comments returned (${detail}); switched to browser fallback`
+      : `TikTok direct API: ไม่พบคอมเมนต์ที่ใช้ได้ (${detail}); สลับไปใช้ browser fallback`;
+  }
+  const tiktokDirectError = value.match(/^TikTok 直连接口：(.+)$/);
+  if (tiktokDirectError) {
+    return locale === "en-US"
+      ? `TikTok direct API: ${tiktokDirectError[1]}`
+      : `TikTok direct API: ${tiktokDirectError[1]}`;
   }
   const channelErrors = value.match(/^通道异常\s+(\d+)\s+条$/);
   if (channelErrors) {

@@ -313,8 +313,8 @@
               </span>
               <span v-if="crawlMetricSummary(record)" class="muted">{{ crawlMetricSummary(record) }}</span>
               <span v-if="record.endReached !== null" class="muted">末尾状态：{{ record.endReached ? "已到达" : "未确认" }}</span>
-              <a-tooltip v-if="record.channelErrors.length" :title="record.channelErrors.join('\n')">
-                <span class="muted">通道异常 {{ record.channelErrors.length }} 条</span>
+              <a-tooltip v-if="record.channelErrors.length" :title="channelErrorsTitle(record)">
+                <span class="muted">{{ tr(`通道异常 ${record.channelErrors.length} 条`) }}</span>
               </a-tooltip>
             </div>
           </template>
@@ -515,6 +515,7 @@ import {
   updateCrawlMonitor
 } from "@/api";
 import { useI18n } from "@/i18n";
+import { translateStaticText } from "@/static-i18n";
 import {
   ANALYSIS_TYPE_PRESETS,
   CRAWL_SOURCE_CHANNEL_PRESETS,
@@ -533,6 +534,7 @@ import {
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
+const tr = (value: string) => translateStaticText(value);
 const jobs = ref<CrawlJobDTO[]>(readWorkspaceCache<CrawlJobDTO>("crawl-jobs"));
 const monitors = ref<CrawlMonitorDTO[]>(readWorkspaceCache<CrawlMonitorDTO>("crawl-monitors"));
 const loading = ref(false);
@@ -1068,6 +1070,10 @@ function crawlMetricSummary(job: CrawlJobDTO) {
     job.lastRequestStatus !== null ? `请求状态 ${job.lastRequestStatus}` : ""
   ].filter(Boolean);
   return parts.join(" · ");
+}
+
+function channelErrorsTitle(job: CrawlJobDTO) {
+  return job.channelErrors.map((item) => tr(item)).join("\n");
 }
 
 type CrawlTelemetryStat = {
