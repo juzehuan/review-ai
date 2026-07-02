@@ -3,42 +3,42 @@
     <div class="growth-hero">
       <div>
         <div class="growth-kicker">Growth Command Center</div>
-        <h1>增长运营工作台</h1>
-        <p>每天看变化、看异常、看竞品差距，把 AI 分析沉淀成可交付的经营动作。</p>
+        <h1>{{ tr("增长运营工作台") }}</h1>
+        <p>{{ tr("每天看变化、看异常、看竞品差距，把 AI 分析沉淀成可交付的经营动作。") }}</p>
       </div>
       <a-space wrap>
-        <a-select v-model:value="activeTaskId" class="task-picker" placeholder="选择任务" @change="loadBrief">
+        <a-select v-model:value="activeTaskId" class="task-picker" :placeholder="tr('选择任务')" @change="loadBrief">
           <a-select-option v-for="task in tasks" :key="task.id" :value="task.id">
             {{ task.productName || task.name }}
           </a-select-option>
         </a-select>
         <a-button :loading="loadingBrief" @click="loadBrief">
           <template #icon><ReloadOutlined /></template>
-          刷新简报
+          {{ tr("刷新简报") }}
         </a-button>
       </a-space>
     </div>
 
-    <a-empty v-if="!tasks.length && !loadingTasks" description="还没有分析任务，请先导入或抓取评论。" />
+    <a-empty v-if="!tasks.length && !loadingTasks" :description="tr('还没有分析任务，请先导入或抓取评论。')" />
 
     <template v-else>
       <section class="brief-grid">
         <div class="brief-card brief-card-main">
           <div class="section-head">
             <div>
-              <span>每日变化简报</span>
-              <strong>{{ brief?.productName || selectedTask?.productName || "未选择任务" }}</strong>
+              <span>{{ tr("每日变化简报") }}</span>
+              <strong>{{ brief?.productName || selectedTask?.productName || tr("未选择任务") }}</strong>
             </div>
-            <a-tag :color="briefRiskColor">{{ briefRiskText }}</a-tag>
+            <a-tag :color="briefRiskColor">{{ tr(briefRiskText) }}</a-tag>
           </div>
-          <p class="brief-summary">{{ brief?.summary || "选择一个已完成分析的任务后生成今日简报。" }}</p>
+          <p class="brief-summary">{{ brief?.summary || tr("选择一个已完成分析的任务后生成今日简报。") }}</p>
           <div class="metric-row">
             <div>
-              <span>今日新增</span>
+              <span>{{ tr("今日新增") }}</span>
               <strong>{{ brief?.metrics.reviewsToday ?? "-" }}</strong>
             </div>
             <div>
-              <span>负面占比</span>
+              <span>{{ tr("负面占比") }}</span>
               <strong>{{ brief?.metrics.negativePercent ?? "-" }}%</strong>
             </div>
             <div>
@@ -46,7 +46,7 @@
               <strong>{{ brief?.metrics.nps ?? "-" }}</strong>
             </div>
             <div>
-              <span>平均星级</span>
+              <span>{{ tr("平均星级") }}</span>
               <strong>{{ brief?.metrics.avgRating ?? "-" }}</strong>
             </div>
           </div>
@@ -55,15 +55,15 @@
         <div class="brief-card">
           <div class="section-head">
             <div>
-              <span>异常预警</span>
-              <strong>{{ brief?.alerts.length || 0 }} 条</strong>
+              <span>{{ tr("异常预警") }}</span>
+              <strong>{{ tr(`${brief?.alerts.length || 0} 条`) }}</strong>
             </div>
           </div>
           <a-list :data-source="brief?.alerts || []" size="small">
             <template #renderItem="{ item }">
               <a-list-item>
                 <div class="alert-line">
-                  <a-tag :color="alertColor(item.level)">{{ alertLabel(item.level) }}</a-tag>
+                  <a-tag :color="alertColor(item.level)">{{ tr(alertLabel(item.level)) }}</a-tag>
                   <div>
                     <strong>{{ item.title }}</strong>
                     <p>{{ item.detail }}</p>
@@ -76,14 +76,14 @@
       </section>
 
       <a-tabs v-model:activeKey="activeTab" class="growth-tabs">
-        <a-tab-pane key="compare" tab="竞品/任务对比">
+        <a-tab-pane key="compare" :tab="tr('竞品/任务对比')">
           <div class="growth-panel">
             <div class="panel-title-row">
               <div>
-                <h2>多任务趋势对比</h2>
-                <p>选择 2-8 个任务，对比 NPS、负面率、评分和主要风险。</p>
+                <h2>{{ tr("多任务趋势对比") }}</h2>
+                <p>{{ tr("选择 2-8 个任务，对比 NPS、负面率、评分和主要风险。") }}</p>
               </div>
-              <a-button type="primary" :loading="loadingCompare" @click="runCompare">开始对比</a-button>
+              <a-button type="primary" :loading="loadingCompare" @click="runCompare">{{ tr("开始对比") }}</a-button>
             </div>
             <a-checkbox-group v-model:value="compareTaskIds" class="compare-picker">
               <a-checkbox v-for="task in tasks" :key="task.id" :value="task.id">
@@ -92,9 +92,9 @@
             </a-checkbox-group>
             <div v-if="compareResult" class="compare-result">
               <div class="winner-card">
-                <span>当前领先</span>
-                <strong>{{ compareResult.winner?.label || "暂无胜出任务" }}</strong>
-                <p>{{ compareResult.winner?.reason || "需要至少两个已完成分析的任务。" }}</p>
+                <span>{{ tr("当前领先") }}</span>
+                <strong>{{ compareResult.winner?.label || tr("暂无胜出任务") }}</strong>
+                <p>{{ compareResult.winner?.reason || tr("需要至少两个已完成分析的任务。") }}</p>
               </div>
               <a-table
                 row-key="taskId"
@@ -110,7 +110,7 @@
                   </template>
                   <template v-else-if="column.key === 'risk'">
                     <a-tag :color="record.negativePercent >= 30 ? 'error' : 'success'">
-                      {{ record.negativePercent >= 30 ? "需关注" : "健康" }}
+                      {{ tr(record.negativePercent >= 30 ? "需关注" : "健康") }}
                     </a-tag>
                   </template>
                 </template>
@@ -119,27 +119,27 @@
           </div>
         </a-tab-pane>
 
-        <a-tab-pane key="quality" tab="AI 纠错与提示词评测">
+        <a-tab-pane key="quality" :tab="tr('AI 纠错与提示词评测')">
           <div class="quality-grid">
             <div class="growth-panel">
               <div class="panel-title-row">
                 <div>
-                  <h2>提示词评测</h2>
-                  <p>从结构化输出、证据约束、分类口径和模型配置检查稳定性。</p>
+                  <h2>{{ tr("提示词评测") }}</h2>
+                  <p>{{ tr("从结构化输出、证据约束、分类口径和模型配置检查稳定性。") }}</p>
                 </div>
-                <a-button type="primary" :loading="loadingPromptEval" @click="runPromptEval">立即评测</a-button>
+                <a-button type="primary" :loading="loadingPromptEval" @click="runPromptEval">{{ tr("立即评测") }}</a-button>
               </div>
               <div v-if="promptEval" class="prompt-score">
                 <a-progress type="circle" :percent="promptEval.score" :size="104" />
                 <div>
-                  <strong>{{ promptEval.modelName || "未配置模型" }}</strong>
-                  <span>{{ promptEval.provider }} / {{ promptEval.promptVersion || "默认版本" }}</span>
+                  <strong>{{ promptEval.modelName || tr("未配置模型") }}</strong>
+                  <span>{{ promptEval.provider }} / {{ promptEval.promptVersion || tr("默认版本") }}</span>
                 </div>
               </div>
               <a-list :data-source="promptEval?.checks || []" size="small">
                 <template #renderItem="{ item }">
                   <a-list-item>
-                    <a-tag :color="item.passed ? 'success' : 'warning'">{{ item.passed ? "通过" : "待补强" }}</a-tag>
+                    <a-tag :color="item.passed ? 'success' : 'warning'">{{ tr(item.passed ? "通过" : "待补强") }}</a-tag>
                     <div>
                       <strong>{{ item.label }}</strong>
                       <p class="muted">{{ item.detail }}</p>
@@ -152,56 +152,56 @@
             <div class="growth-panel">
               <div class="panel-title-row">
                 <div>
-                  <h2>AI 结果纠错</h2>
-                  <p>抽取当前任务的评论样本，修正情绪、摘要、痛点和建议。</p>
+                  <h2>{{ tr("AI 结果纠错") }}</h2>
+                  <p>{{ tr("抽取当前任务的评论样本，修正情绪、摘要、痛点和建议。") }}</p>
                 </div>
-                <a-button :loading="loadingReviews" @click="loadReviewSample">加载样本</a-button>
+                <a-button :loading="loadingReviews" @click="loadReviewSample">{{ tr("加载样本") }}</a-button>
               </div>
-              <a-select v-model:value="correction.reviewId" class="full-input" placeholder="选择评论样本">
+              <a-select v-model:value="correction.reviewId" class="full-input" :placeholder="tr('选择评论样本')">
                 <a-select-option v-for="review in reviewSamples" :key="review.id" :value="review.id">
                   {{ review.summary || review.comment.slice(0, 48) }}
                 </a-select-option>
               </a-select>
               <div class="correction-form">
-                <a-select v-model:value="correction.sentiment" placeholder="修正情绪">
-                  <a-select-option value="positive">正向</a-select-option>
-                  <a-select-option value="neutral">中性</a-select-option>
-                  <a-select-option value="negative">负向</a-select-option>
+                <a-select v-model:value="correction.sentiment" :placeholder="tr('修正情绪')">
+                  <a-select-option value="positive">{{ tr("正向") }}</a-select-option>
+                  <a-select-option value="neutral">{{ tr("中性") }}</a-select-option>
+                  <a-select-option value="negative">{{ tr("负向") }}</a-select-option>
                 </a-select>
-                <a-input v-model:value="correction.topicLabelsText" placeholder="标签，逗号分隔" />
-                <a-textarea v-model:value="correction.summary" :rows="3" placeholder="修正摘要" />
-                <a-textarea v-model:value="correction.note" :rows="2" placeholder="纠错备注" />
+                <a-input v-model:value="correction.topicLabelsText" :placeholder="tr('标签，逗号分隔')" />
+                <a-textarea v-model:value="correction.summary" :rows="3" :placeholder="tr('修正摘要')" />
+                <a-textarea v-model:value="correction.note" :rows="2" :placeholder="tr('纠错备注')" />
                 <a-button type="primary" :disabled="!correction.reviewId" :loading="submittingCorrection" @click="submitCorrection">
-                  保存纠错
+                  {{ tr("保存纠错") }}
                 </a-button>
               </div>
             </div>
           </div>
         </a-tab-pane>
 
-        <a-tab-pane key="delivery" tab="报告交付增强">
+        <a-tab-pane key="delivery" :tab="tr('报告交付增强')">
           <div class="growth-panel delivery-panel">
             <div class="panel-title-row">
               <div>
-                <h2>客户/老板可读报告</h2>
-                <p>一键生成公开报告链接，并支持打开后浏览器打印为 PDF。</p>
+                <h2>{{ tr("客户/老板可读报告") }}</h2>
+                <p>{{ tr("一键生成公开报告链接，并支持打开后浏览器打印为 PDF。") }}</p>
               </div>
               <a-space wrap>
-                <a-button :disabled="!activeTaskId" @click="openReport">打开报告</a-button>
+                <a-button :disabled="!activeTaskId" @click="openReport">{{ tr("打开报告") }}</a-button>
                 <a-button type="primary" :disabled="!activeTaskId" :loading="creatingShare" @click="createShare">
-                  生成交付链接
+                  {{ tr("生成交付链接") }}
                 </a-button>
               </a-space>
             </div>
             <div v-if="shareUrl" class="share-box">
               <a-input :value="shareUrl" readonly />
-              <a-button @click="copyShareUrl">复制链接</a-button>
-              <a-button @click="openShareUrl">打开交付页</a-button>
+              <a-button @click="copyShareUrl">{{ tr("复制链接") }}</a-button>
+              <a-button @click="openShareUrl">{{ tr("打开交付页") }}</a-button>
             </div>
             <div class="delivery-checks">
-              <div><CheckCircleOutlined /> 公开链接可撤销</div>
-              <div><CheckCircleOutlined /> 报告页面支持打印/PDF</div>
-              <div><CheckCircleOutlined /> 指标、趋势、痛点和行动项完整展示</div>
+              <div><CheckCircleOutlined /> {{ tr("公开链接可撤销") }}</div>
+              <div><CheckCircleOutlined /> {{ tr("报告页面支持打印/PDF") }}</div>
+              <div><CheckCircleOutlined /> {{ tr("指标、趋势、痛点和行动项完整展示") }}</div>
             </div>
           </div>
         </a-tab-pane>
@@ -225,10 +225,12 @@ import {
   fetchReviews
 } from "@/api";
 import { useTaskStore } from "@/composables";
+import { translateStaticText } from "@/static-i18n";
 import { copyTextToClipboard } from "@/utils/clipboard";
 
 const router = useRouter();
 const { tasks, selectedTask, selectedTaskId, loadingTasks, refreshTasks, setSelectedTask } = useTaskStore();
+const tr = (value: string) => translateStaticText(value);
 const activeTaskId = ref(selectedTaskId.value);
 const activeTab = ref("compare");
 const brief = ref<DailyBriefDTO | null>(null);
@@ -251,15 +253,15 @@ const correction = reactive({
   note: ""
 });
 
-const compareColumns = [
-  { title: "任务", key: "name", width: 240 },
-  { title: "评论数", dataIndex: "reviewCount", key: "reviewCount", width: 110 },
-  { title: "负面占比", dataIndex: "negativePercent", key: "negativePercent", width: 120 },
+const compareColumns = computed(() => [
+  { title: tr("任务"), key: "name", width: 240 },
+  { title: tr("评论数"), dataIndex: "reviewCount", key: "reviewCount", width: 110 },
+  { title: tr("负面占比"), dataIndex: "negativePercent", key: "negativePercent", width: 120 },
   { title: "NPS", dataIndex: "nps", key: "nps", width: 100 },
-  { title: "评分", dataIndex: "avgRating", key: "avgRating", width: 100 },
-  { title: "首要问题", dataIndex: "topIssue", key: "topIssue", width: 220 },
-  { title: "风险", key: "risk", width: 110 }
-];
+  { title: tr("评分"), dataIndex: "avgRating", key: "avgRating", width: 100 },
+  { title: tr("首要问题"), dataIndex: "topIssue", key: "topIssue", width: 220 },
+  { title: tr("风险"), key: "risk", width: 110 }
+]);
 
 const briefRiskText = computed(() => {
   const level = brief.value?.alerts[0]?.level;
@@ -321,7 +323,7 @@ async function loadBrief() {
   try {
     brief.value = await fetchDailyBrief(activeTaskId.value);
   } catch (error) {
-    message.warning("简报需要至少完成一次 AI 分析。");
+    message.warning(tr("简报需要至少完成一次 AI 分析。"));
   } finally {
     loadingBrief.value = false;
   }
@@ -329,7 +331,7 @@ async function loadBrief() {
 
 async function runCompare() {
   if (compareTaskIds.value.length < 2) {
-    message.warning("请选择至少 2 个任务。");
+    message.warning(tr("请选择至少 2 个任务。"));
     return;
   }
   loadingCompare.value = true;
@@ -388,7 +390,7 @@ async function submitCorrection() {
       summary: correction.summary,
       note: correction.note
     });
-    message.success("纠错已保存，并会覆盖当前分析结果中的对应字段。");
+    message.success(tr("纠错已保存，并会覆盖当前分析结果中的对应字段。"));
     correction.summary = "";
     correction.note = "";
     correction.topicLabelsText = "";
@@ -422,9 +424,9 @@ async function copyShareUrl() {
   }
   const copied = await copyTextToClipboard(shareUrl.value);
   if (copied) {
-    message.success("交付链接已复制。");
+    message.success(tr("交付链接已复制。"));
   } else {
-    message.warning("浏览器未允许自动复制，请手动复制输入框中的链接。");
+    message.warning(tr("浏览器未允许自动复制，请手动复制输入框中的链接。"));
   }
 }
 
