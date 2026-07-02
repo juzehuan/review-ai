@@ -245,7 +245,11 @@
             <a-tag color="blue">{{ tr(roleLabel(record.role)) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'usage'">
-            {{ record.currentPeriodReviewCount }}/{{ record.monthlyReviewLimit }}
+            <div class="workspace-quota-cell">
+              <div>{{ quotaUsageSummary(record, "review") }}</div>
+              <div>{{ quotaUsageSummary(record, "run") }}</div>
+              <div class="member-email">{{ quotaResetSummary(record) }}</div>
+            </div>
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space>
@@ -568,7 +572,7 @@ const columns = computed(() => [
   { title: tr("空间"), key: "name", width: 320 },
   { title: tr("角色"), key: "role", width: 140 },
   { title: tr("套餐"), dataIndex: "planTier", key: "planTier", width: 120 },
-  { title: tr("评论用量"), key: "usage", width: 180 },
+  { title: tr("额度用量"), key: "usage", width: 240 },
   { title: tr("操作"), key: "action", width: 180 }
 ]);
 
@@ -668,6 +672,38 @@ function roleLabel(role?: MemberRole | null) {
     return "只读";
   }
   return "-";
+}
+
+function quotaUsageSummary(
+  item: { currentPeriodReviewCount: number; monthlyReviewLimit: number; currentPeriodRunCount: number; monthlyRunLimit: number },
+  kind: "review" | "run"
+) {
+  const label = kind === "review" ? tr("评论") : tr("分析");
+  if (currentUser.value?.isSuperAdmin) {
+    return `${label}: ${tr("不限额")}`;
+  }
+
+  const used = kind === "review" ? item.currentPeriodReviewCount : item.currentPeriodRunCount;
+  const limit = kind === "review" ? item.monthlyReviewLimit : item.monthlyRunLimit;
+  return `${label}: ${used}/${limit}`;
+}
+
+function quotaResetSummary(item: { currentPeriodEndsAt: string | null; currentPeriodRemainingDays: number | null }) {
+  if (currentUser.value?.isSuperAdmin) {
+    return tr("超管不限额");
+  }
+  if (!item.currentPeriodEndsAt) {
+    return tr("未设置重置日期");
+  }
+  return tr(`剩余 ${item.currentPeriodRemainingDays ?? 0} 天 · ${formatDate(item.currentPeriodEndsAt)} 重置`);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString();
 }
 
 async function loadAiSettings() {

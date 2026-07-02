@@ -86,18 +86,10 @@ export async function POST(request: Request) {
     }
   });
 
-  return ok(
-    {
-      id: workspace.id,
-      slug: workspace.slug,
-      name: workspace.name,
-      planTier: workspace.subscription?.planTier || "free",
-      monthlyReviewLimit: workspace.subscription?.monthlyReviewLimit || 0,
-      monthlyRunLimit: workspace.subscription?.monthlyRunLimit || 0,
-      currentPeriodReviewCount: workspace.subscription?.currentPeriodReviewCount || 0,
-      currentPeriodRunCount: workspace.subscription?.currentPeriodRunCount || 0,
-      role: workspace.memberships[0]?.role || "owner"
-    },
-    201
-  );
+  const membership = workspace.memberships[0];
+  if (!membership) {
+    return fail("空间成员创建失败", 500);
+  }
+
+  return ok(serializeMyWorkspace({ ...membership, workspace }), 201);
 }

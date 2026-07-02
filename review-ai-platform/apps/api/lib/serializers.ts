@@ -39,6 +39,12 @@ import type {
 import type { InviteCode } from "@review-ai/db";
 import { parseCrawlerChannels } from "@/lib/crawler-settings";
 
+const SUBSCRIPTION_PERIOD_DAYS = Math.max(Number(process.env.SUBSCRIPTION_PERIOD_DAYS || 30), 1);
+
+function addSubscriptionPeriodDays(date: Date) {
+  return new Date(date.getTime() + SUBSCRIPTION_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+}
+
 function rawObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
@@ -219,7 +225,7 @@ export function serializeTask(
 }
 
 function serializeSubscriptionUsage(subscription?: Subscription | null) {
-  const periodEndsAt = subscription?.currentPeriodEndsAt || null;
+  const periodEndsAt = subscription?.currentPeriodEndsAt || (subscription ? addSubscriptionPeriodDays(subscription.currentPeriodStartedAt) : null);
   const periodRemainingDays = periodEndsAt
     ? Math.max(0, Math.ceil((periodEndsAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
     : null;
