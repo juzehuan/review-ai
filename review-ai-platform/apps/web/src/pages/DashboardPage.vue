@@ -430,6 +430,7 @@ import {
 import EChartCard from "@/components/EChartCard.vue";
 import { createActionItem, createTaskReportShare, fetchDashboard, fetchTaskReportShares, revokeTaskReportShare } from "@/api";
 import { useTaskStore } from "@/composables";
+import { currentLocale } from "@/i18n";
 import { translateStaticText } from "@/static-i18n";
 import { copyTextToClipboard } from "@/utils/clipboard";
 import type { DashboardDTO, ReportShareDTO, Sentiment } from "@review-ai/shared";
@@ -535,7 +536,7 @@ const negativeMetricLabel = computed(() => (isVideoTask.value ? "负向/争议�
 const negativeMetricNote = computed(() =>
   isVideoTask.value ? "需要澄清或复盘的观众反馈" : isTweetTask.value ? "需要回应或降风险的讨论" : "需要运营跟进的低分反馈"
 );
-const exportedAt = computed(() => new Date().toLocaleString());
+const exportedAt = computed(() => formatExportDateTime());
 const emptySummaryText = computed(() => (dashboard.value?.runId ? "暂无 AI 总结，请查看下方图表和证据模块。" : "当前任务还没有生成分析结果。"));
 const executiveHeadline = computed(() => {
   if (!dashboard.value?.reviewCount) {
@@ -980,12 +981,12 @@ function buildMarkdownReport() {
   const lines = [
     `# ${reportTitle.value} ${tr("分析报告")}`,
     "",
-    `- ${tr("任务名称")}：${task.name}`,
-    `- ${tr("来源渠道")}：${task.sourceChannel}`,
-    `- ${tr("分析类型")}：${tr(analysisTypeLabel(task.analysisType))}`,
-    `- ${tr("导出时间")}：${new Date().toLocaleString()}`,
-    `- ${tr("评论样本")}：${data.reviewCount}`,
-    `- ${tr(scoreLabel.value)}：${data.nps}`,
+    markdownItem("任务名称", task.name),
+    markdownItem("来源渠道", task.sourceChannel),
+    markdownItem("分析类型", tr(analysisTypeLabel(task.analysisType))),
+    markdownItem("导出时间", formatExportDateTime()),
+    markdownItem("评论样本", data.reviewCount),
+    markdownItem(scoreLabel.value, data.nps),
     "",
     `## ${tr("执行摘要")}`,
     "",
@@ -995,30 +996,30 @@ function buildMarkdownReport() {
     "",
     `## ${tr("核心指标")}`,
     "",
-    ...reportSnapshots.value.map((item) => `- ${tr(item.label)}：${item.value}（${tr(item.note)}）`),
+    ...reportSnapshots.value.map((item) => markdownItem(item.label, item.value, item.note)),
     "",
     `## ${tr("情感分布")}`,
     "",
-    ...data.sentimentDistribution.map((item) => `- ${tr(sentimentText(item.sentiment))}：${item.count} ${tr("条")}，${tr("占比")} ${item.percent}%`),
+    ...data.sentimentDistribution.map((item) => markdownRawItem(tr(sentimentText(item.sentiment)), formatCountShare(item.count, "条", item.percent))),
     "",
     `## ${tr("评论意图")}`,
     "",
-    ...(data.intentDistribution.length ? data.intentDistribution.map((item) => `- ${item.label}：${item.count} ${tr("条")}，${tr("占比")} ${item.percent}%`) : [`- ${tr("暂无意图分布数据")}`]),
+    ...(data.intentDistribution.length ? data.intentDistribution.map((item) => markdownRawItem(item.label, formatCountShare(item.count, "条", item.percent))) : [`- ${tr("暂无意图分布数据")}`]),
     "",
     `## ${tr("高频问题")}`,
     "",
-    ...(data.issues.length ? data.issues.slice(0, 10).map((item) => `- ${item.issueName}：${item.count} ${tr("条相关评论")}`) : [`- ${tr("暂无高频问题")}`]),
+    ...(data.issues.length ? data.issues.slice(0, 10).map((item) => markdownRawItem(item.issueName, `${item.count} ${tr("条相关评论")}`)) : [`- ${tr("暂无高频问题")}`]),
     "",
     `## ${tr("动态内容标签")}`,
     "",
     ...(data.dynamicContentTags.length
-      ? data.dynamicContentTags.slice(0, 12).map((tag) => `- ${tag.label}：${tr(dynamicTagKindText(tag.kind))}，${tag.count} ${tr("条")}，${tr("占比")} ${tag.percent}%`)
+      ? data.dynamicContentTags.slice(0, 12).map((tag) => markdownRawItem(tag.label, `${tr(dynamicTagKindText(tag.kind))}${exportComma()}${formatCountShare(tag.count, "条", tag.percent)}`))
       : [`- ${tr("暂无动态内容标签")}`]),
     "",
     `## ${tr("观点聚类")}`,
     "",
     ...(data.insightClusters.length
-      ? data.insightClusters.map((cluster) => `### ${cluster.title}\n\n${normalizeExportText(cluster.summary)}\n\n- ${tr("评论数")}：${cluster.count}，${tr("占比")} ${cluster.percent}%\n- ${tr("情感")}：${tr(sentimentText(cluster.sentiment))}`)
+      ? data.insightClusters.map((cluster) => `### ${cluster.title}\n\n${normalizeExportText(cluster.summary)}\n\n${markdownItem("评论数", cluster.count)}${exportComma()}${tr("占比")} ${cluster.percent}%\n${markdownItem("情感", tr(sentimentText(cluster.sentiment)))}`)
       : [tr("暂无观点聚类")]),
     "",
     `## ${tr(insightReportTitle.value)}`,
@@ -1028,7 +1029,7 @@ function buildMarkdownReport() {
     `## ${tr("分析质量提醒")}`,
     "",
     ...(data.qualityAlerts.length
-      ? data.qualityAlerts.map((alert) => `- [${tr(qualityAlertLevelText(alert.level))}] ${alert.title}：${normalizeExportText(`${alert.detail} ${alert.recommendation}`)}`)
+      ? data.qualityAlerts.map((alert) => markdownRawItem(`[${tr(qualityAlertLevelText(alert.level))}] ${alert.title}`, normalizeExportText(`${alert.detail} ${alert.recommendation}`)))
       : [`- ${tr("暂无质量提醒")}`]),
     "",
     `## ${tr("代表性评论")}`,
@@ -1068,7 +1069,7 @@ function buildHtmlReport() {
     .join("");
   const dynamicTags = data.dynamicContentTags
     .slice(0, 12)
-    .map((tag) => `<li><strong>${escapeHtml(tag.label)}</strong><span>${escapeHtml(tr(dynamicTagKindText(tag.kind)))} · ${tag.count} ${escapeHtml(tr("条"))} · ${tag.percent}%</span></li>`)
+    .map((tag) => `<li><strong>${escapeHtml(tag.label)}</strong><span>${escapeHtml(tr(dynamicTagKindText(tag.kind)))} · ${escapeHtml(formatCountShare(tag.count, "条", tag.percent))}</span></li>`)
     .join("");
   const clusters = data.insightClusters
     .map(
@@ -1076,7 +1077,7 @@ function buildHtmlReport() {
         <article class="section-card">
           <h3>${escapeHtml(cluster.title)}</h3>
           <p>${escapeHtml(cluster.summary)}</p>
-          <div class="muted">${cluster.count} ${escapeHtml(tr("条评论"))} · ${cluster.percent}% · ${escapeHtml(tr(sentimentText(cluster.sentiment)))}</div>
+          <div class="muted">${escapeHtml(formatCountShare(cluster.count, "条评论", cluster.percent))} · ${escapeHtml(tr(sentimentText(cluster.sentiment)))}</div>
         </article>`
     )
     .join("");
@@ -1095,13 +1096,13 @@ function buildHtmlReport() {
   const representativeReviews = buildRepresentativeReviewHtml(data);
 
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="${escapeHtml(currentLocale.value)}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(reportTitle.value)} ${escapeHtml(tr("分析报告"))}</title>
     <style>
-      body { margin: 0; font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif; color: #172033; background: #f4f6fa; }
+      body { margin: 0; font-family: Inter, "Noto Sans Thai", "Microsoft YaHei", "PingFang SC", Arial, sans-serif; color: #172033; background: #f4f6fa; }
       main { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 32px 0 42px; }
       .hero, section { border: 1px solid #e4e7ee; border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
       .hero { padding: 30px; color: #fff; background: #172033; border-color: #172033; }
@@ -1128,9 +1129,9 @@ function buildHtmlReport() {
   <body>
     <main>
       <header class="hero">
-        <div class="kicker">ReviewIQ Report</div>
+        <div class="kicker">ReviewIQ ${escapeHtml(tr("分析报告"))}</div>
         <h1>${escapeHtml(reportTitle.value)} ${escapeHtml(tr("分析报告"))}</h1>
-        <p>${escapeHtml(task.name)} · ${escapeHtml(task.sourceChannel)} · ${escapeHtml(tr(analysisTypeLabel(task.analysisType)))} · ${escapeHtml(tr("导出时间"))} ${escapeHtml(new Date().toLocaleString())}</p>
+        <p>${escapeHtml(task.name)} · ${escapeHtml(task.sourceChannel)} · ${escapeHtml(tr(analysisTypeLabel(task.analysisType)))} · ${escapeHtml(formatExportField("导出时间", formatExportDateTime()))}</p>
       </header>
       <section>
         <h2>${escapeHtml(tr("执行摘要"))}</h2>
@@ -1227,6 +1228,42 @@ function normalizeExportText(value?: string | null) {
   return (value || "-").replace(/\r?\n{3,}/g, "\n\n").trim();
 }
 
+function formatExportDateTime(date = new Date()) {
+  return date.toLocaleString(currentLocale.value);
+}
+
+function exportColon() {
+  return currentLocale.value === "zh-CN" ? "：" : ": ";
+}
+
+function exportComma() {
+  return currentLocale.value === "zh-CN" ? "，" : ", ";
+}
+
+function exportParenthetical(value: string) {
+  return currentLocale.value === "zh-CN" ? `（${value}）` : `(${value})`;
+}
+
+function formatExportField(label: string, value: string | number) {
+  return `${tr(label)}${exportColon()}${value}`;
+}
+
+function formatExportRawField(label: string, value: string | number) {
+  return `${label}${exportColon()}${value}`;
+}
+
+function markdownItem(label: string, value: string | number, note?: string) {
+  return `- ${formatExportField(label, value)}${note ? exportParenthetical(tr(note)) : ""}`;
+}
+
+function markdownRawItem(label: string, value: string | number) {
+  return `- ${formatExportRawField(label, value)}`;
+}
+
+function formatCountShare(count: number, unitKey: string, percent: number) {
+  return `${count} ${tr(unitKey)}${exportComma()}${tr("占比")} ${percent}%`;
+}
+
 function escapeHtml(value?: string | number | null) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -1282,7 +1319,7 @@ async function createActionFromIssue(issue: DashboardDTO["issues"][number]) {
   try {
     const dueAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     await createActionItem(selectedTask.value.id, {
-      title: `${tr("跟进问题")}：${issue.issueName}`,
+      title: formatExportField("跟进问题", issue.issueName),
       description: tr(`报告中发现 ${issue.count} 条相关评论。建议定位样本证据、确认影响范围，并安排负责人跟进解决。`),
       priority: issue.count >= 10 ? "high" : "medium",
       status: "open",
