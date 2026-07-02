@@ -1,6 +1,6 @@
 <template>
   <div v-if="!selectedTask" class="empty-state">
-    <a-empty description="请选择一个分析任务查看行动项" />
+    <a-empty :description="tr('请选择一个分析任务查看行动项')" />
   </div>
 
   <div v-else class="action-page">
@@ -9,7 +9,7 @@
         <div class="panel-label">Action Loop</div>
         <div class="toolbar-title">行动看板</div>
         <div class="toolbar-subtitle">
-          {{ selectedTask.name }} · 把评论洞察拆成可分派、可跟进、可复盘的团队行动。
+          {{ tr(`${selectedTask.name} · 把评论洞察拆成可分派、可跟进、可复盘的团队行动。`) }}
         </div>
       </div>
       <a-space wrap>
@@ -67,7 +67,7 @@
           <a-tag :color="column.color">{{ column.items.length }}</a-tag>
         </div>
 
-        <a-empty v-if="!loading && column.items.length === 0" class="action-empty" description="暂无行动项" />
+        <a-empty v-if="!loading && column.items.length === 0" class="action-empty" :description="tr('暂无行动项')" />
 
         <div v-else class="action-card-list">
           <article v-for="item in column.items" :key="item.id" class="action-card">
@@ -77,11 +77,11 @@
             </div>
 
             <div class="action-card-title">{{ item.title }}</div>
-            <div class="action-card-desc">{{ item.description || "暂无说明" }}</div>
+            <div class="action-card-desc">{{ item.description || tr("暂无说明") }}</div>
 
             <div class="action-card-meta">
-              <span>{{ sourceLabel(item.source) }}</span>
-              <span v-if="item.relatedReviewIds.length">关联 {{ item.relatedReviewIds.length }} 条评论</span>
+              <span>{{ tr(sourceLabel(item.source)) }}</span>
+              <span v-if="item.relatedReviewIds.length">{{ tr(`关联 ${item.relatedReviewIds.length} 条评论`) }}</span>
             </div>
 
             <div class="action-card-controls">
@@ -94,7 +94,7 @@
                 :value="item.assigneeUserId || undefined"
                 allow-clear
                 size="small"
-                placeholder="负责人"
+                :placeholder="tr('负责人')"
                 @change="updateAssignee(item, normalizeUserId($event))"
               >
                 <a-select-option v-for="member in members" :key="member.userId" :value="member.userId">
@@ -106,7 +106,7 @@
             <div class="action-card-actions">
               <a-button size="small" @click="openEdit(item)">编辑</a-button>
               <a-button size="small" :disabled="!item.relatedReviewIds.length" @click="openEvidence(item)">证据</a-button>
-              <a-popconfirm title="确定删除该行动项？" @confirm="removeItem(item)">
+              <a-popconfirm :title="tr('确定删除该行动项？')" @confirm="removeItem(item)">
                 <a-button size="small" danger>删除</a-button>
               </a-popconfirm>
             </div>
@@ -117,36 +117,36 @@
 
     <a-modal
       :open="modalOpen"
-      :title="editingItem ? '编辑行动项' : '新建行动项'"
-      ok-text="保存"
-      cancel-text="取消"
+      :title="tr(editingItem ? '编辑行动项' : '新建行动项')"
+      :ok-text="tr('保存')"
+      :cancel-text="tr('取消')"
       :confirm-loading="saving"
       @ok="submit"
       @cancel="modalOpen = false"
     >
       <a-form layout="vertical">
-        <a-form-item label="标题">
-          <a-input v-model:value="form.title" placeholder="例如：跟进高频负面反馈" />
+        <a-form-item :label="tr('标题')">
+          <a-input v-model:value="form.title" :placeholder="tr('例如：跟进高频负面反馈')" />
         </a-form-item>
-        <a-form-item label="说明">
+        <a-form-item :label="tr('说明')">
           <a-textarea v-model:value="form.description" :auto-size="{ minRows: 3, maxRows: 6 }" />
         </a-form-item>
-        <a-form-item label="负责人">
-          <a-select v-model:value="form.assigneeUserId" allow-clear placeholder="选择负责人">
+        <a-form-item :label="tr('负责人')">
+          <a-select v-model:value="form.assigneeUserId" allow-clear :placeholder="tr('选择负责人')">
             <a-select-option v-for="member in members" :key="member.userId" :value="member.userId">
               {{ member.user.name }} · {{ member.user.email }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <div class="action-form-grid">
-          <a-form-item label="优先级">
+          <a-form-item :label="tr('优先级')">
             <a-select v-model:value="form.priority">
               <a-select-option value="high">高</a-select-option>
               <a-select-option value="medium">中</a-select-option>
               <a-select-option value="low">低</a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="状态">
+          <a-form-item :label="tr('状态')">
             <a-select v-model:value="form.status">
               <a-select-option v-for="item in statusOptions" :key="item.value" :value="item.value">
                 {{ item.label }}
@@ -154,7 +154,7 @@
             </a-select>
           </a-form-item>
         </div>
-        <a-form-item label="截止日期">
+        <a-form-item :label="tr('截止日期')">
           <a-input v-model:value="form.dueAt" type="date" />
         </a-form-item>
       </a-form>
@@ -176,10 +176,12 @@ import {
   updateActionItem
 } from "@/api";
 import { useTaskStore } from "@/composables";
+import { translateStaticText } from "@/static-i18n";
 
 const route = useRoute();
 const router = useRouter();
 const { selectedTask, setSelectedTask } = useTaskStore();
+const tr = (value: string) => translateStaticText(value);
 
 const loading = ref(false);
 const saving = ref(false);
@@ -325,7 +327,7 @@ function openEdit(item: ReviewActionItemDTO) {
 
 async function submit() {
   if (!selectedTask.value || !form.title.trim()) {
-    message.error("请填写行动项标题。");
+    message.error(tr("请填写行动项标题。"));
     return;
   }
   saving.value = true;
@@ -343,7 +345,7 @@ async function submit() {
     } else {
       await createActionItem(selectedTask.value.id, payload);
     }
-    message.success("行动项已保存。");
+    message.success(tr("行动项已保存。"));
     modalOpen.value = false;
     await load();
   } finally {
@@ -356,7 +358,7 @@ async function updateStatus(item: ReviewActionItemDTO, status: string) {
     return;
   }
   await updateActionItem(selectedTask.value.id, item.id, { status });
-  message.success(`已更新为${statusLabel(status)}。`);
+  message.success(tr(`已更新为${statusLabel(status)}。`));
   await load();
 }
 
@@ -365,7 +367,7 @@ async function updateAssignee(item: ReviewActionItemDTO, userId: string | null) 
     return;
   }
   await updateActionItem(selectedTask.value.id, item.id, { assigneeUserId: userId });
-  message.success("负责人已更新。");
+  message.success(tr("负责人已更新。"));
   await load();
 }
 
@@ -374,7 +376,7 @@ async function removeItem(item: ReviewActionItemDTO) {
     return;
   }
   await deleteActionItem(selectedTask.value.id, item.id);
-  message.success("行动项已删除。");
+  message.success(tr("行动项已删除。"));
   await load();
 }
 
