@@ -3,28 +3,28 @@
     <div class="page-toolbar runs-hero crawler-hero">
       <div class="toolbar-title-block">
         <div class="panel-label">Comment Intelligence</div>
-        <div class="toolbar-title">评论采集控制台</div>
+        <div class="toolbar-title">{{ tr("评论采集控制台") }}</div>
         <div class="toolbar-subtitle">
-          把 Shopee、YouTube、TikTok、Facebook 评论变成可持续监听的数据流，新评论自动入库、自动分析，任务状态一眼可见。
+          {{ tr("把 Shopee、YouTube、TikTok、Facebook 评论变成可持续监听的数据流，新评论自动入库、自动分析，任务状态一眼可见。") }}
         </div>
       </div>
       <a-space wrap>
         <a-button :href="browserExtensionDownloadUrl" download="review-exporter.zip">
           <template #icon><DownloadOutlined /></template>
-          下载浏览器插件
+          {{ tr("下载浏览器插件") }}
         </a-button>
-        <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
+        <a-switch v-model:checked="autoRefresh" :checked-children="tr('自动刷新')" :un-checked-children="tr('手动刷新')" />
         <a-button @click="() => refreshPageData()" :loading="loading">
           <template #icon><ReloadOutlined /></template>
-          刷新
+          {{ tr("刷新") }}
         </a-button>
         <a-button :disabled="!crawlerEnabled" @click="openCreateModal">
           <template #icon><PlusOutlined /></template>
-          一次采集
+          {{ tr("一次采集") }}
         </a-button>
         <a-button type="primary" :disabled="!crawlerEnabled" @click="openMonitorModal">
           <template #icon><ThunderboltOutlined /></template>
-          新建监听
+          {{ tr("新建监听") }}
         </a-button>
       </a-space>
     </div>
@@ -34,30 +34,30 @@
       class="import-alert"
       type="warning"
       show-icon
-      message="评论采集已关闭"
-      description="请先在用户后台的抓取设置中启用评论采集，然后再创建监听任务或一次性采集任务。"
+      :message="tr('评论采集已关闭')"
+      :description="tr('请先在用户后台的抓取设置中启用评论采集，然后再创建监听任务或一次性采集任务。')"
     />
 
     <div class="crawler-stats-grid">
       <div class="mini-stat-card mini-stat-cool">
-        <div class="mini-stat-label">监听任务</div>
+        <div class="mini-stat-label">{{ tr("监听任务") }}</div>
         <div class="mini-stat-value">{{ monitors.length }}</div>
-        <div class="stat-note">会按设定频率自动抓取并分析</div>
+        <div class="stat-note">{{ tr("会按设定频率自动抓取并分析") }}</div>
       </div>
       <div class="mini-stat-card mini-stat-warm">
-        <div class="mini-stat-label">运行中</div>
+        <div class="mini-stat-label">{{ tr("运行中") }}</div>
         <div class="mini-stat-value">{{ activeJobCount }}</div>
-        <div class="stat-note">正在排队或抓取的采集任务</div>
+        <div class="stat-note">{{ tr("正在排队或抓取的采集任务") }}</div>
       </div>
       <div class="mini-stat-card mini-stat-cool">
-        <div class="mini-stat-label">已采集评论</div>
+        <div class="mini-stat-label">{{ tr("已采集评论") }}</div>
         <div class="mini-stat-value">{{ fetchedRowCount }}</div>
-        <div class="stat-note">来自当前账号下的采集记录</div>
+        <div class="stat-note">{{ tr("来自当前账号下的采集记录") }}</div>
       </div>
       <div class="mini-stat-card mini-stat-alert">
-        <div class="mini-stat-label">待处理异常</div>
+        <div class="mini-stat-label">{{ tr("待处理异常") }}</div>
         <div class="mini-stat-value">{{ failedJobCount + failedMonitorCount }}</div>
-        <div class="stat-note">需要检查链接、网络代理或平台限制</div>
+        <div class="stat-note">{{ tr("需要检查链接、网络代理或平台限制") }}</div>
       </div>
     </div>
 
@@ -65,30 +65,30 @@
       <div class="crawler-health-head">
         <div>
           <div class="panel-label">Queue Health</div>
-          <div class="settings-section-title">采集运行观察</div>
+          <div class="settings-section-title">{{ tr("采集运行观察") }}</div>
         </div>
-        <a-tag :color="crawlHealthStatusColor">{{ crawlHealthStatusLabel }}</a-tag>
+        <a-tag :color="crawlHealthStatusColor">{{ tr(crawlHealthStatusLabel) }}</a-tag>
       </div>
       <div class="crawler-health-metrics">
         <div class="crawler-health-metric">
-          <span>疑似无更新</span>
+          <span>{{ tr("疑似无更新") }}</span>
           <strong>{{ stalledJobCount }}</strong>
-          <small>{{ stalledJobSummary }}</small>
+          <small>{{ tr(stalledJobSummary) }}</small>
         </div>
         <div class="crawler-health-metric">
-          <span>活跃采集量</span>
-          <strong>{{ activeProgressText }}</strong>
-          <small>{{ activeProgressNote }}</small>
+          <span>{{ tr("活跃采集量") }}</span>
+          <strong>{{ tr(activeProgressText) }}</strong>
+          <small>{{ tr(activeProgressNote) }}</small>
         </div>
         <div class="crawler-health-metric">
-          <span>当前速度</span>
-          <strong>{{ currentFetchRateText }}</strong>
-          <small>{{ fetchRateNote }}</small>
+          <span>{{ tr("当前速度") }}</span>
+          <strong>{{ tr(currentFetchRateText) }}</strong>
+          <small>{{ tr(fetchRateNote) }}</small>
         </div>
         <div class="crawler-health-metric">
-          <span>最近活动</span>
-          <strong>{{ latestActivityText }}</strong>
-          <small>{{ latestActivityNote }}</small>
+          <span>{{ tr("最近活动") }}</span>
+          <strong>{{ tr(latestActivityText) }}</strong>
+          <small>{{ latestActivityJob ? latestActivityNote : tr(latestActivityNote) }}</small>
         </div>
       </div>
     </div>
@@ -97,19 +97,19 @@
       <div class="panel-head">
         <div>
           <div class="panel-label">Always-on Monitor</div>
-          <div class="settings-section-title">持续监听任务</div>
+          <div class="settings-section-title">{{ tr("持续监听任务") }}</div>
         </div>
         <a-space wrap>
-          <a-tag color="blue">{{ enabledMonitorCount }} 个已启用</a-tag>
+          <a-tag color="blue">{{ tr(`${enabledMonitorCount} 个已启用`) }}</a-tag>
           <a-button type="primary" :disabled="!crawlerEnabled" @click="openMonitorModal">
             <template #icon><ThunderboltOutlined /></template>
-            新建监听
+            {{ tr("新建监听") }}
           </a-button>
         </a-space>
       </div>
 
-      <a-empty v-if="!loading && monitors.length === 0" description="还没有持续监听任务">
-        <a-button type="primary" :disabled="!crawlerEnabled" @click="openMonitorModal">创建第一个监听任务</a-button>
+      <a-empty v-if="!loading && monitors.length === 0" :description="tr('还没有持续监听任务')">
+        <a-button type="primary" :disabled="!crawlerEnabled" @click="openMonitorModal">{{ tr("创建第一个监听任务") }}</a-button>
       </a-empty>
 
       <a-table
@@ -130,14 +130,14 @@
               <span>{{ record.productName || record.normalizedUrl }}</span>
               <a class="crawl-url" :href="record.normalizedUrl" target="_blank" rel="noreferrer">{{ record.normalizedUrl }}</a>
               <span v-if="record.workspaceName || record.workspaceSlug" class="muted">
-                空间：{{ record.workspaceName || record.workspaceSlug }}
+                {{ tr("空间") }}：{{ record.workspaceName || record.workspaceSlug }}
               </span>
             </div>
           </template>
           <template v-else-if="column.key === 'schedule'">
             <div class="schedule-cell">
-              <strong>{{ intervalLabel(record.intervalMinutes) }}</strong>
-              <span>下次：{{ formatTime(record.nextRunAt) }}</span>
+              <strong>{{ tr(intervalLabel(record.intervalMinutes)) }}</strong>
+              <span>{{ tr(`下次：${formatTime(record.nextRunAt)}`) }}</span>
             </div>
           </template>
           <template v-else-if="column.key === 'status'">
@@ -145,28 +145,28 @@
               <a-switch
                 :checked="record.enabled"
                 :loading="monitorActionId === record.id"
-                checked-children="启用"
-                un-checked-children="暂停"
+                :checked-children="tr('启用')"
+                :un-checked-children="tr('暂停')"
                 @change="toggleMonitor(record, Boolean($event))"
               />
               <a-tag :color="record.autoAnalyze ? 'green' : 'default'">
-                {{ record.autoAnalyze ? "自动分析" : "仅采集" }}
+                {{ record.autoAnalyze ? tr("自动分析") : tr("仅采集") }}
               </a-tag>
             </div>
           </template>
           <template v-else-if="column.key === 'meta'">
-            <div>{{ record.sourceChannel }} / {{ analysisTypeLabel(record.analysisType) }}</div>
-            <div class="muted">{{ platformLabel(record.platform) }}</div>
+            <div>{{ record.sourceChannel }} / {{ tr(analysisTypeLabel(record.analysisType)) }}</div>
+            <div class="muted">{{ tr(platformLabel(record.platform)) }}</div>
           </template>
           <template v-else-if="column.key === 'last'">
             <div>{{ formatTime(record.lastRunAt) }}</div>
-            <div class="muted">创建于 {{ formatTime(record.createdAt) }}</div>
+            <div class="muted">{{ tr(`创建于 ${formatTime(record.createdAt)}`) }}</div>
           </template>
           <template v-else-if="column.key === 'error'">
-            <a-tooltip v-if="record.lastError" :title="record.lastError">
+            <a-tooltip v-if="record.lastError" :title="tr(record.lastError)">
               <div class="error-pill">
                 <ExclamationCircleOutlined />
-                <span>{{ errorSummary(record.lastError) }}</span>
+                <span>{{ tr(errorSummary(record.lastError)) }}</span>
               </div>
             </a-tooltip>
             <span v-else class="muted">-</span>
@@ -180,26 +180,26 @@
                 @click="runMonitorNow(record)"
               >
                 <template #icon><PlayCircleOutlined /></template>
-                立即运行
+                {{ tr("立即运行") }}
               </a-button>
               <a-dropdown>
                 <a-button size="small" @click.stop>
                   <template #icon><MoreOutlined /></template>
-                  更多
+                  {{ tr("更多") }}
                 </a-button>
                 <template #overlay>
                   <a-menu class="crawl-action-menu" @click.stop>
                     <a-menu-item key="crawl-job" :disabled="!record.lastCrawlJobId" @click="record.lastCrawlJobId && openCrawlJobById(record.lastCrawlJobId)">
                       <CloudDownloadOutlined />
-                      打开采集
+                      {{ tr("打开采集") }}
                     </a-menu-item>
                     <a-menu-item key="task" :disabled="!record.taskId" @click="record.taskId && openTaskById(record.taskId, record.latestRunId)">
                       <FileSearchOutlined />
-                      查看分析
+                      {{ tr("查看分析") }}
                     </a-menu-item>
                     <a-menu-divider />
                     <a-menu-item key="delete" danger @click="removeMonitor(record)">
-                      删除
+                      {{ tr("删除") }}
                     </a-menu-item>
                   </a-menu>
                 </template>
@@ -214,7 +214,7 @@
       <div class="panel-head">
         <div>
           <div class="panel-label">Crawler Queue</div>
-          <div class="settings-section-title">采集记录</div>
+          <div class="settings-section-title">{{ tr("采集记录") }}</div>
         </div>
         <a-space class="crawl-job-toolbar" wrap>
           <a-segmented
@@ -223,7 +223,7 @@
             :options="crawlJobStatusOptions"
             @change="handleCrawlJobStatusChange"
           />
-          <a-tag>{{ crawlJobTotal }} 个任务</a-tag>
+          <a-tag>{{ tr(`${crawlJobTotal} 个任务`) }}</a-tag>
         </a-space>
       </div>
 
@@ -248,33 +248,33 @@
             </div>
           </template>
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
+            <a-tag :color="statusColor(record.status)">{{ tr(statusLabel(record.status)) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'progress'">
             <div class="run-progress-cell">
               <a-progress :percent="record.progress" size="small" :status="progressStatus(record.status)" />
               <div class="crawl-progress-headline">
-                <strong>已抓取 {{ record.fetchedRows }}/{{ record.maxReviews || "不限" }}</strong>
+                <strong>{{ tr(`已抓取 ${record.fetchedRows}/${record.maxReviews || "不限"}`) }}</strong>
                 <a-tag v-if="record.coveragePercent !== null" color="blue" class="crawl-progress-tag">
-                  目标覆盖 {{ record.coveragePercent }}%
+                  {{ tr(`目标覆盖 ${record.coveragePercent}%`) }}
                 </a-tag>
                 <a-tag v-if="record.platformCoveragePercent != null" color="cyan" class="crawl-progress-tag">
-                  平台覆盖 {{ record.platformCoveragePercent }}%
+                  {{ tr(`平台覆盖 ${record.platformCoveragePercent}%`) }}
                 </a-tag>
               </div>
               <div v-if="crawlCoverageStats(record).length" class="crawl-progress-grid">
                 <div v-for="stat in crawlCoverageStats(record)" :key="stat.label" class="crawl-progress-stat">
-                  <span>{{ stat.label }}</span>
-                  <strong>{{ stat.value }}</strong>
+                  <span>{{ tr(stat.label) }}</span>
+                  <strong>{{ tr(stat.value) }}</strong>
                 </div>
               </div>
               <div v-if="crawlRunSignals(record).length" class="crawl-signal-list">
-                <span v-for="signal in crawlRunSignals(record)" :key="signal">{{ signal }}</span>
+                <span v-for="signal in crawlRunSignals(record)" :key="signal">{{ tr(signal) }}</span>
               </div>
               <div v-if="crawlTelemetryStats(record).length || crawlTelemetryHint(record)" class="crawl-telemetry-card">
                 <div class="crawl-telemetry-head">
-                  <span>采集阶段</span>
-                  <strong>{{ crawlStageLabel(record) }}</strong>
+                  <span>{{ tr("采集阶段") }}</span>
+                  <strong>{{ tr(crawlStageLabel(record)) }}</strong>
                 </div>
                 <div v-if="crawlTelemetryStats(record).length" class="crawl-telemetry-grid">
                   <span
@@ -282,47 +282,49 @@
                     :key="metric.label"
                     :class="{ 'crawl-telemetry-warning': metric.warning }"
                   >
-                    <small>{{ metric.label }}</small>
-                    <strong>{{ metric.value }}</strong>
+                    <small>{{ tr(metric.label) }}</small>
+                    <strong>{{ tr(metric.value) }}</strong>
                   </span>
                 </div>
-                <div v-if="crawlTelemetryHint(record)" class="crawl-telemetry-hint">{{ crawlTelemetryHint(record) }}</div>
+                <div v-if="crawlTelemetryHint(record)" class="crawl-telemetry-hint">{{ tr(crawlTelemetryHint(record)) }}</div>
               </div>
               <div class="crawl-alert-tags">
                 <a-tag v-if="record.stalled" color="orange" class="crawl-stalled-tag">
-                  疑似无更新 {{ durationLabel(record.updatedAgoSeconds) }}
+                  {{ tr("疑似无更新") }} {{ tr(durationLabel(record.updatedAgoSeconds)) }}
                 </a-tag>
                 <a-tag v-if="record.partialDueToTimeout" color="orange" class="crawl-stalled-tag">
-                  部分结果：采集接近超时，可能未加载完全部评论
+                  {{ tr("部分结果：采集接近超时，可能未加载完全部评论") }}
                 </a-tag>
                 <a-tag
                   v-if="isRequestStatusWarning(record.lastRequestStatus)"
                   :color="requestStatusColor(record.lastRequestStatus)"
                   class="crawl-stalled-tag"
                 >
-                  请求异常 {{ record.lastRequestStatus }}
+                  {{ tr(`请求异常 ${record.lastRequestStatus}`) }}
                 </a-tag>
               </div>
               <div v-if="crawlJobDiagnostic(record)" class="crawl-diagnostic-tip">
                 <ExclamationCircleOutlined />
-                <span>{{ crawlJobDiagnostic(record) }}</span>
+                <span>{{ tr(crawlJobDiagnostic(record)) }}</span>
               </div>
               <span v-if="record.commentSortAttempted !== null" class="muted">
-                评论排序：{{ record.commentSortSwitched ? "已切换所有评论" : "未确认所有评论" }}
+                {{ tr("评论排序") }}：{{ record.commentSortSwitched ? tr("已切换所有评论") : tr("未确认所有评论") }}
                 <template v-if="record.commentSortLabel"> · {{ record.commentSortLabel }}</template>
               </span>
-              <span v-if="crawlMetricSummary(record)" class="muted">{{ crawlMetricSummary(record) }}</span>
-              <span v-if="record.endReached !== null" class="muted">末尾状态：{{ record.endReached ? "已到达" : "未确认" }}</span>
+              <span v-if="crawlMetricSummary(record)" class="muted">{{ tr(crawlMetricSummary(record)) }}</span>
+              <span v-if="record.endReached !== null" class="muted">
+                {{ tr("末尾状态") }}：{{ record.endReached ? tr("已到达") : tr("未确认") }}
+              </span>
               <a-tooltip v-if="record.channelErrors.length" :title="channelErrorsTitle(record)">
                 <span class="muted">{{ tr(`通道异常 ${record.channelErrors.length} 条`) }}</span>
               </a-tooltip>
             </div>
           </template>
           <template v-else-if="column.key === 'meta'">
-            <div>{{ record.sourceChannel }} / {{ analysisTypeLabel(record.analysisType) }}</div>
-            <div class="muted">{{ record.crawlChannelLabel || platformLabel(record.platform) }}</div>
+            <div>{{ record.sourceChannel }} / {{ tr(analysisTypeLabel(record.analysisType)) }}</div>
+            <div class="muted">{{ tr(record.crawlChannelLabel || platformLabel(record.platform)) }}</div>
             <div v-if="record.workspaceName || record.workspaceSlug" class="muted">
-              空间：{{ record.workspaceName || record.workspaceSlug }}
+              {{ tr("空间") }}：{{ record.workspaceName || record.workspaceSlug }}
             </div>
           </template>
           <template v-else-if="column.key === 'time'">
@@ -340,7 +342,7 @@
                 @click="retryJob(record)"
               >
                 <template #icon><ReloadOutlined /></template>
-                重试
+                {{ tr("重试") }}
               </a-button>
               <a-button
                 v-else
@@ -351,21 +353,21 @@
                 @click="startAnalysis(record)"
               >
                 <template #icon><PlayCircleOutlined /></template>
-                开始分析
+                {{ tr("开始分析") }}
               </a-button>
               <a-button v-if="record.taskId" size="small" @click="openTask(record)">
                 <template #icon><FileSearchOutlined /></template>
-                查看分析
+                {{ tr("查看分析") }}
               </a-button>
               <a-dropdown>
                 <a-button size="small" @click.stop>
                   <template #icon><MoreOutlined /></template>
-                  更多
+                  {{ tr("更多") }}
                 </a-button>
                 <template #overlay>
                   <a-menu class="crawl-action-menu" @click.stop>
                     <a-menu-item key="delete" danger :disabled="!canDeleteJob(record)" @click="confirmRemoveJob(record)">
-                      {{ deletingJobId === record.id ? "删除中" : "删除" }}
+                      {{ deletingJobId === record.id ? tr("删除中") : tr("删除") }}
                     </a-menu-item>
                   </a-menu>
                 </template>
@@ -373,10 +375,10 @@
             </a-space>
           </template>
           <template v-else-if="column.key === 'error'">
-            <a-tooltip v-if="record.lastError" :title="record.lastError">
+            <a-tooltip v-if="record.lastError" :title="tr(record.lastError)">
               <div class="error-pill">
                 <ExclamationCircleOutlined />
-                <span>{{ errorSummary(record.lastError) }}</span>
+                <span>{{ tr(errorSummary(record.lastError)) }}</span>
               </div>
             </a-tooltip>
             <span v-else class="muted">-</span>
@@ -387,25 +389,25 @@
 
     <a-modal
       :open="showMonitorModal"
-      title="新建持续监听"
+      :title="tr('新建持续监听')"
       width="760px"
       :confirm-loading="monitorCreating"
-      ok-text="创建监听"
-      cancel-text="取消"
+      :ok-text="tr('创建监听')"
+      :cancel-text="tr('取消')"
       @cancel="showMonitorModal = false"
       @ok="submitCrawlMonitor"
     >
       <a-form layout="vertical" class="import-form">
         <div class="monitor-form-grid">
-          <a-form-item label="监听名称">
-            <a-input v-model:value="monitorForm.name" placeholder="例如：竞品 TikTok 视频舆情监听" />
+          <a-form-item :label="tr('监听名称')">
+            <a-input v-model:value="monitorForm.name" :placeholder="tr('例如：竞品 TikTok 视频舆情监听')" />
           </a-form-item>
-          <a-form-item label="内容名称">
-            <a-input v-model:value="monitorForm.productName" placeholder="可选，默认使用视频标题或链接" />
+          <a-form-item :label="tr('内容名称')">
+            <a-input v-model:value="monitorForm.productName" :placeholder="tr('可选，默认使用视频标题或链接')" />
           </a-form-item>
         </div>
-        <a-form-item label="评论链接">
-          <a-input v-model:value="monitorForm.productUrl" placeholder="支持 Shopee 商品、YouTube 视频、TikTok 视频、Facebook 帖子/图片/Reel 链接" />
+        <a-form-item :label="tr('评论链接')">
+          <a-input v-model:value="monitorForm.productUrl" :placeholder="tr('支持 Shopee 商品、YouTube 视频、TikTok 视频、Facebook 帖子/图片/Reel 链接')" />
         </a-form-item>
         <a-alert
           class="platform-guide-alert"
@@ -415,26 +417,26 @@
           :description="crawlPlatformGuideDescription(monitorForm)"
         />
         <div class="monitor-form-grid">
-          <a-form-item label="来源渠道">
+          <a-form-item :label="tr('来源渠道')">
             <a-select v-model:value="monitorForm.sourceChannel" :options="sourceChannelOptions" />
           </a-form-item>
-          <a-form-item label="分析类型">
+          <a-form-item :label="tr('分析类型')">
             <a-select v-model:value="monitorForm.analysisType" :options="analysisTypeOptions" />
             <div class="settings-help">{{ crawlAnalysisTypeHint(monitorForm) }}</div>
           </a-form-item>
         </div>
         <div class="monitor-form-grid">
-          <a-form-item label="每次最多采集">
+          <a-form-item :label="tr('每次最多采集')">
             <a-input-number v-model:value="monitorForm.maxReviews" :min="0" :max="20000" class="full-input" />
-            <div class="settings-help">填 0 表示不限，直到平台没有更多评论或采集超时。</div>
+            <div class="settings-help">{{ tr("填 0 表示不限，直到平台没有更多评论或采集超时。") }}</div>
           </a-form-item>
-          <a-form-item label="监听频率">
+          <a-form-item :label="tr('监听频率')">
             <a-select v-model:value="monitorForm.intervalMinutes" :options="intervalOptions" />
-            <div class="settings-help">建议从 6 小时起步，高频任务更容易触发平台限制。</div>
+            <div class="settings-help">{{ tr("建议从 6 小时起步，高频任务更容易触发平台限制。") }}</div>
           </a-form-item>
         </div>
-        <a-form-item label="自动处理">
-          <a-switch v-model:checked="monitorForm.autoAnalyze" checked-children="采集后自动分析" un-checked-children="只采集不分析" />
+        <a-form-item :label="tr('自动处理')">
+          <a-switch v-model:checked="monitorForm.autoAnalyze" :checked-children="tr('采集后自动分析')" :un-checked-children="tr('只采集不分析')" />
           <div class="settings-help">{{ currentMonitorAnalysisTypeDescription }}</div>
         </a-form-item>
       </a-form>
@@ -442,23 +444,23 @@
 
     <a-modal
       :open="showCreateModal"
-      title="新建一次性采集"
+      :title="tr('新建一次性采集')"
       width="720px"
       :confirm-loading="creating"
-      ok-text="开始采集"
-      cancel-text="取消"
+      :ok-text="tr('开始采集')"
+      :cancel-text="tr('取消')"
       @cancel="showCreateModal = false"
       @ok="submitCrawlJob"
     >
       <a-form layout="vertical" class="import-form">
-        <a-form-item label="任务名称">
-          <a-input v-model:value="form.name" placeholder="例如：新品发布 YouTube 评论采集" />
+        <a-form-item :label="tr('任务名称')">
+          <a-input v-model:value="form.name" :placeholder="tr('例如：新品发布 YouTube 评论采集')" />
         </a-form-item>
-        <a-form-item label="内容名称">
-          <a-input v-model:value="form.productName" placeholder="可选，留空时会尽量从页面标题识别" />
+        <a-form-item :label="tr('内容名称')">
+          <a-input v-model:value="form.productName" :placeholder="tr('可选，留空时会尽量从页面标题识别')" />
         </a-form-item>
-        <a-form-item label="评论链接">
-          <a-input v-model:value="form.productUrl" placeholder="支持 Shopee 商品、YouTube 视频、TikTok 视频、Facebook 帖子/图片/Reel 链接" />
+        <a-form-item :label="tr('评论链接')">
+          <a-input v-model:value="form.productUrl" :placeholder="tr('支持 Shopee 商品、YouTube 视频、TikTok 视频、Facebook 帖子/图片/Reel 链接')" />
         </a-form-item>
         <a-alert
           class="platform-guide-alert"
@@ -468,17 +470,17 @@
           :description="crawlPlatformGuideDescription(form)"
         />
         <div class="monitor-form-grid">
-          <a-form-item label="来源渠道">
+          <a-form-item :label="tr('来源渠道')">
             <a-select v-model:value="form.sourceChannel" :options="sourceChannelOptions" />
           </a-form-item>
-          <a-form-item label="分析类型">
+          <a-form-item :label="tr('分析类型')">
             <a-select v-model:value="form.analysisType" :options="analysisTypeOptions" />
             <div class="settings-help">{{ crawlAnalysisTypeHint(form) }}</div>
           </a-form-item>
         </div>
-        <a-form-item label="最多采集条数">
+        <a-form-item :label="tr('最多采集条数')">
           <a-input-number v-model:value="form.maxReviews" :min="0" :max="20000" class="full-input" />
-          <div class="settings-help">填 0 表示不限；采集完成后会自动导入并启动 AI 分析。</div>
+          <div class="settings-help">{{ tr("填 0 表示不限；采集完成后会自动导入并启动 AI 分析。") }}</div>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -630,24 +632,24 @@ const monitorForm = reactive({
   autoAnalyze: true
 });
 
-const sourceChannelOptions = CRAWL_SOURCE_CHANNEL_PRESETS.map((channel) => ({
-  label: channel.label,
+const sourceChannelOptions = computed(() => CRAWL_SOURCE_CHANNEL_PRESETS.map((channel) => ({
+  label: tr(channel.label),
   value: channel.value
-}));
+})));
 
-const analysisTypeOptions = ANALYSIS_TYPE_PRESETS.map((item) => ({
-  label: item.label,
+const analysisTypeOptions = computed(() => ANALYSIS_TYPE_PRESETS.map((item) => ({
+  label: analysisTypeI18nLabel(item.value),
   value: item.value
-}));
+})));
 
-const intervalOptions = [
+const intervalOptions = computed(() => [
   { label: "每 30 分钟", value: 30 },
   { label: "每 1 小时", value: 60 },
   { label: "每 3 小时", value: 180 },
   { label: "每 6 小时", value: 360 },
   { label: "每 12 小时", value: 720 },
   { label: "每天", value: 1440 }
-];
+].map((item) => ({ ...item, label: tr(item.label) })));
 
 type CrawlEntryForm = {
   sourceChannel: string;
@@ -686,39 +688,39 @@ const crawlPlatformGuides: Record<CrawlSourceChannel, CrawlPlatformGuide> = {
 };
 
 const currentMonitorAnalysisTypeDescription = computed(() => {
-  return ANALYSIS_TYPE_PRESETS.find((item) => item.value === monitorForm.analysisType)?.description || "";
+  return t(`analysisType.${monitorForm.analysisType}Description`);
 });
 
-const columns = [
-  { title: "任务", key: "job", width: 360 },
-  { title: "状态", key: "status", width: 110 },
-  { title: "进度", key: "progress", width: 380 },
-  { title: "来源", key: "meta", width: 190 },
-  { title: "时间", key: "time", width: 170 },
-  { title: "错误", key: "error" },
-  { title: "操作", key: "actions", width: 260 }
-];
+const columns = computed(() => [
+  { title: tr("任务"), key: "job", width: 360 },
+  { title: tr("状态"), key: "status", width: 110 },
+  { title: tr("进度"), key: "progress", width: 380 },
+  { title: tr("来源"), key: "meta", width: 190 },
+  { title: tr("时间"), key: "time", width: 170 },
+  { title: tr("错误"), key: "error" },
+  { title: tr("操作"), key: "actions", width: 260 }
+]);
 
-const monitorColumns = [
-  { title: "监听对象", key: "monitor", width: 360 },
-  { title: "频率", key: "schedule", width: 210 },
-  { title: "状态", key: "status", width: 190 },
-  { title: "来源", key: "meta", width: 150 },
-  { title: "最近运行", key: "last", width: 190 },
-  { title: "错误", key: "error" },
-  { title: "操作", key: "actions", width: 220 }
-];
+const monitorColumns = computed(() => [
+  { title: tr("监听对象"), key: "monitor", width: 360 },
+  { title: tr("频率"), key: "schedule", width: 210 },
+  { title: tr("状态"), key: "status", width: 190 },
+  { title: tr("来源"), key: "meta", width: 150 },
+  { title: tr("最近运行"), key: "last", width: 190 },
+  { title: tr("错误"), key: "error" },
+  { title: tr("操作"), key: "actions", width: 220 }
+]);
 
 const crawlJobStatusOptions = computed(() => {
   const counts = crawlJobStatusCounts.value;
   return [
-    { label: `全部 ${formatCount(counts.all)}`, value: "all" },
-    { label: `运行中 ${formatCount(counts.active)}`, value: "active" },
-    { label: `排队 ${formatCount(counts.queued)}`, value: "queued" },
-    { label: `抓取中 ${formatCount(counts.running)}`, value: "running" },
-    { label: `已完成 ${formatCount(counts.completed)}`, value: "completed" },
-    { label: `失败 ${formatCount(counts.failed)}`, value: "failed" },
-    { label: `已分析 ${formatCount(counts.imported)}`, value: "imported" }
+    { label: `${tr("全部")} ${formatCount(counts.all)}`, value: "all" },
+    { label: `${tr("运行中")} ${formatCount(counts.active)}`, value: "active" },
+    { label: `${tr("排队")} ${formatCount(counts.queued)}`, value: "queued" },
+    { label: `${tr("抓取中")} ${formatCount(counts.running)}`, value: "running" },
+    { label: `${tr("已完成")} ${formatCount(counts.completed)}`, value: "completed" },
+    { label: `${tr("失败")} ${formatCount(counts.failed)}`, value: "failed" },
+    { label: `${tr("已分析")} ${formatCount(counts.imported)}`, value: "imported" }
   ];
 });
 
@@ -728,7 +730,7 @@ const crawlJobPagination = computed(() => ({
   total: crawlJobTotal.value,
   showSizeChanger: true,
   pageSizeOptions: ["12", "24", "50", "100"],
-  showTotal: (total: number) => `共 ${formatCount(total)} 个任务`
+  showTotal: (total: number) => tr(`共 ${formatCount(total)} 个任务`)
 }));
 
 const activeJobs = computed(() => jobs.value.filter((job) => ["queued", "running"].includes(job.status)));
@@ -1355,7 +1357,7 @@ async function refreshPageData(options: { silent?: boolean } = {}) {
       crawlerEnabled.value = true;
     }
     if (!options.silent && results.some((result) => result.status === "rejected")) {
-      message.warning("部分采集数据刷新失败，已保留上一次成功加载的记录。");
+      message.warning(tr("部分采集数据刷新失败，已保留上一次成功加载的记录。"));
     }
   } finally {
     loading.value = false;
@@ -1369,7 +1371,7 @@ async function startAnalysis(job: CrawlJobDTO) {
   startingId.value = job.id;
   try {
     const result = await startCrawlJobAnalysis(job.id);
-    message.success("已导入评论并加入分析队列");
+    message.success(tr("已导入评论并加入分析队列"));
     await loadJobs();
     openTaskById(result.taskId, result.run.id);
   } finally {
@@ -1386,7 +1388,7 @@ async function retryJob(job: CrawlJobDTO) {
     await retryCrawlJob(job.id);
     crawlJobStatusFilter.value = "active";
     crawlJobPage.value = 1;
-    message.success("已重新加入采集队列");
+    message.success(tr("已重新加入采集队列"));
     await loadJobs();
   } finally {
     retryingId.value = null;
@@ -1402,7 +1404,7 @@ async function removeJob(job: CrawlJobDTO) {
     await deleteCrawlJob(job.id);
     jobs.value = jobs.value.filter((item) => item.id !== job.id);
     writeWorkspaceCache("crawl-jobs", jobs.value);
-    message.success("采集记录已删除");
+    message.success(tr("采集记录已删除"));
     await loadJobs();
   } finally {
     deletingJobId.value = null;
@@ -1414,10 +1416,10 @@ function confirmRemoveJob(job: CrawlJobDTO) {
     return;
   }
   Modal.confirm({
-    title: "删除采集记录",
-    content: "已生成的分析任务不会被删除。",
-    okText: "删除",
-    cancelText: "取消",
+    title: tr("删除采集记录"),
+    content: tr("已生成的分析任务不会被删除。"),
+    okText: tr("删除"),
+    cancelText: tr("取消"),
     okButtonProps: { danger: true },
     async onOk() {
       await removeJob(job);
@@ -1466,7 +1468,7 @@ async function openCreateModal() {
     const setting = await loadCrawlerSettings();
     if (!setting.enabled) {
       showCreateModal.value = false;
-      message.warning("评论采集已在抓取设置中关闭。");
+      message.warning(tr("评论采集已在抓取设置中关闭。"));
       return;
     }
     form.sourceChannel = normalizeSourceChannel(setting.defaultSourceChannel);
@@ -1485,7 +1487,7 @@ async function openMonitorModal() {
     const setting = await loadCrawlerSettings();
     if (!setting.enabled) {
       showMonitorModal.value = false;
-      message.warning("评论采集已在抓取设置中关闭。");
+      message.warning(tr("评论采集已在抓取设置中关闭。"));
       return;
     }
     monitorForm.sourceChannel = normalizeSourceChannel(setting.defaultSourceChannel);
@@ -1551,16 +1553,16 @@ watch(
 
 async function submitCrawlJob() {
   if (!crawlerEnabled.value) {
-    message.warning("评论采集已在抓取设置中关闭。");
+    message.warning(tr("评论采集已在抓取设置中关闭。"));
     showCreateModal.value = false;
     return;
   }
   if (!form.name.trim()) {
-    message.error("请填写采集任务名称。");
+    message.error(tr("请填写采集任务名称。"));
     return;
   }
   if (!form.productUrl.trim()) {
-    message.error("请填写评论链接。");
+    message.error(tr("请填写评论链接。"));
     return;
   }
   creating.value = true;
@@ -1576,7 +1578,7 @@ async function submitCrawlJob() {
     });
     crawlJobStatusFilter.value = "active";
     crawlJobPage.value = 1;
-    message.success("评论采集已加入队列，完成后会自动导入并启动 AI 分析。");
+    message.success(tr("评论采集已加入队列，完成后会自动导入并启动 AI 分析。"));
     showCreateModal.value = false;
     await loadJobs();
   } finally {
@@ -1586,16 +1588,16 @@ async function submitCrawlJob() {
 
 async function submitCrawlMonitor() {
   if (!crawlerEnabled.value) {
-    message.warning("评论采集已在抓取设置中关闭。");
+    message.warning(tr("评论采集已在抓取设置中关闭。"));
     showMonitorModal.value = false;
     return;
   }
   if (!monitorForm.name.trim()) {
-    message.error("请填写监听任务名称。");
+    message.error(tr("请填写监听任务名称。"));
     return;
   }
   if (!monitorForm.productUrl.trim()) {
-    message.error("请填写评论链接。");
+    message.error(tr("请填写评论链接。"));
     return;
   }
   monitorCreating.value = true;
@@ -1612,7 +1614,7 @@ async function submitCrawlMonitor() {
     });
     monitors.value = [monitor, ...monitors.value.filter((item) => item.id !== monitor.id)];
     writeWorkspaceCache("crawl-monitors", monitors.value);
-    message.success("监听任务已创建，系统会自动发起首次采集。");
+    message.success(tr("监听任务已创建，系统会自动发起首次采集。"));
     showMonitorModal.value = false;
     await refreshPageData();
   } finally {
@@ -1624,7 +1626,7 @@ async function toggleMonitor(monitor: CrawlMonitorDTO, checked: boolean) {
   monitorActionId.value = monitor.id;
   try {
     await updateCrawlMonitor(monitor.id, { enabled: checked });
-    message.success(checked ? "监听任务已启用" : "监听任务已暂停");
+    message.success(checked ? tr("监听任务已启用") : tr("监听任务已暂停"));
     await loadMonitors();
   } finally {
     monitorActionId.value = null;
@@ -1637,7 +1639,7 @@ async function runMonitorNow(monitor: CrawlMonitorDTO) {
     await runCrawlMonitorNow(monitor.id);
     crawlJobStatusFilter.value = "active";
     crawlJobPage.value = 1;
-    message.success("已加入采集队列。");
+    message.success(tr("已加入采集队列。"));
     await refreshPageData();
   } finally {
     monitorActionId.value = null;
@@ -1649,10 +1651,10 @@ function removeMonitor(monitor: CrawlMonitorDTO) {
     return;
   }
   Modal.confirm({
-    title: "删除监听任务",
-    content: `确定删除监听任务「${monitor.name}」吗？历史采集记录和分析任务不会被删除。`,
-    okText: "删除",
-    cancelText: "取消",
+    title: tr("删除监听任务"),
+    content: tr(`确定删除监听任务「${monitor.name}」吗？历史采集记录和分析任务不会被删除。`),
+    okText: tr("删除"),
+    cancelText: tr("取消"),
     okButtonProps: { danger: true },
     async onOk() {
       monitorActionId.value = monitor.id;
@@ -1660,7 +1662,7 @@ function removeMonitor(monitor: CrawlMonitorDTO) {
         await deleteCrawlMonitor(monitor.id);
         monitors.value = monitors.value.filter((item) => item.id !== monitor.id);
         writeWorkspaceCache("crawl-monitors", monitors.value);
-        message.success("监听任务已删除");
+        message.success(tr("监听任务已删除"));
         await loadMonitors();
       } finally {
         monitorActionId.value = null;
