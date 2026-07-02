@@ -1,32 +1,32 @@
 <template>
   <div v-if="!selectedTask" class="empty-state">
-    <a-empty description="先创建分析项目并导入评论 CSV" />
+    <a-empty :description="tr('先创建分析项目并导入评论 CSV')" />
   </div>
 
   <div v-else class="review-page">
     <div class="page-toolbar review-hero">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">评论列表</div>
-        <div class="toolbar-subtitle">筛选、分组、保存视图，并把 AI 分析结果沉淀为团队可复用的评论视图。</div>
+        <div class="toolbar-title">{{ tr("评论列表") }}</div>
+        <div class="toolbar-subtitle">{{ tr("筛选、分组、保存视图，并把 AI 分析结果沉淀为团队可复用的评论视图。") }}</div>
       </div>
       <a-space wrap>
         <a-button @click="loadRuns">
           <template #icon><ReloadOutlined /></template>
-          刷新状态
+          {{ tr("刷新状态") }}
         </a-button>
         <a-button type="primary" @click="runAnalysis" :loading="running">
           <template #icon><RobotOutlined /></template>
-          发起分析
+          {{ tr("发起分析") }}
         </a-button>
         <a-button v-if="canCancelRun" danger @click="cancelAnalysis">
           <template #icon><StopOutlined /></template>
-          停止分析
+          {{ tr("停止分析") }}
         </a-button>
         <a-select
           v-if="resultRuns.length"
           v-model:value="selectedResultRunId"
           class="filter-select-lg"
-          placeholder="分析批次"
+          :placeholder="tr('分析批次')"
           @change="loadReviews"
         >
           <a-select-option v-for="run in resultRuns" :key="run.id" :value="run.id">
@@ -66,16 +66,16 @@
       :message="evidenceAlertMessage"
     >
       <template #action>
-        <a-button size="small" @click="clearEvidenceFilter">清除筛选</a-button>
+        <a-button size="small" @click="clearEvidenceFilter">{{ tr("清除筛选") }}</a-button>
       </template>
     </a-alert>
 
     <div class="analysis-progress-panel">
       <div class="analysis-progress-head">
-        <span>行动项</span>
-        <a-button size="small" @click="loadActionItems">刷新</a-button>
+        <span>{{ tr("行动项") }}</span>
+        <a-button size="small" @click="loadActionItems">{{ tr("刷新") }}</a-button>
       </div>
-      <a-empty v-if="!actionItems.length" description="暂无行动项" />
+      <a-empty v-if="!actionItems.length" :description="tr('暂无行动项')" />
       <div v-else class="view-strip">
         <button v-for="item in actionItems.slice(0, 8)" :key="item.id" type="button" class="view-pill">
           <span>{{ item.title }}</span>
@@ -94,114 +94,114 @@
         :class="{ 'view-pill-active': activeViewId === view.id }"
         @click="applySavedView(view.id)"
       >
-        <span>{{ view.name }}</span>
-        <a-tag v-if="view.isDefault" color="blue">默认</a-tag>
+        <span>{{ view.id === DEFAULT_VIEW_ID ? tr(view.name) : view.name }}</span>
+        <a-tag v-if="view.isDefault" color="blue">{{ tr("默认") }}</a-tag>
       </button>
-      <button type="button" class="view-pill view-pill-ghost" @click="clearActiveView">临时视图</button>
+      <button type="button" class="view-pill view-pill-ghost" @click="clearActiveView">{{ tr("临时视图") }}</button>
     </div>
 
     <div class="review-stats-grid">
       <div class="mini-stat-card mini-stat-warm">
-        <div class="mini-stat-label">筛选结果</div>
+        <div class="mini-stat-label">{{ tr("筛选结果") }}</div>
         <div class="mini-stat-value">{{ totalCount }}</div>
       </div>
       <div class="mini-stat-card mini-stat-cool">
-        <div class="mini-stat-label">当前载入</div>
+        <div class="mini-stat-label">{{ tr("当前载入") }}</div>
         <div class="mini-stat-value">{{ rows.length }}</div>
       </div>
       <div class="mini-stat-card mini-stat-ink">
-        <div class="mini-stat-label">带媒体评论</div>
+        <div class="mini-stat-label">{{ tr("带媒体评论") }}</div>
         <div class="mini-stat-value">{{ mediaCount }}</div>
       </div>
       <div class="mini-stat-card mini-stat-alert">
-        <div class="mini-stat-label">负向评论</div>
+        <div class="mini-stat-label">{{ tr("负向评论") }}</div>
         <div class="mini-stat-value">{{ negativeCount }}</div>
       </div>
     </div>
 
     <div class="page-toolbar review-controls">
       <a-space wrap>
-        <a-select v-model:value="filters.sentiment" allow-clear placeholder="情感" class="filter-select">
-          <a-select-option value="positive">正向</a-select-option>
-          <a-select-option value="neutral">中性</a-select-option>
-          <a-select-option value="negative">负向</a-select-option>
+        <a-select v-model:value="filters.sentiment" allow-clear :placeholder="tr('情感')" class="filter-select">
+          <a-select-option value="positive">{{ tr("正向") }}</a-select-option>
+          <a-select-option value="neutral">{{ tr("中性") }}</a-select-option>
+          <a-select-option value="negative">{{ tr("负向") }}</a-select-option>
         </a-select>
 
-        <a-select v-model:value="filters.intent" allow-clear placeholder="评论意图" class="filter-select">
+        <a-select v-model:value="filters.intent" allow-clear :placeholder="tr('评论意图')" class="filter-select">
           <a-select-option v-for="intent in intentOptions" :key="intent" :value="intent">{{ intent }}</a-select-option>
         </a-select>
 
-        <a-input v-model:value="filters.keyword" placeholder="关键词或标签" class="filter-input" allow-clear>
+        <a-input v-model:value="filters.keyword" :placeholder="tr('关键词或标签')" class="filter-input" allow-clear>
           <template #prefix><SearchOutlined /></template>
         </a-input>
 
-        <a-button type="primary" ghost @click="loadReviews" :loading="loading">筛选</a-button>
-        <a-button :disabled="!activeFilterCount" @click="resetFilters">重置</a-button>
-        <a-tag v-if="activeFilterCount" color="blue">已启用 {{ activeFilterCount }} 个筛选</a-tag>
+        <a-button type="primary" ghost @click="loadReviews" :loading="loading">{{ tr("筛选") }}</a-button>
+        <a-button :disabled="!activeFilterCount" @click="resetFilters">{{ tr("重置") }}</a-button>
+        <a-tag v-if="activeFilterCount" color="blue">{{ tr(`已启用 ${activeFilterCount} 个筛选`) }}</a-tag>
         <a-button @click="advancedFiltersOpen = true">
           <template #icon><SettingOutlined /></template>
-          更多筛选{{ advancedFilterCount ? `(${advancedFilterCount})` : "" }}
+          {{ tr("更多筛选") }}{{ advancedFilterCount ? `(${advancedFilterCount})` : "" }}
         </a-button>
       </a-space>
     </div>
 
-    <a-drawer :open="advancedFiltersOpen" width="min(420px, 100vw)" title="更多筛选与视图" @close="advancedFiltersOpen = false">
+    <a-drawer :open="advancedFiltersOpen" width="min(420px, 100vw)" :title="tr('更多筛选与视图')" @close="advancedFiltersOpen = false">
       <div class="advanced-filter-drawer">
         <section class="advanced-filter-section">
-          <div class="advanced-section-title">筛选条件</div>
+          <div class="advanced-section-title">{{ tr("筛选条件") }}</div>
           <div class="advanced-filter-grid">
-            <a-select v-model:value="filters.ratingStar" allow-clear placeholder="星级">
-              <a-select-option v-for="star in [1, 2, 3, 4, 5]" :key="star" :value="star">{{ star }} 星</a-select-option>
+            <a-select v-model:value="filters.ratingStar" allow-clear :placeholder="tr('星级')">
+              <a-select-option v-for="star in [1, 2, 3, 4, 5]" :key="star" :value="star">{{ tr(`${star} 星`) }}</a-select-option>
             </a-select>
-            <a-select v-model:value="filters.hasMedia" allow-clear placeholder="媒体">
-              <a-select-option :value="true">有图/视频</a-select-option>
-              <a-select-option :value="false">纯文本</a-select-option>
+            <a-select v-model:value="filters.hasMedia" allow-clear :placeholder="tr('媒体')">
+              <a-select-option :value="true">{{ tr("有图/视频") }}</a-select-option>
+              <a-select-option :value="false">{{ tr("纯文本") }}</a-select-option>
             </a-select>
-            <a-select v-model:value="filters.sourceChannel" allow-clear placeholder="来源" class="advanced-filter-wide">
+            <a-select v-model:value="filters.sourceChannel" allow-clear :placeholder="tr('来源')" class="advanced-filter-wide">
               <a-select-option v-for="source in sourceChannelOptions" :key="source" :value="source">{{ source }}</a-select-option>
             </a-select>
-            <a-select v-model:value="filters.analysisTag" allow-clear placeholder="AI 标签" class="advanced-filter-wide">
+            <a-select v-model:value="filters.analysisTag" allow-clear :placeholder="tr('AI 标签')" class="advanced-filter-wide">
               <a-select-option v-for="tag in analysisTagOptions" :key="tag" :value="tag">{{ tag }}</a-select-option>
             </a-select>
-            <div class="settings-help advanced-filter-wide">覆盖该任务全部 {{ sourceChannelOptions.length }} 个来源</div>
+            <div class="settings-help advanced-filter-wide">{{ tr(`覆盖该任务全部 ${sourceChannelOptions.length} 个来源`) }}</div>
           </div>
         </section>
 
         <section class="advanced-filter-section">
-          <div class="advanced-section-title">视图方式</div>
+          <div class="advanced-section-title">{{ tr("视图方式") }}</div>
           <a-space wrap>
             <a-select v-model:value="groupBy" class="filter-select-lg">
-              <a-select-option value="sentiment">按情感分组</a-select-option>
-              <a-select-option value="ratingStar">按星级分组</a-select-option>
-              <a-select-option value="analysisTag">按 AI 标签分组</a-select-option>
-              <a-select-option value="intent">按评论意图分组</a-select-option>
+              <a-select-option value="sentiment">{{ tr("按情感分组") }}</a-select-option>
+              <a-select-option value="ratingStar">{{ tr("按星级分组") }}</a-select-option>
+              <a-select-option value="analysisTag">{{ tr("按 AI 标签分组") }}</a-select-option>
+              <a-select-option value="intent">{{ tr("按评论意图分组") }}</a-select-option>
             </a-select>
             <a-segmented v-model:value="viewMode" :options="viewOptions" />
           </a-space>
         </section>
 
         <section class="advanced-filter-section">
-          <div class="advanced-section-title">显示列</div>
+          <div class="advanced-section-title">{{ tr("显示列") }}</div>
           <div class="column-menu column-menu-inline">
             <a-checkbox-group v-model:value="visibleColumnKeys" :options="columnOptions" />
           </div>
         </section>
 
         <section class="advanced-filter-section">
-          <div class="advanced-section-title">视图操作</div>
+          <div class="advanced-section-title">{{ tr("视图操作") }}</div>
           <a-space wrap>
-            <a-button type="primary" ghost @click="loadReviews" :loading="loading">应用筛选</a-button>
+            <a-button type="primary" ghost @click="loadReviews" :loading="loading">{{ tr("应用筛选") }}</a-button>
             <a-button @click="saveCurrentView">
               <template #icon><SaveOutlined /></template>
-              保存视图
+              {{ tr("保存视图") }}
             </a-button>
             <a-button @click="handleExport" :loading="exporting">
               <template #icon><DownloadOutlined /></template>
-              导出当前结果
+              {{ tr("导出当前结果") }}
             </a-button>
             <a-button @click="setCurrentAsDefault" :disabled="!activeViewId">
               <template #icon><StarOutlined /></template>
-              设为默认
+              {{ tr("设为默认") }}
             </a-button>
           </a-space>
         </section>
@@ -228,7 +228,7 @@
             </a-space>
           </template>
           <template v-else-if="column.key === 'sentiment'">
-            <a-tag :color="sentimentColor(record.sentiment)">{{ sentimentLabel(record.sentiment) }}</a-tag>
+            <a-tag :color="sentimentColor(record.sentiment)">{{ tr(sentimentLabel(record.sentiment)) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'intentLabels'">
             <a-space wrap>
@@ -244,7 +244,7 @@
             </a-tooltip>
           </template>
           <template v-else-if="column.key === 'hasMedia'">
-            <a-tag :color="record.hasMedia ? 'blue' : 'default'">{{ record.hasMedia ? "有" : "无" }}</a-tag>
+            <a-tag :color="record.hasMedia ? 'blue' : 'default'">{{ tr(record.hasMedia ? "有" : "无") }}</a-tag>
           </template>
           <template v-else>
             {{ displayCell(record, column.key) }}
@@ -257,15 +257,15 @@
       <article v-for="row in rows" :key="row.id" class="review-mobile-card" @click="selectedRow = row">
         <div class="review-mobile-head">
           <div>
-            <div class="review-mobile-title">{{ row.productName || row.sourceChannel || "评论" }}</div>
+            <div class="review-mobile-title">{{ row.productName || row.sourceChannel || tr("评论") }}</div>
             <div class="review-mobile-meta">{{ row.commentTime || "-" }} · {{ row.sourceChannel }}</div>
           </div>
-          <a-tag :color="sentimentColor(row.sentiment)">{{ sentimentLabel(row.sentiment) }}</a-tag>
+          <a-tag :color="sentimentColor(row.sentiment)">{{ tr(sentimentLabel(row.sentiment)) }}</a-tag>
         </div>
         <div class="review-mobile-comment">{{ row.summary || truncate(row.comment, 110) }}</div>
         <div class="review-mobile-tags">
           <a-rate :value="row.ratingStar" disabled />
-          <a-tag v-if="row.hasMedia" color="blue">有媒体</a-tag>
+          <a-tag v-if="row.hasMedia" color="blue">{{ tr("有媒体") }}</a-tag>
           <a-tag v-for="tag in row.analysisTags.slice(0, 2)" :key="tag">{{ tag }}</a-tag>
         </div>
       </article>
@@ -284,8 +284,8 @@
       <div v-for="group in groupedRows" :key="group.key" class="group-card">
         <div class="group-header">
           <div>
-            <div class="group-title">{{ group.label }}</div>
-            <div class="group-subtitle">全量 {{ group.totalCount }} 条，当前样本 {{ group.items.length }} 条</div>
+            <div class="group-title">{{ tr(group.label) }}</div>
+            <div class="group-subtitle">{{ tr(`全量 ${group.totalCount} 条，当前样本 ${group.items.length} 条`) }}</div>
           </div>
           <a-tag color="blue">{{ group.totalCount }}</a-tag>
         </div>
@@ -298,7 +298,7 @@
             </div>
             <div class="group-item-summary">{{ item.summary || truncate(item.comment, 96) }}</div>
             <div class="group-item-tags">
-              <a-tag :color="sentimentColor(item.sentiment)">{{ sentimentLabel(item.sentiment) }}</a-tag>
+              <a-tag :color="sentimentColor(item.sentiment)">{{ tr(sentimentLabel(item.sentiment)) }}</a-tag>
               <a-tag v-for="tag in item.analysisTags.slice(0, 3)" :key="tag">{{ tag }}</a-tag>
             </div>
           </div>
@@ -306,41 +306,41 @@
       </div>
     </div>
 
-    <a-drawer :open="Boolean(selectedRow)" width="680" title="评论详情" @close="selectedRow = null">
+    <a-drawer :open="Boolean(selectedRow)" width="680" :title="tr('评论详情')" @close="selectedRow = null">
       <template v-if="selectedRow">
         <a-descriptions bordered :column="1" size="small">
-          <a-descriptions-item label="评论 ID">{{ selectedRow.cmtId }}</a-descriptions-item>
-          <a-descriptions-item label="评分">{{ selectedRow.ratingStar }}</a-descriptions-item>
-          <a-descriptions-item label="规格">{{ selectedRow.variantName || "-" }}</a-descriptions-item>
-          <a-descriptions-item label="来源">{{ selectedRow.sourceChannel }}</a-descriptions-item>
-          <a-descriptions-item label="评论时间">{{ selectedRow.commentTime || "-" }}</a-descriptions-item>
-          <a-descriptions-item label="媒体">{{ selectedRow.hasMedia ? "有" : "无" }}</a-descriptions-item>
-          <a-descriptions-item label="原始评论">{{ selectedRow.comment }}</a-descriptions-item>
-          <a-descriptions-item label="翻译评论">{{ selectedRow.commentTr || "-" }}</a-descriptions-item>
-          <a-descriptions-item label="AI 摘要">{{ selectedRow.summary || "-" }}</a-descriptions-item>
-          <a-descriptions-item label="AI 情感">{{ sentimentLabel(selectedRow.sentiment) }}</a-descriptions-item>
-          <a-descriptions-item label="AI 标签">{{ selectedRow.analysisTags.join("、") || "-" }}</a-descriptions-item>
-          <a-descriptions-item label="评论意图">{{ selectedRow.intentLabels.join("、") || "-" }}</a-descriptions-item>
-          <a-descriptions-item label="关键词">{{ selectedRow.keywords.join("、") || "-" }}</a-descriptions-item>
-          <a-descriptions-item label="问题点">{{ selectedRow.painPoints.join("、") || "-" }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('评论 ID')">{{ selectedRow.cmtId }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('评分')">{{ selectedRow.ratingStar }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('规格')">{{ selectedRow.variantName || "-" }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('来源')">{{ selectedRow.sourceChannel }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('评论时间')">{{ selectedRow.commentTime || "-" }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('媒体')">{{ tr(selectedRow.hasMedia ? "有" : "无") }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('原始评论')">{{ selectedRow.comment }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('翻译评论')">{{ selectedRow.commentTr || "-" }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('AI 摘要')">{{ selectedRow.summary || "-" }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('AI 情感')">{{ tr(sentimentLabel(selectedRow.sentiment)) }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('AI 标签')">{{ selectedRow.analysisTags.join("、") || "-" }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('评论意图')">{{ selectedRow.intentLabels.join("、") || "-" }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('关键词')">{{ selectedRow.keywords.join("、") || "-" }}</a-descriptions-item>
+          <a-descriptions-item :label="tr('问题点')">{{ selectedRow.painPoints.join("、") || "-" }}</a-descriptions-item>
         </a-descriptions>
         <div class="drawer-actions">
-          <a-button type="primary" @click="createActionFromSelectedRow">转为行动项</a-button>
+          <a-button type="primary" @click="createActionFromSelectedRow">{{ tr("转为行动项") }}</a-button>
         </div>
       </template>
     </a-drawer>
 
     <a-modal
       :open="saveViewModalOpen"
-      title="保存筛选视图"
-      ok-text="保存"
-      cancel-text="取消"
+      :title="tr('保存筛选视图')"
+      :ok-text="tr('保存')"
+      :cancel-text="tr('取消')"
       @ok="confirmSaveView"
       @cancel="saveViewModalOpen = false"
     >
       <a-form layout="vertical">
-        <a-form-item label="视图名称">
-          <a-input v-model:value="pendingViewName" placeholder="例如：负向问题评论 / 5 星好评 / 带图评论" />
+        <a-form-item :label="tr('视图名称')">
+          <a-input v-model:value="pendingViewName" :placeholder="tr('例如：负向问题评论 / 5 星好评 / 带图评论')" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -401,6 +401,14 @@ type ColumnKey =
   | "analysisTags"
   | "intentLabels"
   | "sentiment";
+
+type ReviewColumn = {
+  title: string;
+  dataIndex: ColumnKey;
+  key: ColumnKey;
+  width: number;
+  sorter?: boolean;
+};
 
 type SavedView = {
   id: string;
@@ -472,31 +480,41 @@ const sortState = reactive({
   sortOrder: "desc" as "asc" | "desc"
 });
 
-const viewOptions = [
-  { label: "表格", value: "table" },
-  { label: "分组", value: "grouped" }
+const allColumnKeys: ColumnKey[] = [
+  "rowNo",
+  "cmtId",
+  "productName",
+  "variantName",
+  "comment",
+  "commentTime",
+  "ratingStar",
+  "sourceChannel",
+  "hasMedia",
+  "analysisTags",
+  "intentLabels",
+  "sentiment"
 ];
-
-const allColumns = [
-  { title: "编号", dataIndex: "rowNo", key: "rowNo", width: 90 },
-  { title: "评论ID", dataIndex: "cmtId", key: "cmtId", width: 110 },
-  { title: "商品名称", dataIndex: "productName", key: "productName", width: 200 },
-  { title: "规格/颜色", dataIndex: "variantName", key: "variantName", width: 140 },
-  { title: "用户评价", dataIndex: "comment", key: "comment", width: 380 },
-  { title: "评论时间", dataIndex: "commentTime", key: "commentTime", width: 180, sorter: true },
-  { title: "评级", dataIndex: "ratingStar", key: "ratingStar", width: 160, sorter: true },
-  { title: "渠道", dataIndex: "sourceChannel", key: "sourceChannel", width: 120 },
-  { title: "媒体", dataIndex: "hasMedia", key: "hasMedia", width: 100 },
-  { title: "AI 标签", dataIndex: "analysisTags", key: "analysisTags", width: 220 },
-  { title: "评论意图", dataIndex: "intentLabels", key: "intentLabels", width: 200 },
-  { title: "AI 情感", dataIndex: "sentiment", key: "sentiment", width: 120, sorter: true }
-] as const;
-
-const columnOptions = allColumns.map((column) => ({ label: column.title, value: column.key }));
-const defaultVisibleColumnKeys: ColumnKey[] = allColumns
-  .filter((column) => column.key !== "cmtId")
-  .map((column) => column.key);
+const defaultVisibleColumnKeys: ColumnKey[] = allColumnKeys.filter((key) => key !== "cmtId");
 const visibleColumnKeys = ref<ColumnKey[]>([...defaultVisibleColumnKeys]);
+const viewOptions = computed(() => [
+  { label: tr("表格"), value: "table" },
+  { label: tr("分组"), value: "grouped" }
+]);
+const allColumns = computed<ReviewColumn[]>(() => [
+  { title: tr("编号"), dataIndex: "rowNo", key: "rowNo", width: 90 },
+  { title: tr("评论ID"), dataIndex: "cmtId", key: "cmtId", width: 110 },
+  { title: tr("商品名称"), dataIndex: "productName", key: "productName", width: 200 },
+  { title: tr("规格/颜色"), dataIndex: "variantName", key: "variantName", width: 140 },
+  { title: tr("用户评价"), dataIndex: "comment", key: "comment", width: 380 },
+  { title: tr("评论时间"), dataIndex: "commentTime", key: "commentTime", width: 180, sorter: true },
+  { title: tr("评级"), dataIndex: "ratingStar", key: "ratingStar", width: 160, sorter: true },
+  { title: tr("渠道"), dataIndex: "sourceChannel", key: "sourceChannel", width: 120 },
+  { title: tr("媒体"), dataIndex: "hasMedia", key: "hasMedia", width: 100 },
+  { title: tr("AI 标签"), dataIndex: "analysisTags", key: "analysisTags", width: 220 },
+  { title: tr("评论意图"), dataIndex: "intentLabels", key: "intentLabels", width: 200 },
+  { title: tr("AI 情感"), dataIndex: "sentiment", key: "sentiment", width: 120, sorter: true }
+]);
+const columnOptions = computed(() => allColumns.value.map((column) => ({ label: column.title, value: column.key })));
 const intentOptions = computed(() =>
   [...new Set([...reviewFacets.value.intentLabels, ...rows.value.flatMap((item) => item.intentLabels || [])])]
     .filter(Boolean)
@@ -515,7 +533,7 @@ const sourceChannelOptions = computed(() =>
 const totalCount = computed(() => pagination.total || 0);
 const mediaCount = computed(() => reviewStats.value.mediaCount);
 const negativeCount = computed(() => reviewStats.value.negativeCount);
-const visibleColumns = computed(() => allColumns.filter((column) => visibleColumnKeys.value.includes(column.key)));
+const visibleColumns = computed(() => allColumns.value.filter((column) => visibleColumnKeys.value.includes(column.key)));
 const advancedFilterCount = computed(() =>
   [filters.ratingStar, filters.hasMedia, filters.sourceChannel, filters.analysisTag].filter((value) => value !== undefined && value !== "").length
 );
@@ -544,9 +562,11 @@ function runProgressSummary(run: AnalysisRunDTO) {
 const evidenceAlertMessage = computed(() => {
   if (evidenceReviewIds.value.length) {
     const label = evidenceLabel.value || evidenceTypeLabel(evidenceType.value);
-    return `正在查看${label ? `「${label}」` : ""}关联的 ${evidenceReviewIds.value.length} 条评论证据`;
+    return label
+      ? tr(`正在查看「${label}」关联的 ${evidenceReviewIds.value.length} 条评论证据`)
+      : tr(`正在查看 ${evidenceReviewIds.value.length} 条评论证据`);
   }
-  return `正在查看「${evidenceLabel.value || evidenceIssue.value}」相关评论证据`;
+  return tr(`正在查看「${evidenceLabel.value || evidenceIssue.value}」相关评论证据`);
 });
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -619,7 +639,7 @@ function buildDefaultView(): SavedView {
 function savedViewFromDto(view: SavedReviewViewDTO): SavedView {
   const filters = view.filters as SavedView["filters"];
   const visibleColumnKeys = view.visibleColumnKeys.filter((key): key is ColumnKey =>
-    allColumns.some((column) => column.key === key)
+    allColumns.value.some((column) => column.key === key)
   );
   return {
     id: view.id,
@@ -721,7 +741,7 @@ async function confirmSaveView() {
     return;
   }
   if (!pendingViewName.value.trim()) {
-    message.error("请输入视图名称。");
+    message.error(tr("请输入视图名称。"));
     return;
   }
 
@@ -732,18 +752,18 @@ async function confirmSaveView() {
   activeViewId.value = createdView.id;
   saveViewModalOpen.value = false;
   pendingViewName.value = "";
-  message.success("视图已保存。");
+  message.success(tr("视图已保存。"));
 }
 
 async function setCurrentAsDefault() {
   if (!selectedTask.value || !activeViewId.value) {
-    message.warning("请先选择一个已保存视图。");
+    message.warning(tr("请先选择一个已保存视图。"));
     return;
   }
 
   await updateSavedView(selectedTask.value.id, activeViewId.value, { isDefault: true });
   savedViews.value = (await fetchSavedViews(selectedTask.value.id)).map(savedViewFromDto);
-  message.success("默认视图已更新。");
+  message.success(tr("默认视图已更新。"));
 }
 
 function truncate(value: string, max: number) {
@@ -952,7 +972,7 @@ async function loadRuns() {
         if (!latestRun.value || !["queued", "running"].includes(latestRun.value.status)) {
           running.value = false;
           stopPolling();
-          message.success("分析已完成，列表已刷新。");
+          message.success(tr("分析已完成，列表已刷新。"));
         }
       }, 5000);
     }
@@ -1025,11 +1045,11 @@ async function runAnalysis() {
   running.value = true;
   try {
     await createRun(selectedTask.value.id);
-    message.success("分析任务已提交，系统会自动轮询状态。");
+    message.success(tr("分析任务已提交，系统会自动轮询状态。"));
     await loadRuns();
   } catch {
     running.value = false;
-    message.error("发起分析失败。");
+    message.error(tr("发起分析失败。"));
   }
 }
 
@@ -1042,9 +1062,9 @@ async function cancelAnalysis() {
     latestRun.value = await cancelRun(selectedTask.value.id, latestRun.value.id);
     running.value = false;
     stopPolling();
-    message.success("分析已停止。");
+    message.success(tr("分析已停止。"));
   } catch {
-    message.error("停止分析失败，请稍后重试。");
+    message.error(tr("停止分析失败，请稍后重试。"));
   }
 }
 
@@ -1062,7 +1082,7 @@ async function createActionFromSelectedRow() {
     relatedReviewIds: [row.id]
   });
   await loadActionItems();
-  message.success("已创建行动项。");
+  message.success(tr("已创建行动项。"));
 }
 
 async function handleExport() {
@@ -1093,7 +1113,7 @@ async function handleExport() {
     link.remove();
     URL.revokeObjectURL(url);
   } catch {
-    message.error("导出失败，当前筛选条件可能没有评论。");
+    message.error(tr("导出失败，当前筛选条件可能没有评论。"));
   } finally {
     exporting.value = false;
   }

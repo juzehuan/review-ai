@@ -115,6 +115,30 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "提示词与模型": "Prompts & models",
     "抓取设置": "Crawler settings",
     "评论明细": "Comment details",
+    "筛选、分组、保存视图，并把 AI 分析结果沉淀为团队可复用的评论视图。": "Filter, group, save views, and turn AI analysis results into reusable team comment views.",
+    "刷新状态": "Refresh status",
+    "发起分析": "Start analysis",
+    "清除筛选": "Clear filters",
+    "默认": "Default",
+    "临时视图": "Temporary view",
+    "筛选结果": "Filtered results",
+    "当前载入": "Currently loaded",
+    "带媒体评论": "Comments with media",
+    "筛选条件": "Filter conditions",
+    "有图/视频": "Images / videos",
+    "纯文本": "Text only",
+    "视图方式": "View mode",
+    "按情感分组": "Group by sentiment",
+    "按星级分组": "Group by stars",
+    "按 AI 标签分组": "Group by AI tags",
+    "按评论意图分组": "Group by comment intent",
+    "显示列": "Visible columns",
+    "视图操作": "View actions",
+    "应用筛选": "Apply filters",
+    "保存视图": "Save view",
+    "导出当前结果": "Export current results",
+    "设为默认": "Set as default",
+    "转为行动项": "Create action item",
     "更多筛选与视图": "More filters and views",
     "保存筛选视图": "Save filter view",
     "视图名称": "View name",
@@ -1096,6 +1120,30 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "提示词与模型": "พรอมป์และโมเดล",
     "抓取设置": "ตั้งค่าการเก็บข้อมูล",
     "评论明细": "รายละเอียดคอมเมนต์",
+    "筛选、分组、保存视图，并把 AI 分析结果沉淀为团队可复用的评论视图。": "กรอง จัดกลุ่ม บันทึกมุมมอง และเปลี่ยนผลวิเคราะห์ AI ให้เป็นมุมมองคอมเมนต์ที่ทีมใช้ซ้ำได้",
+    "刷新状态": "รีเฟรชสถานะ",
+    "发起分析": "เริ่มวิเคราะห์",
+    "清除筛选": "ล้างตัวกรอง",
+    "默认": "ค่าเริ่มต้น",
+    "临时视图": "มุมมองชั่วคราว",
+    "筛选结果": "ผลลัพธ์หลังกรอง",
+    "当前载入": "โหลดปัจจุบัน",
+    "带媒体评论": "คอมเมนต์พร้อมสื่อ",
+    "筛选条件": "เงื่อนไขตัวกรอง",
+    "有图/视频": "มีรูป/วิดีโอ",
+    "纯文本": "ข้อความล้วน",
+    "视图方式": "รูปแบบมุมมอง",
+    "按情感分组": "จัดกลุ่มตามความรู้สึก",
+    "按星级分组": "จัดกลุ่มตามดาว",
+    "按 AI 标签分组": "จัดกลุ่มตามแท็ก AI",
+    "按评论意图分组": "จัดกลุ่มตามเจตนาคอมเมนต์",
+    "显示列": "คอลัมน์ที่แสดง",
+    "视图操作": "การทำงานของมุมมอง",
+    "应用筛选": "ใช้ตัวกรอง",
+    "保存视图": "บันทึกมุมมอง",
+    "导出当前结果": "ส่งออกผลลัพธ์ปัจจุบัน",
+    "设为默认": "ตั้งเป็นค่าเริ่มต้น",
+    "转为行动项": "แปลงเป็นงานติดตาม",
     "更多筛选与视图": "ตัวกรองและมุมมองเพิ่มเติม",
     "保存筛选视图": "บันทึกมุมมองตัวกรอง",
     "视图名称": "ชื่อมุมมอง",
@@ -2032,6 +2080,30 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">): s
   const commentCount = value.match(/^(\d+)\s*条评论$/);
   if (commentCount) {
     return locale === "en-US" ? `${commentCount[1]} comments` : `${commentCount[1]} คอมเมนต์`;
+  }
+  const starCount = value.match(/^(\d+)\s*星$/);
+  if (starCount) {
+    return locale === "en-US" ? `${starCount[1]} star${starCount[1] === "1" ? "" : "s"}` : `${starCount[1]} ดาว`;
+  }
+  const activeFilterCount = value.match(/^已启用\s+(\d+)\s+个筛选$/);
+  if (activeFilterCount) {
+    return locale === "en-US" ? `${activeFilterCount[1]} filters enabled` : `เปิดใช้ตัวกรอง ${activeFilterCount[1]} รายการ`;
+  }
+  const linkedEvidenceCount = value.match(/^正在查看「(.+)」关联的\s+([\d,]+)\s+条评论证据$/);
+  if (linkedEvidenceCount) {
+    const label = staticText[locale][linkedEvidenceCount[1]] || linkedEvidenceCount[1];
+    return locale === "en-US"
+      ? `Viewing ${linkedEvidenceCount[2]} comment evidence items linked to "${label}"`
+      : `กำลังดูหลักฐานคอมเมนต์ ${linkedEvidenceCount[2]} รายการที่เกี่ยวข้องกับ "${label}"`;
+  }
+  const evidenceCount = value.match(/^正在查看\s+([\d,]+)\s+条评论证据$/);
+  if (evidenceCount) {
+    return locale === "en-US" ? `Viewing ${evidenceCount[1]} comment evidence items` : `กำลังดูหลักฐานคอมเมนต์ ${evidenceCount[1]} รายการ`;
+  }
+  const relatedEvidence = value.match(/^正在查看「(.+)」相关评论证据$/);
+  if (relatedEvidence) {
+    const label = staticText[locale][relatedEvidence[1]] || relatedEvidence[1];
+    return locale === "en-US" ? `Viewing comment evidence related to "${label}"` : `กำลังดูหลักฐานคอมเมนต์ที่เกี่ยวข้องกับ "${label}"`;
   }
   const headerComments = value.match(/^评论\s+([\d,]+)$/);
   if (headerComments) {
