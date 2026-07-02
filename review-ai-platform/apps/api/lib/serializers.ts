@@ -93,7 +93,7 @@ function readOptionalScalarString(value: unknown) {
   return null;
 }
 
-function readCrawlTotalComments(rawResult: Record<string, unknown> | null) {
+export function readCrawlTotalComments(rawResult: Record<string, unknown> | null) {
   const directTotal = readOptionalNumber(rawResult?.totalComments);
   if (directTotal !== null) {
     return directTotal;

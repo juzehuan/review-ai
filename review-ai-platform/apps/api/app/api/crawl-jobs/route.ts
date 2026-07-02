@@ -13,7 +13,7 @@ import { resolvedCrawlerSettingFromRecord, normalizeRequestedCrawlInput, support
 import { writeAuditLog } from "@/lib/audit-log";
 import { fail, ok } from "@/lib/http";
 import { getPlatformCrawlerSetting } from "@/lib/platform-settings";
-import { serializeCrawlJob } from "@/lib/serializers";
+import { readCrawlTotalComments, serializeCrawlJob } from "@/lib/serializers";
 import { canAccessAllWorkspaces, getWorkspaceContext, requireWorkspaceRole } from "@/lib/workspace";
 
 const CRAWL_JOB_STATUSES = ["queued", "running", "completed", "failed", "imported"] as const satisfies readonly CrawlJobStatus[];
@@ -67,6 +67,29 @@ function buildCrawlJobStatusCounts(groups: Array<{ status: CrawlJobStatus; _coun
   return counts;
 }
 
+function rawObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function summarizeCrawlCoverageGaps(rows: Array<{ fetchedRows: number; rawResult: Prisma.JsonValue | null }>) {
+  let platformRemainingRows = 0;
+  let platformUncoveredJobCount = 0;
+
+  for (const row of rows) {
+    const totalComments = readCrawlTotalComments(rawObject(row.rawResult));
+    if (totalComments === null || totalComments <= 0) {
+      continue;
+    }
+    const remainingRows = Math.max(0, totalComments - row.fetchedRows);
+    if (remainingRows > 0) {
+      platformRemainingRows += remainingRows;
+      platformUncoveredJobCount += 1;
+    }
+  }
+
+  return { platformRemainingRows, platformUncoveredJobCount };
+}
+
 export async function GET(request: Request) {
   const context = await getWorkspaceContext(request);
   if (context.response || !context.workspace) {
@@ -84,7 +107,7 @@ export async function GET(request: Request) {
     ...baseWhere,
     ...crawlJobStatusWhere(status)
   };
-  const [jobs, total, statusGroups, totalsAggregate] = await Promise.all([
+  const [jobs, total, statusGroups, totalsAggregate, coverageGapRows] = await Promise.all([
     prisma.crawlJob.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -116,8 +139,19 @@ export async function GET(request: Request) {
         importedRows: true,
         skippedDuplicate: true
       }
+    }),
+    prisma.crawlJob.findMany({
+      where: {
+        ...baseWhere,
+        status: { in: ["completed", "imported"] }
+      },
+      select: {
+        fetchedRows: true,
+        rawResult: true
+      }
     })
   ]);
+  const coverageGapTotals = summarizeCrawlCoverageGaps(coverageGapRows);
 
   if (targetJobId && !jobs.some((job) => job.id === targetJobId)) {
     const targetJob = await prisma.crawlJob.findFirst({
@@ -152,7 +186,8 @@ export async function GET(request: Request) {
     totals: {
       fetchedRows: totalsAggregate._sum.fetchedRows || 0,
       importedRows: totalsAggregate._sum.importedRows || 0,
-      skippedDuplicate: totalsAggregate._sum.skippedDuplicate || 0
+      skippedDuplicate: totalsAggregate._sum.skippedDuplicate || 0,
+      ...coverageGapTotals
     },
     updatedAt: new Date().toISOString()
   });

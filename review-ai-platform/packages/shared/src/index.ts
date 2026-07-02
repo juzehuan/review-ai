@@ -378,6 +378,8 @@ export interface CrawlJobListTotalsDTO {
   fetchedRows: number;
   importedRows: number;
   skippedDuplicate: number;
+  platformRemainingRows: number;
+  platformUncoveredJobCount: number;
 }
 
 export interface CrawlJobListResponse {

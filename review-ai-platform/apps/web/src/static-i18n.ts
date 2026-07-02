@@ -283,6 +283,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "平台剩余": "Platform remaining",
     "未覆盖评论": "Uncovered comments",
     "当前页暂无覆盖缺口": "No coverage gap on this page",
+    "暂无覆盖缺口": "No coverage gap",
     "重复跳过": "Duplicates skipped",
     "疑似无更新": "Likely no update",
     "活跃采集量": "Active crawl volume",
@@ -1404,6 +1405,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "平台剩余": "เหลือบนแพลตฟอร์ม",
     "未覆盖评论": "คอมเมนต์ที่ยังไม่ครอบคลุม",
     "当前页暂无覆盖缺口": "หน้านี้ไม่มีช่องว่างความครอบคลุม",
+    "暂无覆盖缺口": "ไม่มีช่องว่างความครอบคลุม",
     "重复跳过": "ข้ามรายการซ้ำ",
     "疑似无更新": "อาจไม่มีอัปเดต",
     "活跃采集量": "ปริมาณที่กำลังเก็บ",
@@ -2679,6 +2681,12 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">): s
     return locale === "en-US"
       ? `${uncoveredPageCrawlJobs[1]} tasks on this page still have uncovered comments`
       : `งานในหน้านี้ ${uncoveredPageCrawlJobs[1]} งานยังมีคอมเมนต์ที่ไม่ครอบคลุม`;
+  }
+  const uncoveredCrawlJobs = value.match(/^([\d,]+)\s+个采集任务未覆盖完$/);
+  if (uncoveredCrawlJobs) {
+    return locale === "en-US"
+      ? `${uncoveredCrawlJobs[1]} crawl tasks still have uncovered comments`
+      : `งานเก็บข้อมูล ${uncoveredCrawlJobs[1]} งานยังมีคอมเมนต์ที่ไม่ครอบคลุม`;
   }
   const runningJobs = value.match(/^([\d,]+)\s+个运行中$/);
   if (runningJobs) {

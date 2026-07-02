@@ -588,7 +588,9 @@ const crawlJobStatusCounts = ref<CrawlJobStatusCounts>(crawlJobStatusCountsFromR
 const crawlJobTotals = ref({
   fetchedRows: jobs.value.reduce((total, job) => total + job.fetchedRows, 0),
   importedRows: jobs.value.reduce((total, job) => total + job.importedRows, 0),
-  skippedDuplicate: jobs.value.reduce((total, job) => total + job.skippedDuplicate, 0)
+  skippedDuplicate: jobs.value.reduce((total, job) => total + job.skippedDuplicate, 0),
+  platformRemainingRows: jobs.value.reduce((total, job) => total + (job.platformRemainingRows || 0), 0),
+  platformUncoveredJobCount: jobs.value.filter((job) => ["completed", "imported"].includes(job.status) && (job.platformRemainingRows || 0) > 0).length
 });
 
 function workspaceCacheKey(kind: string) {
@@ -782,13 +784,10 @@ const currentFetchRateText = computed(() => {
 const fetchRateNote = computed(() => {
   return activeFetchRates.value.length ? `${activeFetchRates.value.length} 个任务有速度回传` : "等待采集器回传速度";
 });
-const coverageGapJobs = computed(() =>
-  jobs.value.filter((job) => ["completed", "imported"].includes(job.status) && (job.platformRemainingRows || 0) > 0)
-);
-const coverageGapRows = computed(() => coverageGapJobs.value.reduce((total, job) => total + (job.platformRemainingRows || 0), 0));
+const coverageGapRows = computed(() => crawlJobTotals.value.platformRemainingRows);
 const coverageGapText = computed(() => (coverageGapRows.value > 0 ? `约 ${formatCount(coverageGapRows.value)} 条` : "-"));
 const coverageGapNote = computed(() =>
-  coverageGapJobs.value.length ? `${coverageGapJobs.value.length} 个当前页任务未覆盖完` : "当前页暂无覆盖缺口"
+  crawlJobTotals.value.platformUncoveredJobCount ? `${crawlJobTotals.value.platformUncoveredJobCount} 个采集任务未覆盖完` : "暂无覆盖缺口"
 );
 const crawlHealthStatusLabel = computed(() => {
   if (stalledJobCount.value) {
