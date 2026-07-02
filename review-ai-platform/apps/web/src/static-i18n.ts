@@ -495,6 +495,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "已导入并进入分析": "Imported and analyzing",
     "采集完成": "Crawl completed",
     "采集失败": "Crawl failed",
+    "加载页数": "Loaded pages",
     "接口请求": "API requests",
     "接口评论": "API comments",
     "页面评论": "Page comments",
@@ -1593,6 +1594,7 @@ const staticText: Record<Exclude<AppLocale, "zh-CN">, Record<string, string>> = 
     "已导入并进入分析": "นำเข้าแล้วและเข้าสู่การวิเคราะห์",
     "采集完成": "เก็บข้อมูลเสร็จแล้ว",
     "采集失败": "เก็บข้อมูลล้มเหลว",
+    "加载页数": "จำนวนหน้าที่โหลด",
     "接口请求": "คำขอ API",
     "接口评论": "คอมเมนต์จาก API",
     "页面评论": "คอมเมนต์บนหน้า",
@@ -2703,6 +2705,8 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">): s
     if (platformRemaining) {
       return locale === "en-US" ? `Platform remaining about ${platformRemaining[1]}` : `เหลือบนแพลตฟอร์มประมาณ ${platformRemaining[1]}`;
     }
+    const loadedPages = part.match(/^加载页数\s+(\d+)$/);
+    if (loadedPages) return locale === "en-US" ? `Loaded pages ${loadedPages[1]}` : `โหลดแล้ว ${loadedPages[1]} หน้า`;
     const apiRequests = part.match(/^接口请求\s+(\d+)$/);
     if (apiRequests) return locale === "en-US" ? `API requests ${apiRequests[1]}` : `คำขอ API ${apiRequests[1]}`;
     const apiComments = part.match(/^接口评论\s+(\d+)$/);

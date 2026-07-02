@@ -1057,6 +1057,7 @@ function crawlCoverageStats(job: CrawlJobDTO) {
 
 function crawlMetricSummary(job: CrawlJobDTO) {
   const parts = [
+    job.loadedPages !== null ? `加载页数 ${job.loadedPages}` : "",
     job.nextRequests !== null ? `接口请求 ${job.nextRequests}` : "",
     job.payloadComments !== null ? `接口评论 ${job.payloadComments}` : "",
     job.domCommentCount !== null ? `DOM 评论 ${job.domCommentCount}` : "",
@@ -1108,6 +1109,9 @@ function crawlStageLabel(job: CrawlJobDTO) {
 
 function crawlTelemetryStats(job: CrawlJobDTO): CrawlTelemetryStat[] {
   const stats: CrawlTelemetryStat[] = [];
+  if (job.loadedPages !== null) {
+    stats.push({ label: "加载页数", value: formatCount(job.loadedPages) });
+  }
   if (job.nextRequests !== null) {
     stats.push({ label: "接口请求", value: formatCount(job.nextRequests) });
   }

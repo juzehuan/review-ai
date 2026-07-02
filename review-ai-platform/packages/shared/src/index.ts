@@ -346,6 +346,7 @@ export interface CrawlJobDTO {
   commentSortSwitched: boolean | null;
   commentSortOpened: boolean | null;
   commentSortLabel: string | null;
+  loadedPages: number | null;
   nextRequests: number | null;
   payloadComments: number | null;
   domCommentCount: number | null;

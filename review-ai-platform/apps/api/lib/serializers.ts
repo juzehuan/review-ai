@@ -116,6 +116,23 @@ function readCrawlTotalComments(rawResult: Record<string, unknown> | null) {
   return null;
 }
 
+function readCrawlLoadedPages(rawResult: Record<string, unknown> | null) {
+  const explicitCandidates = [rawResult?.loadedPages, rawResult?.loadedPageCount, rawResult?.pageCount];
+  for (const candidate of explicitCandidates) {
+    const value = readOptionalNumber(candidate);
+    if (value !== null) {
+      return Math.max(0, Math.round(value));
+    }
+  }
+
+  if (Array.isArray(rawResult?.pageOffsets) && rawResult.pageOffsets.length > 0) {
+    return rawResult.pageOffsets.length;
+  }
+
+  const nextRequests = readOptionalNumber(rawResult?.nextRequests);
+  return nextRequests !== null ? Math.max(0, Math.round(nextRequests)) : null;
+}
+
 function readStringArray(value: unknown) {
   return Array.isArray(value) ? value.map((item) => String(item || "").trim()).filter(Boolean) : [];
 }
@@ -440,6 +457,7 @@ export function serializeCrawlJob(job: CrawlJobWithWorkspace): CrawlJobDTO {
     commentSortSwitched: readOptionalBoolean(rawResult?.commentSortSwitched),
     commentSortOpened: readOptionalBoolean(rawResult?.commentSortOpened),
     commentSortLabel: readOptionalString(rawResult?.commentSortLabel),
+    loadedPages: readCrawlLoadedPages(rawResult),
     nextRequests: readOptionalNumber(rawResult?.nextRequests),
     payloadComments: readOptionalNumber(rawResult?.payloadComments),
     domCommentCount: readOptionalNumber(rawResult?.domCommentCount),

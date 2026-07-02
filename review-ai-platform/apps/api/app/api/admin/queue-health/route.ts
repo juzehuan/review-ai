@@ -173,6 +173,23 @@ function readCrawlTotalComments(rawResult: Record<string, unknown> | null) {
   return null;
 }
 
+function readCrawlLoadedPages(rawResult: Record<string, unknown> | null) {
+  const explicitCandidates = [rawResult?.loadedPages, rawResult?.loadedPageCount, rawResult?.pageCount];
+  for (const candidate of explicitCandidates) {
+    const value = readOptionalNumber(candidate);
+    if (value !== null) {
+      return Math.max(0, Math.round(value));
+    }
+  }
+
+  if (Array.isArray(rawResult?.pageOffsets) && rawResult.pageOffsets.length > 0) {
+    return rawResult.pageOffsets.length;
+  }
+
+  const nextRequests = readOptionalNumber(rawResult?.nextRequests);
+  return nextRequests !== null ? Math.max(0, Math.round(nextRequests)) : null;
+}
+
 function truncateText(value: string | null | undefined, maxLength = 80) {
   const text = String(value || "").trim();
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
@@ -260,8 +277,10 @@ function buildCrawlStalledInsight(job: {
   const lastRequestStatus = readOptionalNumber(rawResult?.lastRequestStatus);
   const channelErrors = readStringArray(rawResult?.channelErrors);
   const firstChannelError = firstChannelErrorSummary(channelErrors);
+  const loadedPages = readCrawlLoadedPages(rawResult);
   const metricSummary = buildMetricSummary([
     totalComments !== null ? `平台总量 ${totalComments}` : null,
+    loadedPages !== null ? `加载页数 ${loadedPages}` : null,
     nextRequests !== null ? `接口请求 ${nextRequests}` : null,
     payloadComments !== null ? `接口评论 ${payloadComments}` : null,
     domCommentCount !== null ? `DOM 评论 ${domCommentCount}` : null,
