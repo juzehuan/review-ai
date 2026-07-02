@@ -2,44 +2,44 @@
   <div class="review-page">
     <div class="page-toolbar dashboard-toolbar">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">{{ pageTitle }}</div>
-        <div class="toolbar-subtitle">{{ pageSubtitle }}</div>
+        <div class="toolbar-title">{{ tr(pageTitle) }}</div>
+        <div class="toolbar-subtitle">{{ tr(pageSubtitle) }}</div>
       </div>
       <a-space wrap>
         <a-button @click="reloadCurrentSection" :loading="loading">
           <template #icon><ReloadOutlined /></template>
-          刷新
+          {{ tr("刷新") }}
         </a-button>
         <a-button v-if="activeSection === 'workspace'" :disabled="!canManageMembers" @click="openMemberModal">
           <template #icon><UserAddOutlined /></template>
-          添加成员
+          {{ tr("添加成员") }}
         </a-button>
         <a-button v-if="activeSection === 'workspace'" type="primary" @click="modalOpen = true">
           <template #icon><PlusOutlined /></template>
-          新建空间
+          {{ tr("新建空间") }}
         </a-button>
       </a-space>
     </div>
 
     <div v-if="activeSection === 'workspace'" class="settings-grid">
       <section class="settings-panel">
-        <div class="panel-label">当前空间</div>
+        <div class="panel-label">{{ tr("当前空间") }}</div>
         <div class="settings-title">{{ workspace?.name || "-" }}</div>
         <div class="settings-meta">{{ workspace?.slug || "-" }}</div>
       </section>
       <section class="settings-panel">
-        <div class="panel-label">我的角色</div>
-        <div class="settings-title">{{ roleLabel(currentRole) }}</div>
-        <div class="settings-meta">所有者和管理员可以管理成员与空间配置</div>
+        <div class="panel-label">{{ tr("我的角色") }}</div>
+        <div class="settings-title">{{ tr(roleLabel(currentRole)) }}</div>
+        <div class="settings-meta">{{ tr("所有者和管理员可以管理成员与空间配置") }}</div>
       </section>
       <section class="settings-panel">
-        <div class="panel-label">评论额度</div>
-        <div class="settings-title">{{ reviewUsageLabel }}</div>
+        <div class="panel-label">{{ tr("评论额度") }}</div>
+        <div class="settings-title">{{ tr(reviewUsageLabel) }}</div>
         <a-progress :percent="reviewUsagePercent" size="small" />
       </section>
       <section class="settings-panel">
-        <div class="panel-label">分析次数</div>
-        <div class="settings-title">{{ runUsageLabel }}</div>
+        <div class="panel-label">{{ tr("分析次数") }}</div>
+        <div class="settings-title">{{ tr(runUsageLabel) }}</div>
         <a-progress :percent="runUsagePercent" size="small" />
       </section>
     </div>
@@ -51,7 +51,7 @@
             <div class="panel-label">Members</div>
             <div class="settings-section-title">当前空间成员</div>
           </div>
-          <a-tag :color="canManageMembers ? 'blue' : 'default'">{{ canManageMembers ? "可管理" : "只读" }}</a-tag>
+          <a-tag :color="canManageMembers ? 'blue' : 'default'">{{ tr(canManageMembers ? "可管理" : "只读") }}</a-tag>
         </div>
         <a-table
           :columns="memberColumns"
@@ -78,24 +78,24 @@
                 @change="changeRoleFromSelect(record.id, $event)"
               >
                 <a-select-option v-for="role in roleOptions" :key="role.value" :value="role.value">
-                  {{ role.label }}
+                  {{ tr(role.label) }}
                 </a-select-option>
               </a-select>
             </template>
             <template v-else-if="column.key === 'isSuperAdmin'">
               <a-tag :color="record.user.isSuperAdmin ? 'purple' : 'default'">
-                {{ record.user.isSuperAdmin ? "平台超管" : "普通账号" }}
+                {{ tr(record.user.isSuperAdmin ? "平台超管" : "普通账号") }}
               </a-tag>
             </template>
             <template v-else-if="column.key === 'action'">
-              <a-popconfirm title="确定从当前空间移除该成员？" @confirm="removeMember(record.id)">
-                <a-button danger size="small" :disabled="!canManageMembers || !canRemoveMember(record)">移除</a-button>
+              <a-popconfirm :title="tr('确定从当前空间移除该成员？')" @confirm="removeMember(record.id)">
+                <a-button danger size="small" :disabled="!canManageMembers || !canRemoveMember(record)">{{ tr("移除") }}</a-button>
               </a-popconfirm>
             </template>
           </template>
         </a-table>
         <div class="settings-help">
-          这里管理的是当前空间成员关系；平台账号、超管权限和租户额度由超管后台管理。
+          {{ tr("这里管理的是当前空间成员关系；平台账号、超管权限和租户额度由超管后台管理。") }}
         </div>
       </section>
     </div>
@@ -107,41 +107,41 @@
             <div class="panel-label">模型设置</div>
             <div class="settings-section-title">分析模型</div>
           </div>
-          <a-tag :color="canEditAi ? 'blue' : 'default'">{{ canEditAi ? "可编辑" : "只读" }}</a-tag>
+          <a-tag :color="canEditAi ? 'blue' : 'default'">{{ tr(canEditAi ? "可编辑" : "只读") }}</a-tag>
         </div>
         <a-form layout="vertical" class="settings-form">
-          <a-form-item label="模型供应商">
+          <a-form-item :label="tr('模型供应商')">
             <a-select v-model:value="aiForm.provider" :disabled="!canEditAi">
               <a-select-option v-for="provider in AI_PROVIDER_PRESETS" :key="provider.id" :value="provider.id">
                 {{ provider.label }}
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="接口密钥">
+          <a-form-item :label="tr('接口密钥')">
             <a-input-password
               v-model:value="aiForm.apiKey"
               :disabled="!canEditAi"
-              :placeholder="aiForm.apiKeySet ? `已保存（${aiForm.apiKey || '已隐藏'}），输入新密钥可替换` : currentProvider?.apiKeyHint || 'API Key'"
+              :placeholder="tr(apiKeyPlaceholder)"
             />
           </a-form-item>
-          <a-form-item label="接口地址">
+          <a-form-item :label="tr('接口地址')">
             <a-input
               v-model:value="aiForm.baseUrl"
               :disabled="!canEditAi"
               :placeholder="currentProvider?.baseUrl || 'https://api.example.com/v1'"
             />
           </a-form-item>
-          <a-form-item label="模型名称">
+          <a-form-item :label="tr('模型名称')">
             <a-select v-model:value="aiForm.modelName" :disabled="!canEditAi" show-search>
               <a-select-option v-for="model in providerModels" :key="model" :value="model">
                 {{ model }}
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="提示词版本">
-            <a-input v-model:value="aiForm.promptVersion" :disabled="!canEditAi" placeholder="例如：v2-thai" />
+          <a-form-item :label="tr('提示词版本')">
+            <a-input v-model:value="aiForm.promptVersion" :disabled="!canEditAi" :placeholder="tr('例如：v2-thai')" />
           </a-form-item>
-          <a-form-item label="随机性">
+          <a-form-item :label="tr('随机性')">
             <a-input-number v-model:value="aiForm.temperature" :disabled="!canEditAi" :min="0" :max="2" :step="0.1" class="full-input" />
           </a-form-item>
         </a-form>
@@ -156,34 +156,34 @@
           <a-space>
             <a-button :disabled="!canEditAi" @click="resetDefaultPrompts">
               <template #icon><UndoOutlined /></template>
-              恢复默认提示词
+              {{ tr("恢复默认提示词") }}
             </a-button>
             <a-button type="primary" :disabled="!canEditAi" :loading="savingAi" @click="saveAiSettings">
               <template #icon><SaveOutlined /></template>
-              保存设置
+              {{ tr("保存设置") }}
             </a-button>
           </a-space>
         </div>
         <a-form layout="vertical" class="settings-form">
-          <a-form-item label="系统提示词">
+          <a-form-item :label="tr('系统提示词')">
             <a-textarea v-model:value="aiForm.systemPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 3, maxRows: 6 }" />
           </a-form-item>
-          <a-form-item label="分析类型">
+          <a-form-item :label="tr('分析类型')">
             <a-segmented v-model:value="promptProfileType" :options="promptProfileOptions" />
-            <div class="settings-help compact-help">{{ activePromptProfile?.description }}</div>
+            <div class="settings-help compact-help">{{ tr(activePromptProfile?.description || "") }}</div>
           </a-form-item>
-          <a-form-item label="单条评论分析提示词模板">
+          <a-form-item :label="tr('单条评论分析提示词模板')">
             <a-textarea v-model:value="activeUserPromptTemplate" :disabled="!canEditAi" :auto-size="{ minRows: 12, maxRows: 20 }" />
           </a-form-item>
-          <a-form-item label="总体总结提示词">
+          <a-form-item :label="tr('总体总结提示词')">
             <a-textarea v-model:value="activeSummaryPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 6, maxRows: 12 }" />
           </a-form-item>
-          <a-form-item label="分析报告提示词">
+          <a-form-item :label="tr('分析报告提示词')">
             <a-textarea v-model:value="activeInsightsPrompt" :disabled="!canEditAi" :auto-size="{ minRows: 8, maxRows: 16 }" />
           </a-form-item>
         </a-form>
         <div class="settings-help">
-          可用变量：{taxonomy}、{ratingStar}、{comment}、{commentTr}
+          {{ tr("可用变量：{taxonomy}、{ratingStar}、{comment}、{commentTr}") }}
         </div>
       </section>
 
@@ -199,42 +199,42 @@
           <a-space wrap>
             <a-button :href="browserExtensionDownloadUrl" download="review-exporter.zip">
               <template #icon><DownloadOutlined /></template>
-              下载浏览器插件
+              {{ tr("下载浏览器插件") }}
             </a-button>
             <a-button type="primary" :disabled="!canEditAi" :loading="savingCrawler" @click="saveCrawlerSettings">
-              保存爬虫设置
+              {{ tr("保存爬虫设置") }}
             </a-button>
           </a-space>
         </div>
         <a-form layout="vertical" class="settings-form">
-          <a-form-item label="启用链接抓取">
+          <a-form-item :label="tr('启用链接抓取')">
             <a-switch v-model:checked="crawlerForm.enabled" :disabled="!canEditAi" />
           </a-form-item>
-          <a-form-item label="Python 命令">
-            <a-input v-model:value="crawlerForm.pythonBin" :disabled="!canEditAi" placeholder="python 或 C:\\Python312\\python.exe" />
+          <a-form-item :label="tr('Python 命令')">
+            <a-input v-model:value="crawlerForm.pythonBin" :disabled="!canEditAi" :placeholder="tr('python 或 C:\\Python312\\python.exe')" />
           </a-form-item>
-          <a-form-item label="代理地址">
-            <a-input v-model:value="crawlerForm.proxyUrl" :disabled="!canEditAi" placeholder="例如：http://127.0.0.1:7890" />
+          <a-form-item :label="tr('代理地址')">
+            <a-input v-model:value="crawlerForm.proxyUrl" :disabled="!canEditAi" :placeholder="tr('例如：http://127.0.0.1:7890')" />
           </a-form-item>
-          <a-form-item label="默认来源渠道">
+          <a-form-item :label="tr('默认来源渠道')">
             <a-select v-model:value="crawlerForm.defaultSourceChannel" :disabled="!canEditAi" :options="crawlerSourceChannelOptions" />
           </a-form-item>
-          <a-form-item label="默认抓取条数">
+          <a-form-item :label="tr('默认抓取条数')">
             <a-input-number v-model:value="crawlerForm.defaultMaxReviews" :disabled="!canEditAi" :min="0" :max="20000" class="full-input" />
-            <div class="settings-help">填 0 表示不限，适用于 Shopee、YouTube、TikTok、Facebook 评论采集。</div>
+            <div class="settings-help">{{ tr("填 0 表示不限，适用于 Shopee、YouTube、TikTok、Facebook 评论采集。") }}</div>
           </a-form-item>
-          <a-form-item label="超时时间（秒）">
+          <a-form-item :label="tr('超时时间（秒）')">
             <a-input-number v-model:value="crawlerForm.requestTimeoutSec" :disabled="!canEditAi" :min="30" :max="900" class="full-input" />
           </a-form-item>
         </a-form>
         <div class="settings-help">
-          链接抓取当前支持 Shopee 商品、YouTube 视频、TikTok 视频和 Facebook 帖子/图片/Reel 评论。代理会传给本地 Scrapling 脚本，用于访问公开评论接口。
+          {{ tr("链接抓取当前支持 Shopee 商品、YouTube 视频、TikTok 视频和 Facebook 帖子/图片/Reel 评论。代理会传给本地 Scrapling 脚本，用于访问公开评论接口。") }}
         </div>
       </section>
     </div>
 
     <div v-if="activeSection === 'workspace'" class="table-shell">
-      <div class="table-title">我的空间</div>
+      <div class="table-title">{{ tr("我的空间") }}</div>
       <a-table :columns="columns" :data-source="workspaces" row-key="id" :pagination="false">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
@@ -242,7 +242,7 @@
             <div class="member-email">{{ record.slug }}</div>
           </template>
           <template v-else-if="column.key === 'role'">
-            <a-tag color="blue">{{ roleLabel(record.role) }}</a-tag>
+            <a-tag color="blue">{{ tr(roleLabel(record.role)) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'usage'">
             {{ record.currentPeriodReviewCount }}/{{ record.monthlyReviewLimit }}
@@ -250,17 +250,17 @@
           <template v-else-if="column.key === 'action'">
             <a-space>
               <a-button size="small" :disabled="record.slug === workspace?.slug" @click="switchTo(record.slug)">
-                切换
+                {{ tr("切换") }}
               </a-button>
               <a-popconfirm
-                title="确定删除这个工作空间吗？"
-                description="删除后空间内的任务、评论、分析结果和成员关系都会被移除。"
-                ok-text="删除"
-                cancel-text="取消"
+                :title="tr('确定删除这个工作空间吗？')"
+                :description="tr('删除后空间内的任务、评论、分析结果和成员关系都会被移除。')"
+                :ok-text="tr('删除')"
+                :cancel-text="tr('取消')"
                 placement="left"
                 @confirm="removeWorkspace(record.id)"
               >
-                <a-button size="small" danger :disabled="!canDeleteWorkspace(record)">删除</a-button>
+                <a-button size="small" danger :disabled="!canDeleteWorkspace(record)">{{ tr("删除") }}</a-button>
               </a-popconfirm>
             </a-space>
           </template>
@@ -270,48 +270,48 @@
 
     <a-modal
       :open="modalOpen"
-      title="新建租户空间"
-      ok-text="创建"
-      cancel-text="取消"
+      :title="tr('新建租户空间')"
+      :ok-text="tr('创建')"
+      :cancel-text="tr('取消')"
       :confirm-loading="saving"
       @ok="submit"
       @cancel="modalOpen = false"
     >
       <a-form layout="vertical">
-        <a-form-item label="空间名称">
-          <a-input v-model:value="form.name" placeholder="例如：品牌运营团队" />
+        <a-form-item :label="tr('空间名称')">
+          <a-input v-model:value="form.name" :placeholder="tr('例如：品牌运营团队')" />
         </a-form-item>
-        <a-form-item label="空间标识">
-          <a-input v-model:value="form.slug" placeholder="可选，例如：brand-ops" />
+        <a-form-item :label="tr('空间标识')">
+          <a-input v-model:value="form.slug" :placeholder="tr('可选，例如：brand-ops')" />
         </a-form-item>
       </a-form>
     </a-modal>
 
     <a-modal
       :open="memberModalOpen"
-      title="添加空间成员"
-      ok-text="保存"
-      cancel-text="取消"
+      :title="tr('添加空间成员')"
+      :ok-text="tr('保存')"
+      :cancel-text="tr('取消')"
       :confirm-loading="savingMember"
       @ok="submitMember"
       @cancel="memberModalOpen = false"
     >
       <a-form layout="vertical">
-        <a-form-item label="姓名">
-          <a-input v-model:value="memberForm.name" placeholder="例如：运营同事" />
+        <a-form-item :label="tr('姓名')">
+          <a-input v-model:value="memberForm.name" :placeholder="tr('例如：运营同事')" />
         </a-form-item>
-        <a-form-item label="邮箱">
+        <a-form-item :label="tr('邮箱')">
           <a-input v-model:value="memberForm.email" placeholder="name@example.com" />
         </a-form-item>
-        <a-form-item label="空间角色">
+        <a-form-item :label="tr('空间角色')">
           <a-select v-model:value="memberForm.role">
             <a-select-option v-for="role in roleOptions" :key="role.value" :value="role.value">
-              {{ role.label }}
+              {{ tr(role.label) }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <div class="settings-help">
-          如果该邮箱尚未注册，系统会先创建占位账号；对方用同一邮箱注册后即可进入此空间。
+          {{ tr("如果该邮箱尚未注册，系统会先创建占位账号；对方用同一邮箱注册后即可进入此空间。") }}
         </div>
       </a-form>
     </a-modal>
@@ -348,8 +348,10 @@ import {
   updateWorkspaceCrawlerSettings
 } from "@/api";
 import { useTaskStore } from "@/composables";
+import { translateStaticText } from "@/static-i18n";
 
 const { workspace, workspaces, currentUser, refreshTasks, switchWorkspace } = useTaskStore();
+const tr = (value: string) => translateStaticText(value);
 const route = useRoute();
 const router = useRouter();
 const modalOpen = ref(false);
@@ -442,18 +444,21 @@ const canManageMembers = computed(() => {
   return Boolean(currentUser.value?.isSuperAdmin || currentRole.value === "owner" || currentRole.value === "admin");
 });
 const currentProvider = computed(() => AI_PROVIDER_PRESETS.find((item) => item.id === aiForm.provider) || null);
+const apiKeyPlaceholder = computed(() =>
+  aiForm.apiKeySet ? `已保存（${aiForm.apiKey || "已隐藏"}），输入新密钥可替换` : currentProvider.value?.apiKeyHint || "API Key"
+);
 const providerModels = computed(() => {
   const models = currentProvider.value?.models || [];
   return models.includes(aiForm.modelName) ? models : [aiForm.modelName, ...models].filter(Boolean);
 });
-const promptProfileOptions = ANALYSIS_TYPE_PRESETS.map((item) => ({
+const promptProfileOptions = computed(() => ANALYSIS_TYPE_PRESETS.map((item) => ({
+  label: tr(item.label),
+  value: item.value
+})));
+const crawlerSourceChannelOptions = computed(() => CRAWL_SOURCE_CHANNEL_PRESETS.map((item) => ({
   label: item.label,
   value: item.value
-}));
-const crawlerSourceChannelOptions = CRAWL_SOURCE_CHANNEL_PRESETS.map((item) => ({
-  label: item.label,
-  value: item.value
-}));
+})));
 const activePromptProfile = computed(() => {
   return ANALYSIS_TYPE_PRESETS.find((item) => item.value === promptProfileType.value);
 });
@@ -559,13 +564,13 @@ const runUsageLabel = computed(() =>
     : `${workspace.value?.currentPeriodRunCount || 0}/${workspace.value?.monthlyRunLimit || 0}`
 );
 
-const columns = [
-  { title: "空间", key: "name", width: 320 },
-  { title: "角色", key: "role", width: 140 },
-  { title: "套餐", dataIndex: "planTier", key: "planTier", width: 120 },
-  { title: "评论用量", key: "usage", width: 180 },
-  { title: "操作", key: "action", width: 180 }
-];
+const columns = computed(() => [
+  { title: tr("空间"), key: "name", width: 320 },
+  { title: tr("角色"), key: "role", width: 140 },
+  { title: tr("套餐"), dataIndex: "planTier", key: "planTier", width: 120 },
+  { title: tr("评论用量"), key: "usage", width: 180 },
+  { title: tr("操作"), key: "action", width: 180 }
+]);
 
 const roleOptions: Array<{ label: string; value: MemberRole }> = [
   { label: "所有者", value: "owner" },
@@ -574,13 +579,13 @@ const roleOptions: Array<{ label: string; value: MemberRole }> = [
   { label: "只读", value: "viewer" }
 ];
 
-const memberColumns = [
-  { title: "成员", key: "user", width: 320 },
-  { title: "空间角色", key: "role", width: 180 },
-  { title: "平台权限", key: "isSuperAdmin", width: 140 },
-  { title: "加入时间", dataIndex: "createdAt", key: "createdAt", width: 220 },
-  { title: "操作", key: "action", width: 120 }
-];
+const memberColumns = computed(() => [
+  { title: tr("成员"), key: "user", width: 320 },
+  { title: tr("空间角色"), key: "role", width: 180 },
+  { title: tr("平台权限"), key: "isSuperAdmin", width: 140 },
+  { title: tr("加入时间"), dataIndex: "createdAt", key: "createdAt", width: 220 },
+  { title: tr("操作"), key: "action", width: 120 }
+]);
 
 function assignAiForm(data: WorkspaceAiSettingDTO) {
   syncingAiForm.value = true;
@@ -646,7 +651,7 @@ function resetDefaultPrompts() {
     activeSummaryPrompt.value = profile.summaryPrompt;
     activeInsightsPrompt.value = profile.insightsPrompt;
   }
-  message.success("已恢复当前类型默认提示词，保存后生效");
+  message.success(tr("已恢复当前类型默认提示词，保存后生效"));
 }
 
 function roleLabel(role?: MemberRole | null) {
@@ -669,7 +674,7 @@ async function loadAiSettings() {
   try {
     assignAiForm(await fetchWorkspaceAiSettings());
   } catch {
-    message.error("模型设置加载失败");
+    message.error(tr("模型设置加载失败"));
   }
 }
 
@@ -677,7 +682,7 @@ async function loadCrawlerSettings() {
   try {
     assignCrawlerForm(await fetchWorkspaceCrawlerSettings());
   } catch {
-    message.error("抓取设置加载失败");
+    message.error(tr("抓取设置加载失败"));
   }
 }
 
@@ -691,7 +696,7 @@ async function loadMembers() {
     members.value = await fetchWorkspaceMembers();
   } catch {
     members.value = [];
-    message.error("成员列表加载失败，请检查权限");
+    message.error(tr("成员列表加载失败，请检查权限"));
   } finally {
     loadingMembers.value = false;
   }
@@ -724,9 +729,9 @@ async function saveAiSettings() {
   savingAi.value = true;
   try {
     assignAiForm(await updateWorkspaceAiSettings({ ...aiForm }));
-    message.success("AI 设置已保存");
+    message.success(tr("AI 设置已保存"));
   } catch {
-    message.error("AI 设置保存失败，请检查权限或输入内容");
+    message.error(tr("AI 设置保存失败，请检查权限或输入内容"));
   } finally {
     savingAi.value = false;
   }
@@ -740,9 +745,9 @@ async function saveCrawlerSettings() {
       shopeeCookie: null,
       defaultSourceChannel: normalizeCrawlSourceChannel(crawlerForm.defaultSourceChannel, "YouTube")
     }));
-    message.success("爬虫设置已保存");
+    message.success(tr("爬虫设置已保存"));
   } catch {
-    message.error("爬虫设置保存失败，请检查权限或输入内容");
+    message.error(tr("爬虫设置保存失败，请检查权限或输入内容"));
   } finally {
     savingCrawler.value = false;
   }
@@ -751,7 +756,7 @@ async function saveCrawlerSettings() {
 async function switchTo(slug: string) {
   await switchWorkspace(slug);
   await reloadCurrentSection();
-  message.success("空间已切换");
+  message.success(tr("空间已切换"));
 }
 
 function openMemberModal() {
@@ -777,17 +782,17 @@ function canRemoveMember(record: WorkspaceMemberDTO) {
 
 async function submitMember() {
   if (!memberForm.name.trim() || !memberForm.email.trim()) {
-    message.error("请填写姓名和邮箱");
+    message.error(tr("请填写姓名和邮箱"));
     return;
   }
   savingMember.value = true;
   try {
     await createWorkspaceMember({ ...memberForm, name: memberForm.name.trim(), email: memberForm.email.trim() });
-    message.success("成员已添加到当前空间");
+    message.success(tr("成员已添加到当前空间"));
     memberModalOpen.value = false;
     await loadMembers();
   } catch {
-    message.error("成员保存失败，请检查权限或输入信息");
+    message.error(tr("成员保存失败，请检查权限或输入信息"));
   } finally {
     savingMember.value = false;
   }
@@ -796,10 +801,10 @@ async function submitMember() {
 async function changeRole(memberId: string, role: MemberRole) {
   try {
     await updateWorkspaceMember(memberId, { role });
-    message.success("成员角色已更新");
+    message.success(tr("成员角色已更新"));
     await loadMembers();
   } catch {
-    message.error("角色更新失败，请检查权限");
+    message.error(tr("角色更新失败，请检查权限"));
   }
 }
 
@@ -810,10 +815,10 @@ function changeRoleFromSelect(memberId: string, role: unknown) {
 async function removeMember(memberId: string) {
   try {
     await deleteWorkspaceMember(memberId);
-    message.success("成员已从当前空间移除");
+    message.success(tr("成员已从当前空间移除"));
     await loadMembers();
   } catch {
-    message.error("成员移除失败，请检查权限");
+    message.error(tr("成员移除失败，请检查权限"));
   }
 }
 
@@ -835,9 +840,9 @@ async function removeWorkspace(workspaceId: string) {
     } else {
       await refreshTasks();
     }
-    message.success(`工作空间「${target?.name || "已选空间"}」已删除`);
+    message.success(tr(`工作空间「${target?.name || "已选空间"}」已删除`));
   } catch {
-    message.error("删除工作空间失败，请检查权限或稍后重试");
+    message.error(tr("删除工作空间失败，请检查权限或稍后重试"));
   } finally {
     deletingWorkspaceId.value = "";
   }
@@ -845,7 +850,7 @@ async function removeWorkspace(workspaceId: string) {
 
 async function submit() {
   if (!form.name.trim()) {
-    message.error("请填写空间名称");
+    message.error(tr("请填写空间名称"));
     return;
   }
 
@@ -857,12 +862,12 @@ async function submit() {
     });
     await switchWorkspace(next.slug);
     await refreshTasks();
-    message.success("空间已创建");
+    message.success(tr("空间已创建"));
     form.name = "";
     form.slug = "";
     modalOpen.value = false;
   } catch {
-    message.error("空间创建失败，请稍后重试");
+    message.error(tr("空间创建失败，请稍后重试"));
   } finally {
     saving.value = false;
   }
