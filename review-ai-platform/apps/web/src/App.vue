@@ -206,6 +206,7 @@ const navSections = computed<NavSection[]>(() => [
       { path: "/growth", label: t("nav.growthOps"), disabled: false, icon: RiseOutlined },
       { path: "/crawl-jobs", label: t("nav.reviewCollection"), disabled: false, icon: CloudDownloadOutlined },
       { path: "/analysis-runs", label: t("nav.analysisRuns"), disabled: false, icon: UnorderedListOutlined },
+      { path: "/settings/workspace", label: t("nav.workspaceSettings"), disabled: false, icon: TeamOutlined },
       { path: "/account", label: t("nav.accountSettings"), disabled: false, icon: LockOutlined },
       { path: "/help", label: t("nav.helpCenter"), disabled: false, icon: QuestionCircleOutlined }
     ]
@@ -275,6 +276,9 @@ const pageTitle = computed(() => {
   }
   if (route.path.startsWith("/settings/crawler")) {
     return t("nav.crawlerSettings");
+  }
+  if (route.path.startsWith("/settings/workspace")) {
+    return t("nav.workspaceSettings");
   }
   if (route.path === "/crawl-jobs") {
     return t("nav.reviewCollection");

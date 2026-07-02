@@ -36,8 +36,8 @@ export const router = createRouter({
     { path: "/help", component: HelpCenterPage },
     { path: "/account", component: AccountSettingsPage },
     { path: "/users", redirect: "/admin" },
-    { path: "/settings", redirect: "/settings/ai" },
-    { path: "/settings/workspace", redirect: "/settings/ai" },
+    { path: "/settings", redirect: "/settings/workspace" },
+    { path: "/settings/workspace", component: WorkspaceSettingsPage },
     { path: "/settings/ai", component: WorkspaceSettingsPage },
     { path: "/settings/crawler", component: WorkspaceSettingsPage },
     { path: "/admin", component: AdminPage }

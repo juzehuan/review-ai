@@ -98,6 +98,39 @@
           {{ tr("这里管理的是当前空间成员关系；平台账号、超管权限和租户额度由超管后台管理。") }}
         </div>
       </section>
+
+      <section class="settings-panel settings-panel-wide">
+        <div class="settings-section-head">
+          <div>
+            <div class="panel-label">Permissions</div>
+            <div class="settings-section-title">{{ tr("角色权限矩阵") }}</div>
+          </div>
+          <a-tag color="blue">{{ tr("按当前接口权限") }}</a-tag>
+        </div>
+        <a-table
+          class="permission-matrix-table"
+          :columns="permissionColumns"
+          :data-source="rolePermissionRows"
+          row-key="key"
+          :pagination="false"
+          size="small"
+          :scroll="{ x: 760 }"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'capability'">
+              <span class="member-name">{{ tr(record.capability) }}</span>
+            </template>
+            <template v-else>
+              <a-tag :color="permissionStatusColor(permissionCellState(record, column.key))">
+                {{ tr(permissionStatusLabel(permissionCellState(record, column.key))) }}
+              </a-tag>
+            </template>
+          </template>
+        </a-table>
+        <div class="settings-help">
+          {{ tr("平台超管不受空间角色限制；普通成员按所在空间角色执行权限。") }}
+        </div>
+      </section>
     </div>
 
     <div v-if="activeSection === 'ai'" class="settings-layout">
@@ -591,6 +624,89 @@ const memberColumns = computed(() => [
   { title: tr("操作"), key: "action", width: 120 }
 ]);
 
+type PermissionCellState = "allow" | "deny" | "platform";
+type PermissionRoleKey = "owner" | "admin" | "analyst" | "viewer" | "superAdmin";
+type PermissionRow = {
+  key: string;
+  capability: string;
+} & Record<PermissionRoleKey, PermissionCellState>;
+
+const permissionRoleKeys: PermissionRoleKey[] = ["owner", "admin", "analyst", "viewer", "superAdmin"];
+const permissionColumns = computed(() => [
+  { title: tr("权限点"), key: "capability", width: 220 },
+  { title: tr("所有者"), key: "owner", width: 108 },
+  { title: tr("管理员"), key: "admin", width: 108 },
+  { title: tr("分析师"), key: "analyst", width: 108 },
+  { title: tr("只读"), key: "viewer", width: 108 },
+  { title: tr("平台超管"), key: "superAdmin", width: 120 }
+]);
+
+const rolePermissionRows: PermissionRow[] = [
+  {
+    key: "view",
+    capability: "查看报告与评论",
+    owner: "allow",
+    admin: "allow",
+    analyst: "allow",
+    viewer: "allow",
+    superAdmin: "allow"
+  },
+  {
+    key: "collect",
+    capability: "导入/采集评论",
+    owner: "allow",
+    admin: "allow",
+    analyst: "allow",
+    viewer: "deny",
+    superAdmin: "allow"
+  },
+  {
+    key: "analysis",
+    capability: "启动/停止分析",
+    owner: "allow",
+    admin: "allow",
+    analyst: "allow",
+    viewer: "deny",
+    superAdmin: "allow"
+  },
+  {
+    key: "share",
+    capability: "创建/撤销分享",
+    owner: "allow",
+    admin: "allow",
+    analyst: "allow",
+    viewer: "deny",
+    superAdmin: "allow"
+  },
+  {
+    key: "delete-task",
+    capability: "删除任务和采集记录",
+    owner: "allow",
+    admin: "allow",
+    analyst: "allow",
+    viewer: "deny",
+    superAdmin: "allow"
+  },
+  {
+    key: "members",
+    capability: "管理空间成员",
+    owner: "allow",
+    admin: "allow",
+    analyst: "deny",
+    viewer: "deny",
+    superAdmin: "allow"
+  },
+  {
+    key: "platform-settings",
+    capability: "修改模型和爬虫配置",
+    owner: "platform",
+    admin: "platform",
+    analyst: "platform",
+    viewer: "platform",
+    superAdmin: "allow"
+  }
+];
+
 function assignAiForm(data: WorkspaceAiSettingDTO) {
   syncingAiForm.value = true;
   aiForm.provider = data.provider;
@@ -672,6 +788,34 @@ function roleLabel(role?: MemberRole | null) {
     return "只读";
   }
   return "-";
+}
+
+function isPermissionRoleKey(value: unknown): value is PermissionRoleKey {
+  return typeof value === "string" && permissionRoleKeys.includes(value as PermissionRoleKey);
+}
+
+function permissionCellState(row: PermissionRow, key: unknown): PermissionCellState {
+  return isPermissionRoleKey(key) ? row[key] : "deny";
+}
+
+function permissionStatusLabel(state: PermissionCellState) {
+  if (state === "allow") {
+    return "可用";
+  }
+  if (state === "platform") {
+    return "仅超管";
+  }
+  return "无权限";
+}
+
+function permissionStatusColor(state: PermissionCellState) {
+  if (state === "allow") {
+    return "green";
+  }
+  if (state === "platform") {
+    return "purple";
+  }
+  return "default";
 }
 
 function quotaUsageSummary(

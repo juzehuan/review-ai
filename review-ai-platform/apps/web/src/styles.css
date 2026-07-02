@@ -1418,6 +1418,10 @@ select {
   width: 132px;
 }
 
+.permission-matrix-table .ant-table-cell {
+  white-space: nowrap;
+}
+
 .full-input {
   width: 100%;
 }
