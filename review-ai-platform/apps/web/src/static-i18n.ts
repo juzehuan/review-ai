@@ -2520,6 +2520,13 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">): s
     const duration = translateDuration(silentFor[1]);
     return locale === "en-US" ? `Silent for ${duration}` : `เงียบมา ${duration}`;
   }
+  const fetchedWithImportAndDuplicate = value.match(/^已抓取\s+(.+)\/(.+)，导入\s+(.+)，重复跳过\s+(.+)$/);
+  if (fetchedWithImportAndDuplicate) {
+    const max = fetchedWithImportAndDuplicate[2] === "不限" ? unlimited : fetchedWithImportAndDuplicate[2];
+    return locale === "en-US"
+      ? `Fetched ${fetchedWithImportAndDuplicate[1]}/${max}, imported ${fetchedWithImportAndDuplicate[3]}, duplicates skipped ${fetchedWithImportAndDuplicate[4]}`
+      : `เก็บแล้ว ${fetchedWithImportAndDuplicate[1]}/${max}, นำเข้า ${fetchedWithImportAndDuplicate[3]}, ข้ามซ้ำ ${fetchedWithImportAndDuplicate[4]}`;
+  }
   const fetchedWithImport = value.match(/^已抓取\s+(.+)\/(.+)，导入\s+(.+)$/);
   if (fetchedWithImport) {
     const max = fetchedWithImport[2] === "不限" ? unlimited : fetchedWithImport[2];
@@ -2707,6 +2714,8 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">): s
     if (requestStatus) return locale === "en-US" ? `HTTP status ${requestStatus[1]}` : `สถานะ HTTP ${requestStatus[1]}`;
     const imported = part.match(/^导入\s+(\d+)$/);
     if (imported) return locale === "en-US" ? `Imported ${imported[1]}` : `นำเข้า ${imported[1]}`;
+    const skippedDuplicate = part.match(/^重复跳过\s+(\d+)$/);
+    if (skippedDuplicate) return locale === "en-US" ? `Duplicates skipped ${skippedDuplicate[1]}` : `ข้ามซ้ำ ${skippedDuplicate[1]}`;
     const duplicate = part.match(/^重复\s+(\d+)$/);
     if (duplicate) return locale === "en-US" ? `Duplicates ${duplicate[1]}` : `ซ้ำ ${duplicate[1]}`;
     const elapsed = part.match(/^耗时\s+(.+)$/);

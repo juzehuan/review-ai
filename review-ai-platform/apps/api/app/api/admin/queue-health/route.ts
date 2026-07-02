@@ -234,12 +234,14 @@ function buildCrawlStalledInsight(job: {
   status: string;
   fetchedRows: number;
   importedRows: number;
+  skippedDuplicate: number;
   maxReviews: number;
   rawResult: unknown;
   lastError: string | null;
 }) {
   const rawResult = rawObject(job.rawResult);
   const maxReviewsLabel = job.maxReviews > 0 ? String(job.maxReviews) : "不限";
+  const crawlImportDetail = `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}，重复跳过 ${job.skippedDuplicate}`;
   const stopReason = readOptionalString(rawResult?.stopReason);
   const progressEventAt = readOptionalString(rawResult?.progressEventAt);
   const partialDueToTimeout = readOptionalBoolean(rawResult?.partialDueToTimeout);
@@ -273,13 +275,15 @@ function buildCrawlStalledInsight(job: {
     progressEventAt ? `进度回传 ${progressEventAt}` : null,
     partialDueToTimeout ? "部分结果超时" : null,
     stopReason ? `停止原因 ${formatCrawlStopReason(stopReason)}` : null,
+    `导入 ${job.importedRows}`,
+    `重复跳过 ${job.skippedDuplicate}`,
     channelErrors.length ? `通道异常 ${channelErrors.length} 条` : null,
     firstChannelError ? `首条通道异常 ${firstChannelError}` : null
   ]);
 
   if (job.status === "queued") {
     return {
-      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      detail: crawlImportDetail,
       diagnosis: "排队超过阈值，疑似 worker 未消费或队列阻塞",
       nextAction: "检查 crawl-jobs 队列 active/waiting 数、worker 进程和 Redis 连接",
       metricSummary,
@@ -289,7 +293,7 @@ function buildCrawlStalledInsight(job: {
   const requestStatusInsight = buildRequestStatusInsight(lastRequestStatus);
   if (requestStatusInsight) {
     return {
-      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      detail: crawlImportDetail,
       ...requestStatusInsight,
       metricSummary,
       lastError: truncateText(job.lastError) || null
@@ -297,7 +301,7 @@ function buildCrawlStalledInsight(job: {
   }
   if (stopReason === "cursor_stalled") {
     return {
-      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      detail: crawlImportDetail,
       diagnosis: "TikTok 接口游标未继续推进，疑似分页签名、会话或平台限制",
       nextAction: "稍后重试；若持续出现，降低单次采集上限并检查代理、浏览器参数和接口签名",
       metricSummary,
@@ -306,7 +310,7 @@ function buildCrawlStalledInsight(job: {
   }
   if (stopReason === "idle_no_progress") {
     return {
-      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      detail: crawlImportDetail,
       diagnosis: "浏览器兜底采集连续多轮无新增，疑似评论面板未继续加载、代理波动或平台风控",
       nextAction: "检查登录态、代理稳定性和评论弹窗打开情况；必要时降低单次采集上限后重试",
       metricSummary,
@@ -315,7 +319,7 @@ function buildCrawlStalledInsight(job: {
   }
   if (job.lastError) {
     return {
-      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      detail: crawlImportDetail,
       diagnosis: "任务仍在运行态但已有最近错误",
       nextAction: "先查看错误摘要，确认代理、登录态、平台限制或 Python 浏览器依赖",
       metricSummary,
@@ -324,7 +328,7 @@ function buildCrawlStalledInsight(job: {
   }
   if (stopReason === "timeout") {
     return {
-      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      detail: crawlImportDetail,
       diagnosis: "采集器接近或达到超时，任务未正常收尾",
       nextAction: "降低单次最大采集数或检查平台加载速度，必要时重试",
       metricSummary,
@@ -333,7 +337,7 @@ function buildCrawlStalledInsight(job: {
   }
   if (commentSortAttempted && commentSortSwitched === false) {
     return {
-      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      detail: crawlImportDetail,
       diagnosis: "评论排序未确认切换到全部评论",
       nextAction: "检查平台登录态、页面语言和排序按钮文案，避免只抓到相关评论",
       metricSummary,
@@ -342,7 +346,7 @@ function buildCrawlStalledInsight(job: {
   }
   if (job.fetchedRows > 0) {
     return {
-      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      detail: crawlImportDetail,
       diagnosis: "已有评论入缓存，疑似导入或收尾阶段静默",
       nextAction: "等待短时间自动收尾；若持续静默，查看 worker 日志后重试",
       metricSummary,
@@ -351,7 +355,7 @@ function buildCrawlStalledInsight(job: {
   }
   if (progressEventAt || nextRequests !== null || domCommentCount !== null || loadMoreClicks !== null) {
     return {
-      detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+      detail: crawlImportDetail,
       diagnosis: "采集器仍有过程指标，但暂未形成有效评论",
       nextAction: "检查平台是否需要登录、评论区是否受限、代理是否触发风控",
       metricSummary,
@@ -359,7 +363,7 @@ function buildCrawlStalledInsight(job: {
     };
   }
   return {
-    detail: `已抓取 ${job.fetchedRows}/${maxReviewsLabel}，导入 ${job.importedRows}`,
+    detail: crawlImportDetail,
     diagnosis: "运行超过阈值且没有采集器进度回传",
     nextAction: "优先检查 Python/浏览器依赖、worker 进程、代理和目标链接可访问性",
     metricSummary,
