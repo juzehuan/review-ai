@@ -34,30 +34,28 @@
           </a-select-option>
         </a-select>
         <a-tag :color="runStatusColor(latestRun?.status)">
-          {{ latestRun ? `最新分析：${runStatusLabel(latestRun.status)}` : "尚未分析" }}
+          {{ tr(latestRun ? `最新分析：${runStatusLabel(latestRun.status)}` : "尚未分析") }}
         </a-tag>
       </a-space>
     </div>
 
     <div v-if="latestRun" class="analysis-progress-panel">
       <div class="analysis-progress-head">
-        <span>{{ runStatusLabel(latestRun.status) }}</span>
-        <span>
-          已处理 {{ latestRun.processedCount }}/{{ latestRun.reviewCount || 0 }}，成功 {{ latestRun.successCount }}，失败 {{ latestRun.failedCount }}
-        </span>
+        <span>{{ tr(runStatusLabel(latestRun.status)) }}</span>
+        <span>{{ tr(runProgressSummary(latestRun)) }}</span>
       </div>
       <a-progress :percent="progressPercent" :status="progressStatus" />
       <div class="analysis-progress-metrics">
-        <span>失败率 {{ latestRun.failureRatePercent }}%</span>
-        <span v-if="latestRun.queuePosition !== null">排队第 {{ latestRun.queuePosition }} 位</span>
-        <span v-if="latestRun.throughputPerMinute !== null">速度 {{ latestRun.throughputPerMinute }}/分钟</span>
-        <span v-if="latestRun.estimatedRemainingSeconds !== null">预计剩余 {{ durationLabel(latestRun.estimatedRemainingSeconds) }}</span>
-        <span v-if="latestRun.lastActivityAt">最后日志 {{ durationLabel(latestRun.lastActivityAgoSeconds) }}前</span>
+        <span>{{ tr(`失败率 ${latestRun.failureRatePercent}%`) }}</span>
+        <span v-if="latestRun.queuePosition !== null">{{ tr(`排队第 ${latestRun.queuePosition} 位`) }}</span>
+        <span v-if="latestRun.throughputPerMinute !== null">{{ tr(`速度 ${latestRun.throughputPerMinute}/分钟`) }}</span>
+        <span v-if="latestRun.estimatedRemainingSeconds !== null">{{ tr(`预计剩余 ${durationLabel(latestRun.estimatedRemainingSeconds)}`) }}</span>
+        <span v-if="latestRun.lastActivityAt">{{ tr(`最后日志 ${durationLabel(latestRun.lastActivityAgoSeconds)}前`) }}</span>
       </div>
       <a-tag v-if="latestRun.stalled" color="orange" class="analysis-progress-stalled">
-        疑似无日志 {{ durationLabel(latestRun.lastActivityAgoSeconds) }}
+        {{ tr(`疑似无日志 ${durationLabel(latestRun.lastActivityAgoSeconds)}`) }}
       </a-tag>
-      <div v-if="latestRun.lastError" class="analysis-progress-error">{{ latestRun.lastError }}</div>
+      <div v-if="latestRun.lastError" class="analysis-progress-error">{{ tr(latestRun.lastError) }}</div>
     </div>
 
     <a-alert
@@ -377,6 +375,7 @@ import {
   updateSavedView
 } from "@/api";
 import { useTaskStore } from "@/composables";
+import { translateStaticText } from "@/static-i18n";
 
 type PaginationConfig = {
   current?: number;
@@ -429,6 +428,7 @@ const EMPTY_REVIEW_STATS: ReviewListStatsDTO = { mediaCount: 0, negativeCount: 0
 const route = useRoute();
 const router = useRouter();
 const { selectedTask, setSelectedTask } = useTaskStore();
+const tr = (value: string) => translateStaticText(value);
 const loading = ref(false);
 const running = ref(false);
 const rows = ref<ReviewRowDTO[]>([]);
@@ -537,6 +537,10 @@ const progressStatus = computed(() => {
   }
   return "active";
 });
+function runProgressSummary(run: AnalysisRunDTO) {
+  return `已处理 ${run.processedCount}/${run.reviewCount || 0}，成功 ${run.successCount}，失败 ${run.failedCount}`;
+}
+
 const evidenceAlertMessage = computed(() => {
   if (evidenceReviewIds.value.length) {
     const label = evidenceLabel.value || evidenceTypeLabel(evidenceType.value);

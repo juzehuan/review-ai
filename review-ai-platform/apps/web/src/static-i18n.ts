@@ -2013,6 +2013,11 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">): s
     };
     return `${labels[analysisStatusFilter[1]][locale]} ${analysisStatusFilter[2]}`;
   }
+  const latestAnalysis = value.match(/^最新分析：(.+)$/);
+  if (latestAnalysis) {
+    const status = staticText[locale][latestAnalysis[1]] || latestAnalysis[1];
+    return locale === "en-US" ? `Latest analysis: ${status}` : `วิเคราะห์ล่าสุด: ${status}`;
+  }
   const processedProgress = value.match(/^已处理\s+([\d,]+)\/([\d,]+)$/);
   if (processedProgress) {
     return locale === "en-US"
