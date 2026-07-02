@@ -86,6 +86,11 @@
           <small>{{ tr(fetchRateNote) }}</small>
         </div>
         <div class="crawler-health-metric">
+          <span>{{ tr("未覆盖评论") }}</span>
+          <strong>{{ tr(coverageGapText) }}</strong>
+          <small>{{ tr(coverageGapNote) }}</small>
+        </div>
+        <div class="crawler-health-metric">
           <span>{{ tr("最近活动") }}</span>
           <strong>{{ tr(latestActivityText) }}</strong>
           <small>{{ latestActivityJob ? latestActivityNote : tr(latestActivityNote) }}</small>
@@ -777,6 +782,14 @@ const currentFetchRateText = computed(() => {
 const fetchRateNote = computed(() => {
   return activeFetchRates.value.length ? `${activeFetchRates.value.length} 个任务有速度回传` : "等待采集器回传速度";
 });
+const coverageGapJobs = computed(() =>
+  jobs.value.filter((job) => ["completed", "imported"].includes(job.status) && (job.platformRemainingRows || 0) > 0)
+);
+const coverageGapRows = computed(() => coverageGapJobs.value.reduce((total, job) => total + (job.platformRemainingRows || 0), 0));
+const coverageGapText = computed(() => (coverageGapRows.value > 0 ? `约 ${formatCount(coverageGapRows.value)} 条` : "-"));
+const coverageGapNote = computed(() =>
+  coverageGapJobs.value.length ? `${coverageGapJobs.value.length} 个当前页任务未覆盖完` : "当前页暂无覆盖缺口"
+);
 const crawlHealthStatusLabel = computed(() => {
   if (stalledJobCount.value) {
     return "需要检查";
@@ -1728,7 +1741,7 @@ onUnmounted(() => {
 .crawler-health-metrics {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .crawler-health-metric {
