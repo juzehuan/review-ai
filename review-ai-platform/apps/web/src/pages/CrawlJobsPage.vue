@@ -1041,19 +1041,16 @@ function shortCursor(value: string) {
 
 function crawlCoverageStats(job: CrawlJobDTO) {
   const stats = [
-    { label: "目标上限", value: job.maxReviews > 0 ? formatCount(job.maxReviews) : "不限" }
+    { label: "目标上限", value: job.maxReviews > 0 ? formatCount(job.maxReviews) : "不限" },
+    { label: "已抓取", value: formatCount(job.fetchedRows) },
+    { label: "已导入", value: formatCount(job.importedRows) },
+    { label: "重复跳过", value: formatCount(job.skippedDuplicate) }
   ];
   if (job.totalComments !== null) {
     stats.push({ label: "平台总量", value: formatCount(job.totalComments) });
   }
   if (job.platformRemainingRows !== null) {
     stats.push({ label: "平台剩余", value: `约 ${formatCount(job.platformRemainingRows)} 条` });
-  }
-  if (job.importedRows > 0) {
-    stats.push({ label: "已导入", value: formatCount(job.importedRows) });
-  }
-  if (job.skippedDuplicate > 0) {
-    stats.push({ label: "重复跳过", value: formatCount(job.skippedDuplicate) });
   }
   return stats;
 }
