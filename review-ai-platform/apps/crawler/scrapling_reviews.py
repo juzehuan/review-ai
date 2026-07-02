@@ -50,6 +50,7 @@ TIKTOK_HOSTS = {"tiktok.com", "www.tiktok.com", "m.tiktok.com"}
 FACEBOOK_HOSTS = {"facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"}
 NESTED_URL_PARAM_NAMES = ("url", "u", "q", "target", "redirect", "redirect_url")
 CRAWL_PROGRESS_PREFIX = "__CRAWL_PROGRESS__"
+FACEBOOK_SHARE_PATH_RE = re.compile(r"/share/(?:p|v|r|reel|video|photo)(?:/|$)", re.IGNORECASE)
 
 
 def compact_dict(value: dict[str, Any]) -> dict[str, Any]:
@@ -175,9 +176,11 @@ def is_facebook_post_url(url: str) -> bool:
         return False
     path = parsed.path or ""
     params = parse_qs(parsed.query)
+    if FACEBOOK_SHARE_PATH_RE.search(path):
+        return True
     if params.get("story_fbid") or params.get("fbid") or params.get("v"):
-        return bool(re.search(r"/(story\.php|permalink\.php|photo(?:\.php)?|watch|posts|videos|reel|share/[pv])", path, re.IGNORECASE))
-    return bool(re.search(r"/(?:groups/[^/]+/posts|posts|videos|reel|share/[pv])/[^/?#]+", path, re.IGNORECASE))
+        return bool(re.search(r"/(story\.php|permalink\.php|photo(?:\.php)?|watch|posts|videos|reel)", path, re.IGNORECASE))
+    return bool(re.search(r"/(?:groups/[^/]+/posts|posts|videos|reel)/[^/?#]+", path, re.IGNORECASE))
 
 
 def parse_youtube_video_id(url: str) -> str:
@@ -225,7 +228,7 @@ def parse_facebook_post_id(url: str) -> str:
     match = re.search(r"/groups/[^/]+/posts/([^/?#]+)", parsed.path, re.IGNORECASE)
     if match:
         return match.group(1)
-    match = re.search(r"/(?:posts|videos|reel|share/[pv])/([^/?#]+)", parsed.path, re.IGNORECASE)
+    match = re.search(r"/(?:posts|videos|reel|share/(?:p|v|r|reel|video|photo))/([^/?#]+)", parsed.path, re.IGNORECASE)
     if match:
         return match.group(1)
     digest = hashlib.sha1(url.encode("utf-8")).hexdigest()

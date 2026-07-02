@@ -918,7 +918,7 @@ function inferSourceChannelFromUrl(value?: string | null) {
   if (text.includes("shopee.")) {
     return "Shopee";
   }
-  if (text.includes("facebook.") && /(story_fbid=|fbid=|[?&]v=|\/posts\/|\/videos\/|\/reel\/|\/photo\/|photo\.php|\/share\/[pv])/i.test(text)) {
+  if (text.includes("facebook.") && /(story_fbid=|fbid=|[?&]v=|\/posts\/|\/videos\/|\/reel\/|\/photo\/|photo\.php|\/share\/(?:p|v|r|reel|video|photo)(?:\/|$))/i.test(text)) {
     return "Facebook";
   }
   return "";

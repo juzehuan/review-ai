@@ -75,6 +75,7 @@ function parseCrawlerOutput(stdout: string) {
 
 const nestedUrlParamNames = ["url", "u", "q", "target", "redirect", "redirect_url"] as const;
 const supportedCrawlUrlMessage = "目前支持 Shopee 商品链接、YouTube 视频链接、TikTok 视频链接和 Facebook 帖子/图片/Reel 链接。";
+const facebookSharePathPattern = /\/share\/(?:p|v|r|reel|video|photo)(?:\/|$)/i;
 
 function isFacebookHost(host: string) {
   return host === "facebook.com" || host.endsWith(".facebook.com");
@@ -82,10 +83,13 @@ function isFacebookHost(host: string) {
 
 function isFacebookCrawlTarget(pathname: string, searchParams: URLSearchParams) {
   const path = pathname || "/";
-  if (searchParams.has("story_fbid") || searchParams.has("fbid") || searchParams.has("v")) {
-    return /\/(story\.php|permalink\.php|photo(?:\.php)?|watch|posts|videos|reel|share\/[pv])/i.test(path);
+  if (facebookSharePathPattern.test(path)) {
+    return true;
   }
-  return /\/(?:groups\/[^/]+\/posts|posts|videos|reel|share\/[pv])\/[^/?#]+/i.test(path);
+  if (searchParams.has("story_fbid") || searchParams.has("fbid") || searchParams.has("v")) {
+    return /\/(story\.php|permalink\.php|photo(?:\.php)?|watch|posts|videos|reel)/i.test(path);
+  }
+  return /\/(?:groups\/[^/]+\/posts|posts|videos|reel)\/[^/?#]+/i.test(path);
 }
 
 export function coerceCrawlUrl(value: string) {
@@ -150,7 +154,7 @@ export function detectCrawlerPlatform(url: string) {
     if (text.includes("shopee.")) {
       return "shopee";
     }
-    if (text.includes("facebook.") && /(story_fbid=|fbid=|[?&]v=|\/posts\/|\/videos\/|\/reel\/|\/photo\/|photo\.php|\/share\/[pv])/i.test(text)) {
+    if (text.includes("facebook.") && /(story_fbid=|fbid=|[?&]v=|\/posts\/|\/videos\/|\/reel\/|\/photo\/|photo\.php|\/share\/(?:p|v|r|reel|video|photo)(?:\/|$))/i.test(text)) {
       return "facebook-post";
     }
   }

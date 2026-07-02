@@ -501,7 +501,7 @@ export const ANALYSIS_TYPE_PRESETS: Array<{ label: string; value: AnalysisType; 
 
 function isFacebookVideoLikeUrl(value?: string | null) {
   const text = String(value || "").trim().toLowerCase();
-  return Boolean(text && text.includes("facebook.") && /(\/reel\/|\/videos\/|\/watch\/|[?&]v=|\/share\/v)/i.test(text));
+  return Boolean(text && text.includes("facebook.") && /(\/reel\/|\/videos\/|\/watch\/|[?&]v=|\/share\/(?:v|r|reel|video)(?:\/|$))/i.test(text));
 }
 
 export function inferAnalysisType(sourceChannel?: string | null, sourceUrl?: string | null): AnalysisType {
