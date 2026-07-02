@@ -75,16 +75,16 @@
                   size="small"
                   :status="taskRunProgressStatus(record)"
                 />
-                <span class="muted">{{ taskRunMetricSummary(record) }}</span>
+                <span class="muted">{{ tr(taskRunMetricSummary(record)) }}</span>
                 <a-tag v-if="record.latestRunStalled" color="orange" class="task-run-stalled-tag">
-                  疑似无日志 {{ durationLabel(record.latestRunLastActivityAgoSeconds) }}
+                  {{ tr(`疑似无日志 ${durationLabel(record.latestRunLastActivityAgoSeconds)}`) }}
                 </a-tag>
-                <a-tooltip v-if="record.latestRunLastError" :title="record.latestRunLastError">
-                  <span class="task-run-error">最新错误：{{ errorSummary(record.latestRunLastError) }}</span>
+                <a-tooltip v-if="record.latestRunLastError" :title="tr(record.latestRunLastError)">
+                  <span class="task-run-error">{{ tr(`最新错误：${errorSummary(record.latestRunLastError)}`) }}</span>
                 </a-tooltip>
                 <div v-if="taskRunDiagnostic(record)" class="analysis-diagnostic-tip analysis-diagnostic-compact">
                   <ExclamationCircleOutlined />
-                  <span>{{ taskRunDiagnostic(record) }}</span>
+                  <span>{{ tr(taskRunDiagnostic(record)) }}</span>
                 </div>
               </template>
             </div>
@@ -218,16 +218,14 @@
             <template v-else-if="column.key === 'progress'">
               <div class="run-progress-cell">
                 <a-progress :percent="runProgress(record)" size="small" :status="progressStatus(record)" />
-                <span>
-                  已处理 {{ record.processedCount }}/{{ record.reviewCount }}，成功 {{ record.successCount }}，失败 {{ record.failedCount }}
-                </span>
-                <span v-if="runMetricSummary(record)" class="muted">{{ runMetricSummary(record) }}</span>
+                <span>{{ tr(runProgressSummary(record)) }}</span>
+                <span v-if="runMetricSummary(record)" class="muted">{{ tr(runMetricSummary(record)) }}</span>
                 <a-tag v-if="record.stalled" color="orange" class="analysis-stalled-tag">
-                  疑似无日志 {{ durationLabel(record.lastActivityAgoSeconds) }}
+                  {{ tr(`疑似无日志 ${durationLabel(record.lastActivityAgoSeconds)}`) }}
                 </a-tag>
                 <div v-if="analysisRunDiagnostic(record)" class="analysis-diagnostic-tip">
                   <ExclamationCircleOutlined />
-                  <span>{{ analysisRunDiagnostic(record) }}</span>
+                  <span>{{ tr(analysisRunDiagnostic(record)) }}</span>
                 </div>
               </div>
             </template>
@@ -295,7 +293,7 @@
           type="warning"
           show-icon
           class="queue-alert"
-          :message="analysisRunDiagnostic(selectedRun)"
+          :message="tr(analysisRunDiagnostic(selectedRun))"
         />
 
         <a-alert
@@ -307,7 +305,7 @@
           description="如果长时间只有 queued 记录，且没有 Worker picked up analysis run，通常说明 worker 没有运行、Redis 队列未连通，或 worker 还没有消费到该任务。"
         />
 
-        <a-alert v-if="selectedRun?.lastError" type="error" show-icon class="queue-alert" :message="selectedRun.lastError" />
+        <a-alert v-if="selectedRun?.lastError" type="error" show-icon class="queue-alert" :message="tr(selectedRun.lastError)" />
 
         <div class="logs-box">
           <div v-if="!selectedTask" class="logs-empty">选择任务后查看日志</div>
@@ -356,6 +354,7 @@ import type { AnalysisRunDTO, AnalysisRunLogDTO, TaskListItem, TaskStatusCounts,
 import TaskImportModal from "@/components/TaskImportModal.vue";
 import { cancelRun, createRun, deleteTask, fetchRunLogs, fetchRuns, fetchTaskList } from "@/api";
 import { useTaskStore } from "@/composables";
+import { translateStaticText } from "@/static-i18n";
 
 const router = useRouter();
 const route = useRoute();
@@ -369,6 +368,7 @@ const {
   currentUser,
   setSelectedTask
 } = useTaskStore();
+const tr = (value: string) => translateStaticText(value);
 const runs = ref<AnalysisRunDTO[]>([]);
 const logs = ref<AnalysisRunLogDTO[]>([]);
 const selectedRun = ref<AnalysisRunDTO | null>(null);
@@ -760,6 +760,10 @@ function runMetricSummary(run: AnalysisRunDTO) {
     run.lastActivityAt ? `最后日志 ${durationLabel(run.lastActivityAgoSeconds)}前` : ""
   ].filter(Boolean);
   return parts.join(" · ");
+}
+
+function runProgressSummary(run: AnalysisRunDTO) {
+  return `已处理 ${run.processedCount}/${run.reviewCount}，成功 ${run.successCount}，失败 ${run.failedCount}`;
 }
 
 function taskRowClassName(record: TaskListItem) {

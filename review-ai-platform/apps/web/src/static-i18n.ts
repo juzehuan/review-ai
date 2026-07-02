@@ -2019,6 +2019,12 @@ function translatePattern(value: string, locale: Exclude<AppLocale, "zh-CN">): s
       ? `Processed ${processedProgress[1]}/${processedProgress[2]}`
       : `ประมวลผลแล้ว ${processedProgress[1]}/${processedProgress[2]}`;
   }
+  const processedSuccessFailure = value.match(/^已处理\s+([\d,]+)\/([\d,]+)，成功\s+([\d,]+)，失败\s+([\d,]+)$/);
+  if (processedSuccessFailure) {
+    return locale === "en-US"
+      ? `Processed ${processedSuccessFailure[1]}/${processedSuccessFailure[2]}, succeeded ${processedSuccessFailure[3]}, failed ${processedSuccessFailure[4]}`
+      : `ประมวลผลแล้ว ${processedSuccessFailure[1]}/${processedSuccessFailure[2]}, สำเร็จ ${processedSuccessFailure[3]}, ล้มเหลว ${processedSuccessFailure[4]}`;
+  }
   const successCount = value.match(/^成功\s+([\d,]+)$/);
   if (successCount) {
     return locale === "en-US" ? `Succeeded ${successCount[1]}` : `สำเร็จ ${successCount[1]}`;
