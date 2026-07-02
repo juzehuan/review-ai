@@ -2,18 +2,18 @@
   <div class="runs-page">
     <div class="page-toolbar runs-hero">
       <div class="toolbar-title-block">
-        <div class="toolbar-title">分析任务</div>
-        <div class="toolbar-subtitle">管理空间内所有任务，进入评论列表、分析报告，并查看实时分析日志。</div>
+        <div class="toolbar-title">{{ tr("分析任务") }}</div>
+        <div class="toolbar-subtitle">{{ tr("管理空间内所有任务，进入评论列表、分析报告，并查看实时分析日志。") }}</div>
       </div>
       <a-space wrap>
-        <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
+        <a-switch v-model:checked="autoRefresh" :checked-children="tr('自动刷新')" :un-checked-children="tr('手动刷新')" />
         <a-button @click="refreshAll" :loading="loading">
           <template #icon><ReloadOutlined /></template>
-          刷新
+          {{ tr("刷新") }}
         </a-button>
         <a-button type="primary" :disabled="!canWriteWorkspace" @click="showImport = true">
           <template #icon><CloudUploadOutlined /></template>
-          新建分析项目
+          {{ tr("新建分析项目") }}
         </a-button>
       </a-space>
     </div>
@@ -22,7 +22,7 @@
       <div class="panel-head">
         <div>
           <div class="panel-label">Tasks</div>
-          <div class="settings-section-title">全部任务列表</div>
+          <div class="settings-section-title">{{ tr("全部任务列表") }}</div>
         </div>
         <a-space class="task-list-toolbar" wrap>
           <a-segmented
@@ -31,7 +31,7 @@
             :options="taskStatusOptions"
             @change="handleTaskStatusChange"
           />
-          <a-tag>{{ taskListTotal }} 个任务</a-tag>
+          <a-tag>{{ tr(`${taskListTotal} 个任务`) }}</a-tag>
         </a-space>
       </div>
 
@@ -56,19 +56,19 @@
           </template>
           <template v-else-if="column.key === 'workspace'">
             <div class="task-name-cell">
-              <strong>{{ record.workspaceOwnerName || record.workspaceOwnerEmail || "未设置负责人" }}</strong>
+              <strong>{{ record.workspaceOwnerName || record.workspaceOwnerEmail || tr("未设置负责人") }}</strong>
               <span>{{ record.workspaceName || record.workspaceSlug || record.workspaceId || "-" }}</span>
             </div>
           </template>
           <template v-else-if="column.key === 'taskStatus'">
-            <a-tag :color="taskStatusColor(record.status)">{{ taskStatusLabel(record.status) }}</a-tag>
+            <a-tag :color="taskStatusColor(record.status)">{{ tr(taskStatusLabel(record.status)) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'analysisType'">
-            <a-tag>{{ analysisTypeLabel(record.analysisType) }}</a-tag>
+            <a-tag>{{ tr(analysisTypeLabel(record.analysisType)) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'analysisStatus'">
             <div class="task-analysis-cell">
-              <a-tag :color="runStatusColor(record.latestRunStatus)">{{ runStatusLabel(record.latestRunStatus) }}</a-tag>
+              <a-tag :color="runStatusColor(record.latestRunStatus)">{{ tr(runStatusLabel(record.latestRunStatus)) }}</a-tag>
               <template v-if="record.latestRunStatus">
                 <a-progress
                   :percent="record.latestRunProgressPercent"
@@ -96,35 +96,35 @@
             <a-space class="task-actions">
               <a-button size="small" type="primary" ghost @click.stop="openReviews(record)">
                 <template #icon><TableOutlined /></template>
-                评论列表
+                {{ tr("评论列表") }}
               </a-button>
               <a-button size="small" @click.stop="openReport(record)">
                 <template #icon><FileTextOutlined /></template>
-                分析报告
+                {{ tr("分析报告") }}
               </a-button>
               <a-dropdown>
                 <a-button size="small" @click.stop>
-                  更多
+                  {{ tr("更多") }}
                   <template #icon><MoreOutlined /></template>
                 </a-button>
                 <template #overlay>
                   <a-menu class="task-action-menu" @click.stop>
                     <a-menu-item key="logs" @click="openLogs(record)">
                       <FileSearchOutlined />
-                      分析日志
+                      {{ tr("分析日志") }}
                     </a-menu-item>
                     <a-menu-item key="actions" @click="openActions(record)">
                       <CheckSquareOutlined />
-                      行动项
+                      {{ tr("行动项") }}
                     </a-menu-item>
                     <a-menu-item key="append" :disabled="!canWriteWorkspace" @click="appendReviews(record)">
                       <FileAddOutlined />
-                      追加评论
+                      {{ tr("追加评论") }}
                     </a-menu-item>
                     <a-menu-divider />
                     <a-menu-item key="delete" danger :disabled="!canDeleteTask(record)" @click="confirmRemoveTask(record)">
                       <DeleteOutlined />
-                      {{ deletingTaskId === record.id ? "删除中" : "删除" }}
+                      {{ deletingTaskId === record.id ? tr("删除中") : tr("删除") }}
                     </a-menu-item>
                   </a-menu>
                 </template>
@@ -139,30 +139,30 @@
       <div class="analysis-health-head">
         <div>
           <div class="panel-label">AI Queue Health</div>
-          <div class="settings-section-title">AI 分析运行观察</div>
+          <div class="settings-section-title">{{ tr("AI 分析运行观察") }}</div>
         </div>
-        <a-tag :color="analysisHealthStatusColor">{{ analysisHealthStatusLabel }}</a-tag>
+        <a-tag :color="analysisHealthStatusColor">{{ tr(analysisHealthStatusLabel) }}</a-tag>
       </div>
       <div class="analysis-health-metrics">
         <div class="analysis-health-metric">
-          <span>疑似无日志</span>
+          <span>{{ tr("疑似无日志") }}</span>
           <strong>{{ stalledRunCount }}</strong>
-          <small>{{ stalledRunSummary }}</small>
+          <small>{{ tr(stalledRunSummary) }}</small>
         </div>
         <div class="analysis-health-metric">
-          <span>活跃分析量</span>
+          <span>{{ tr("活跃分析量") }}</span>
           <strong>{{ activeRunProgressText }}</strong>
-          <small>{{ activeRunProgressNote }}</small>
+          <small>{{ tr(activeRunProgressNote) }}</small>
         </div>
         <div class="analysis-health-metric">
-          <span>失败占比</span>
+          <span>{{ tr("失败占比") }}</span>
           <strong>{{ activeFailureRateText }}</strong>
-          <small>{{ activeFailureRateNote }}</small>
+          <small>{{ tr(activeFailureRateNote) }}</small>
         </div>
         <div class="analysis-health-metric">
-          <span>最近日志</span>
-          <strong>{{ latestRunActivityText }}</strong>
-          <small>{{ latestRunActivityNote }}</small>
+          <span>{{ tr("最近日志") }}</span>
+          <strong>{{ tr(latestRunActivityText) }}</strong>
+          <small>{{ latestActivityRun ? latestRunActivityNote : tr(latestRunActivityNote) }}</small>
         </div>
       </div>
     </div>
@@ -172,7 +172,7 @@
         <div class="panel-head">
           <div>
             <div class="panel-label">Runs</div>
-            <div class="settings-section-title">{{ selectedTask?.name || "选择任务后查看批次" }}</div>
+            <div class="settings-section-title">{{ selectedTask?.name || tr("选择任务后查看批次") }}</div>
           </div>
           <a-space wrap>
             <a-button
@@ -182,11 +182,11 @@
               :loading="starting"
             >
               <template #icon><RobotOutlined /></template>
-              新建分析
+              {{ tr("新建分析") }}
             </a-button>
             <a-button v-if="selectedRun && canCancel(selectedRun)" danger @click="cancelSelectedRun">
               <template #icon><StopOutlined /></template>
-              停止当前任务
+              {{ tr("停止当前任务") }}
             </a-button>
             <a-button
               v-if="selectedRun && canRetry(selectedRun)"
@@ -194,12 +194,12 @@
               @click="retryOne(selectedRun)"
             >
               <template #icon><ReloadOutlined /></template>
-              重试当前批次
+              {{ tr("重试当前批次") }}
             </a-button>
           </a-space>
         </div>
 
-        <a-empty v-if="!selectedTask" description="请选择上方任务查看分析批次" />
+        <a-empty v-if="!selectedTask" :description="tr('请选择上方任务查看分析批次')" />
         <a-table
           v-else
           row-key="id"
@@ -213,7 +213,7 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
-              <a-tag :color="runStatusColor(record.status)">{{ runStatusLabel(record.status) }}</a-tag>
+              <a-tag :color="runStatusColor(record.status)">{{ tr(runStatusLabel(record.status)) }}</a-tag>
             </template>
             <template v-else-if="column.key === 'progress'">
               <div class="run-progress-cell">
@@ -235,16 +235,16 @@
             </template>
             <template v-else-if="column.key === 'action'">
               <a-space>
-                <a-button size="small" @click.stop="selectRun(record)">日志</a-button>
+                <a-button size="small" @click.stop="selectRun(record)">{{ tr("日志") }}</a-button>
                 <a-button
                   v-if="canRetry(record)"
                   size="small"
                   :loading="retryingRunId === record.id"
                   @click.stop="retryOne(record)"
                 >
-                  重试
+                  {{ tr("重试") }}
                 </a-button>
-                <a-button v-if="canCancel(record)" size="small" danger @click.stop="cancelOne(record)">停止</a-button>
+                <a-button v-if="canCancel(record)" size="small" danger @click.stop="cancelOne(record)">{{ tr("停止") }}</a-button>
               </a-space>
             </template>
           </template>
@@ -254,37 +254,37 @@
       <section class="run-log-panel">
         <div class="log-panel-head">
           <div>
-            <div class="log-title">实时日志</div>
-            <div class="muted">{{ selectedTask ? selectedTask.name : "未选择任务" }}</div>
+            <div class="log-title">{{ tr("实时日志") }}</div>
+            <div class="muted">{{ selectedTask ? selectedTask.name : tr("未选择任务") }}</div>
           </div>
           <div class="log-head-actions">
             <a-segmented v-model:value="logLevelFilter" size="small" :options="logLevelOptions" />
             <a-tag v-if="selectedRun" :color="runStatusColor(selectedRun.status)">
-              {{ runStatusLabel(selectedRun.status) }}
+              {{ tr(runStatusLabel(selectedRun.status)) }}
             </a-tag>
           </div>
         </div>
 
         <div v-if="selectedRun" class="run-summary">
           <div>
-            <span class="summary-label">模型</span>
+            <span class="summary-label">{{ tr("模型") }}</span>
             <strong>{{ selectedRun.provider }} / {{ selectedRun.modelName }}</strong>
           </div>
           <div>
-            <span class="summary-label">进度</span>
+            <span class="summary-label">{{ tr("进度") }}</span>
             <strong>{{ selectedRun.processedCount }}/{{ selectedRun.reviewCount }}</strong>
           </div>
           <div v-if="selectedRun.queuePosition !== null">
-            <span class="summary-label">排队</span>
-            <strong>第 {{ selectedRun.queuePosition }} 位</strong>
+            <span class="summary-label">{{ tr("排队") }}</span>
+            <strong>{{ tr(`排队第 ${selectedRun.queuePosition} 位`) }}</strong>
           </div>
           <div>
-            <span class="summary-label">失败</span>
+            <span class="summary-label">{{ tr("失败") }}</span>
             <strong>{{ selectedRun.failedCount }} · {{ selectedRun.failureRatePercent }}%</strong>
           </div>
           <div>
-            <span class="summary-label">速度</span>
-            <strong>{{ selectedRun.throughputPerMinute ?? "-" }}/分钟</strong>
+            <span class="summary-label">{{ tr("速度") }}</span>
+            <strong>{{ selectedRun.throughputPerMinute === null ? "-" : tr(`${selectedRun.throughputPerMinute}/分钟`) }}</strong>
           </div>
         </div>
 
@@ -301,17 +301,17 @@
           type="warning"
           show-icon
           class="queue-alert"
-          message="任务仍在排队"
-          description="如果长时间只有 queued 记录，且没有 Worker picked up analysis run，通常说明 worker 没有运行、Redis 队列未连通，或 worker 还没有消费到该任务。"
+          :message="tr('任务仍在排队')"
+          :description="tr('如果长时间只有 queued 记录，且没有 Worker picked up analysis run，通常说明 worker 没有运行、Redis 队列未连通，或 worker 还没有消费到该任务。')"
         />
 
         <a-alert v-if="selectedRun?.lastError" type="error" show-icon class="queue-alert" :message="tr(selectedRun.lastError)" />
 
         <div class="logs-box">
-          <div v-if="!selectedTask" class="logs-empty">选择任务后查看日志</div>
-          <div v-else-if="!selectedRun" class="logs-empty">该任务暂无分析批次</div>
-          <div v-else-if="!logs.length" class="logs-empty">暂无日志，等待 worker 写入</div>
-          <div v-else-if="!filteredLogs.length" class="logs-empty">当前筛选下暂无日志</div>
+          <div v-if="!selectedTask" class="logs-empty">{{ tr("选择任务后查看日志") }}</div>
+          <div v-else-if="!selectedRun" class="logs-empty">{{ tr("该任务暂无分析批次") }}</div>
+          <div v-else-if="!logs.length" class="logs-empty">{{ tr("暂无日志，等待 worker 写入") }}</div>
+          <div v-else-if="!filteredLogs.length" class="logs-empty">{{ tr("当前筛选下暂无日志") }}</div>
           <div v-for="log in filteredLogs" :key="log.id" class="log-line" :class="`log-${log.level}`">
             <span class="log-time">{{ formatTime(log.createdAt) }}</span>
             <a-tag :color="logColor(log.level)" class="log-level">{{ log.level }}</a-tag>
@@ -426,34 +426,34 @@ const canWriteWorkspace = computed(() => {
 });
 
 const taskColumns = computed(() => [
-  { title: "任务", key: "task", width: 260 },
-  ...(currentUser.value?.isSuperAdmin ? [{ title: "所属用户/空间", key: "workspace", width: 210 }] : []),
-  { title: "来源", dataIndex: "sourceChannel", key: "sourceChannel", width: 110 },
-  { title: "分析类型", key: "analysisType", width: 120 },
-  { title: "导入状态", key: "taskStatus", width: 120 },
-  { title: "分析状态", key: "analysisStatus", width: 260 },
-  { title: "创建时间", key: "createdAt", width: 180 },
-  { title: "操作", key: "actions", width: 280 }
+  { title: tr("任务"), key: "task", width: 260 },
+  ...(currentUser.value?.isSuperAdmin ? [{ title: tr("所属用户/空间"), key: "workspace", width: 210 }] : []),
+  { title: tr("来源"), dataIndex: "sourceChannel", key: "sourceChannel", width: 110 },
+  { title: tr("分析类型"), key: "analysisType", width: 120 },
+  { title: tr("导入状态"), key: "taskStatus", width: 120 },
+  { title: tr("分析状态"), key: "analysisStatus", width: 260 },
+  { title: tr("创建时间"), key: "createdAt", width: 180 },
+  { title: tr("操作"), key: "actions", width: 280 }
 ]);
 
-const runColumns = [
-  { title: "状态", key: "status", width: 110 },
-  { title: "模型", dataIndex: "modelName", key: "modelName", width: 180 },
-  { title: "服务商", dataIndex: "provider", key: "provider", width: 110 },
-  { title: "进度", key: "progress", width: 320 },
-  { title: "开始/结束", key: "time", width: 180 },
-  { title: "操作", key: "action", width: 180 }
-];
+const runColumns = computed(() => [
+  { title: tr("状态"), key: "status", width: 110 },
+  { title: tr("模型"), dataIndex: "modelName", key: "modelName", width: 180 },
+  { title: tr("服务商"), dataIndex: "provider", key: "provider", width: 110 },
+  { title: tr("进度"), key: "progress", width: 320 },
+  { title: tr("开始/结束"), key: "time", width: 180 },
+  { title: tr("操作"), key: "action", width: 180 }
+]);
 
 const taskStatusOptions = computed(() => {
   const counts = taskStatusCounts.value;
   return [
-    { label: `全部 ${formatCount(counts.all)}`, value: "all" },
-    { label: `草稿 ${formatCount(counts.draft)}`, value: "draft" },
-    { label: `已导入 ${formatCount(counts.imported)}`, value: "imported" },
-    { label: `分析中 ${formatCount(counts.analyzing)}`, value: "analyzing" },
-    { label: `已完成 ${formatCount(counts.completed)}`, value: "completed" },
-    { label: `失败 ${formatCount(counts.failed)}`, value: "failed" }
+    { label: `${tr("全部")} ${formatCount(counts.all)}`, value: "all" },
+    { label: `${tr("草稿")} ${formatCount(counts.draft)}`, value: "draft" },
+    { label: `${tr("已导入")} ${formatCount(counts.imported)}`, value: "imported" },
+    { label: `${tr("分析中")} ${formatCount(counts.analyzing)}`, value: "analyzing" },
+    { label: `${tr("已完成")} ${formatCount(counts.completed)}`, value: "completed" },
+    { label: `${tr("失败")} ${formatCount(counts.failed)}`, value: "failed" }
   ];
 });
 
@@ -463,14 +463,14 @@ const taskPagination = computed(() => ({
   total: taskListTotal.value,
   showSizeChanger: true,
   pageSizeOptions: ["10", "20", "50", "100"],
-  showTotal: (total: number) => `共 ${formatCount(total)} 个任务`
+  showTotal: (total: number) => tr(`共 ${formatCount(total)} 个任务`)
 }));
 
-const logLevelOptions = [
+const logLevelOptions = computed(() => [
   { label: "全部", value: "all" },
   { label: "警告", value: "warn" },
   { label: "错误", value: "error" }
-];
+].map((item) => ({ ...item, label: tr(item.label) })));
 
 const hasWorkerLog = computed(() => logs.value.some((log) => log.message.includes("Worker picked up")));
 const filteredLogs = computed(() =>
@@ -831,7 +831,7 @@ async function removeTask(task: TaskListItem) {
   deletingTaskId.value = task.id;
   try {
     await deleteTask(task.id);
-    message.success("分析任务已删除");
+    message.success(tr("分析任务已删除"));
     if (selectedTask.value?.id === task.id) {
       setSelectedTask("");
       selectedRun.value = null;
@@ -857,10 +857,10 @@ function confirmRemoveTask(task: TaskListItem) {
     return;
   }
   Modal.confirm({
-    title: "删除分析任务",
-    content: "评论、分析结果、报告分享和行动项都会被删除。",
-    okText: "删除",
-    cancelText: "取消",
+    title: tr("删除分析任务"),
+    content: tr("评论、分析结果、报告分享和行动项都会被删除。"),
+    okText: tr("删除"),
+    cancelText: tr("取消"),
     okButtonProps: { danger: true },
     async onOk() {
       await removeTask(task);
@@ -984,7 +984,7 @@ async function startAnalysis() {
   starting.value = true;
   try {
     const run = await createRun(selectedTask.value.id);
-    message.success("分析任务已加入队列");
+    message.success(tr("分析任务已加入队列"));
     await loadTaskPage({ targetTaskId: selectedTask.value.id });
     await loadRuns();
     await selectRun(run);
@@ -1000,7 +1000,7 @@ async function retryOne(run: AnalysisRunDTO) {
   retryingRunId.value = run.id;
   try {
     const nextRun = await createRun(selectedTask.value.id);
-    message.success("分析任务已重新加入队列");
+    message.success(tr("分析任务已重新加入队列"));
     await loadTaskPage({ targetTaskId: selectedTask.value.id });
     await loadRuns();
     await selectRun(nextRun);
@@ -1014,7 +1014,7 @@ async function cancelOne(run: AnalysisRunDTO) {
     return;
   }
   await cancelRun(selectedTask.value.id, run.id);
-  message.success("已发送停止请求");
+  message.success(tr("已发送停止请求"));
   await refreshAll();
 }
 
