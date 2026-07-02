@@ -240,8 +240,8 @@
               </template>
               <template v-else-if="column.key === 'diagnosis'">
                 <div class="stalled-diagnosis-cell">
-                  <a-tag color="red">{{ record.diagnosis }}</a-tag>
-                  <div class="member-email">{{ record.nextAction }}</div>
+                  <a-tag color="red">{{ tr(record.diagnosis) }}</a-tag>
+                  <div class="member-email">{{ tr(record.nextAction) }}</div>
                 </div>
               </template>
               <template v-else-if="column.key === 'activity'">
@@ -323,11 +323,11 @@
               </template>
               <template v-else-if="column.key === 'diagnosis'">
                 <div class="stalled-diagnosis-cell">
-                  <a-tag :color="stalledDiagnosisColor(record)">{{ record.diagnosis }}</a-tag>
-                  <div class="member-email">{{ record.nextAction }}</div>
-                  <div v-if="record.metricSummary" class="member-email">{{ record.metricSummary }}</div>
-                  <a-tooltip v-if="record.lastError" :title="record.lastError">
-                    <div class="member-email error-summary">最近错误：{{ errorSummary(record.lastError) }}</div>
+                  <a-tag :color="stalledDiagnosisColor(record)">{{ tr(record.diagnosis) }}</a-tag>
+                  <div class="member-email">{{ tr(record.nextAction) }}</div>
+                  <div v-if="record.metricSummary" class="member-email">{{ tr(record.metricSummary) }}</div>
+                  <a-tooltip v-if="record.lastError" :title="tr(record.lastError)">
+                    <div class="member-email error-summary">{{ tr(`最近错误：${errorSummary(record.lastError)}`) }}</div>
                   </a-tooltip>
                 </div>
               </template>
@@ -391,15 +391,15 @@
                 <div class="member-email">{{ record.modelName || "-" }}</div>
               </template>
               <template v-else-if="column.key === 'error'">
-                <a-tooltip :title="record.error || '-'">
-                  <span class="muted">{{ errorSummary(record.error) }}</span>
+                <a-tooltip :title="tr(record.error || '-')">
+                  <span class="muted">{{ tr(errorSummary(record.error)) }}</span>
                 </a-tooltip>
               </template>
               <template v-else-if="column.key === 'diagnosis'">
                 <div class="stalled-diagnosis-cell">
-                  <a-tag :color="record.kind === 'crawl' ? 'orange' : 'purple'">{{ record.diagnosis || "待复核" }}</a-tag>
-                  <div v-if="record.metricSummary" class="member-email">{{ record.metricSummary }}</div>
-                  <div v-if="record.nextAction" class="member-email">{{ record.nextAction }}</div>
+                  <a-tag :color="record.kind === 'crawl' ? 'orange' : 'purple'">{{ tr(record.diagnosis || "待复核") }}</a-tag>
+                  <div v-if="record.metricSummary" class="member-email">{{ tr(record.metricSummary) }}</div>
+                  <div v-if="record.nextAction" class="member-email">{{ tr(record.nextAction) }}</div>
                 </div>
               </template>
               <template v-else-if="column.key === 'time'">
@@ -603,6 +603,7 @@ import {
   updateAdminUser
 } from "@/api";
 import { useTaskStore } from "@/composables";
+import { translateStaticText } from "@/static-i18n";
 import { copyTextToClipboard } from "@/utils/clipboard";
 
 const loading = ref(false);
@@ -623,6 +624,7 @@ const queueRetryingId = ref("");
 const queueControlName = ref("");
 const quotaDrafts = reactive<Record<string, { monthlyReviewLimit: number; monthlyRunLimit: number }>>({});
 const { currentUser } = useTaskStore();
+const tr = (value: string) => translateStaticText(value);
 let queueHealthTimer: ReturnType<typeof setInterval> | null = null;
 let queueHealthRefreshing = false;
 
