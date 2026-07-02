@@ -14,7 +14,7 @@
     <main v-else-if="report" class="shared-report">
       <section class="shared-hero">
         <div>
-          <div class="shared-kicker">ReviewIQ Shared Report</div>
+          <div class="shared-kicker">ReviewIQ {{ tr("共享报告") }}</div>
           <h1>{{ report.share.title || report.task.productName || report.task.name }}</h1>
           <p>{{ report.task.name }} · {{ report.task.sourceChannel }} · {{ tr(analysisTypeLabel(report.task.analysisType)) }}</p>
         </div>
@@ -28,14 +28,14 @@
       </section>
 
       <section v-if="report.dashboard.aiSummary" class="shared-summary">
-        <div class="panel-label">AI Summary</div>
+        <div class="panel-label">{{ tr("AI 总结") }}</div>
         <div>{{ report.dashboard.aiSummary }}</div>
       </section>
 
       <section v-if="report.dashboard.qualityAlerts?.length" class="quality-alerts-panel">
         <div class="settings-section-head">
           <div>
-            <div class="panel-label">Quality Check</div>
+            <div class="panel-label">{{ tr("质量检查") }}</div>
             <div class="settings-section-title">{{ tr("分析质量提醒") }}</div>
           </div>
         </div>
@@ -95,7 +95,7 @@
       <section v-if="report.dashboard.dynamicContentTags?.length" class="dynamic-tags-panel">
         <div class="settings-section-head">
           <div>
-            <div class="panel-label">Dynamic Topics</div>
+            <div class="panel-label">{{ tr("动态话题") }}</div>
             <div class="settings-section-title">{{ tr("动态内容标签") }}</div>
           </div>
         </div>
@@ -114,7 +114,7 @@
       <section v-if="report.dashboard.duplicateProfile?.duplicateCommentCount" class="duplicate-noise-panel">
         <div class="settings-section-head">
           <div>
-            <div class="panel-label">Noise Control</div>
+            <div class="panel-label">{{ tr("噪音控制") }}</div>
             <div class="settings-section-title">{{ tr("重复/相似评论聚合") }}</div>
           </div>
         </div>
@@ -146,7 +146,7 @@
       <section v-if="report.dashboard.insightClusters?.length" class="insight-clusters-panel">
         <div class="settings-section-head">
           <div>
-            <div class="panel-label">Opinion Clusters</div>
+            <div class="panel-label">{{ tr("观点聚类") }}</div>
             <div class="settings-section-title">{{ tr("观点聚类与证据评论") }}</div>
           </div>
         </div>
@@ -175,7 +175,7 @@
       <section v-if="report.dashboard.productInsights" class="shared-insights">
         <div class="settings-section-head">
           <div>
-            <div class="panel-label">Strategic Insights</div>
+            <div class="panel-label">{{ tr("策略洞察") }}</div>
             <div class="settings-section-title">{{ tr(insightReportTitle) }}</div>
           </div>
         </div>
@@ -190,7 +190,7 @@
       <section v-if="report.dashboard.issues.length" class="shared-evidence">
         <div class="settings-section-head">
           <div>
-            <div class="panel-label">Evidence</div>
+            <div class="panel-label">{{ tr("证据") }}</div>
             <div class="settings-section-title">{{ tr("主要问题证据") }}</div>
           </div>
         </div>
@@ -273,6 +273,16 @@ const productInsightSections = computed(() => {
       { key: "advantages", title: tr("内容优势"), content: insights.advantages },
       { key: "improvements", title: tr("待优化点"), content: insights.improvements },
       { key: "expectations", title: tr("观众期待"), content: insights.expectations }
+    ].filter((item) => item.content);
+  }
+  if (type === "tweet") {
+    return [
+      { key: "userPersonas", title: tr("参与人群"), content: insights.userPersonas },
+      { key: "usageScenarios", title: tr("讨论场景"), content: insights.usageScenarios },
+      { key: "sellingPoints", title: tr("支持/扩散理由"), content: insights.sellingPoints },
+      { key: "advantages", title: tr("传播优势"), content: insights.advantages },
+      { key: "improvements", title: tr("风险与误解"), content: insights.improvements },
+      { key: "expectations", title: tr("回应期待"), content: insights.expectations }
     ].filter((item) => item.content);
   }
   return [
